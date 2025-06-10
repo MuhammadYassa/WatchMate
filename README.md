@@ -24,20 +24,14 @@
 - MySQL relational database for data persistence  
 - Hibernate (JPA) for ORM and database interactions
 
-### Frontend
-- Modern JavaScript framework/library (React)  
-- Responsive design for desktop and mobile devices  
-- Integration with backend API for seamless data flow  
-
 ---
 
 ## Getting Started
 
 ### Prerequisites
-- Java 17 or later  
-- Node.js and npm (for frontend build and package management)  
+- Java 17 or later    
 - MySQL installed and running locally or accessible remotely  
-- Maven or Gradle for backend build  
+- Maven for backend build  
 
 ### Setup Instructions
 
@@ -45,13 +39,13 @@
    `git clone https://github.com/YourUsername/WatchMate.git`
 
 2. **Configure backend:**  
-   - Edit the `application-template.properties` file with your MySQL database credentials and JWT secret key and rename to 'application.properties'. 
+   - Edit the `application-template.properties` file with your MySQL database credentials and JWT secret key and rename to `application.properties`. 
    - Build and run the backend server:  
      `./mvnw spring-boot:run`  
 
-3. **Setup frontend:**  
+3. **Setup frontend**  
 
-4. **Access the application:**  
+4. **Access the application**  
 
 ---
 
