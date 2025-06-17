@@ -8,6 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
@@ -32,6 +33,7 @@ public class Media {
 
     private String title;
 
+    @Lob
     private String overview;
 
     private String posterPath;
@@ -39,6 +41,8 @@ public class Media {
     private Date releaseDate;
 
     private MediaType type;
+    
+    private Double rating;
 
     @ManyToMany
     @JoinTable(

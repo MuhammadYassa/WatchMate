@@ -3,6 +3,7 @@ package com.project.watchmate.Models;
 import java.util.List;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -27,10 +28,12 @@ public class Users {
     @GeneratedValue
     private Integer id;
 
+    @Column(unique = true)
     private String username;
 
     private String password;
     
+    @Column(unique = true)
     private String email;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)

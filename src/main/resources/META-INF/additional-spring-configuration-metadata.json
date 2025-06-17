@@ -1,5 +1,12 @@
-{"properties": [{
-  "name": "jwt.secret",
-  "type": "java.lang.String",
-  "description": "Secret Key for JWT Authentication'"
-}]}
+{"properties": [
+  {
+    "name": "jwt.secret",
+    "type": "java.lang.String",
+    "description": "Secret Key for JWT Authentication'"
+  },
+  {
+    "name": "tmdb.api.token",
+    "type": "java.lang.String",
+    "description": "A description for 'tmdb.api.token'"
+  }
+]}
