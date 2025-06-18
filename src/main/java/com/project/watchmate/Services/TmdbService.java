@@ -28,12 +28,13 @@ public class TmdbService {
 
     private final PopularMediaRepository  popularMediaRepository;
 
-    @Scheduled(cron = "0 0 2 * * *")
+    @Scheduled(cron = "0 47 23 * * *")
     public void popularMedia(){
         fetchAndStorePopularMedia();
     }
 
     public void fetchAndStorePopularMedia(){
+        popularMediaRepository.deleteAll();
         fetchAndStorePopular("tv", MediaType.TV_SHOW);
         fetchAndStorePopular("movie", MediaType.MOVIE);
     }
@@ -62,8 +63,6 @@ public class TmdbService {
             .build()).toList();
 
         List<Media> media = saveAndUpdateMedia(mediaList);
-
-        popularMediaRepository.deleteAll();
 
         List<PopularMedia> popularList = new ArrayList<>();
 

@@ -5,16 +5,17 @@ import org.springframework.web.bind.annotation.RestController;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Services.UserService;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 
 @RestController
+@RequiredArgsConstructor
 public class UserController {
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
     
     @PostMapping("/register")
     public void registerUser(@RequestBody Users user) {
