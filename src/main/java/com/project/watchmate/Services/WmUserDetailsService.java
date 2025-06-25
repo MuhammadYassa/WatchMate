@@ -1,6 +1,7 @@
 package com.project.watchmate.Services;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -23,6 +24,10 @@ public class WmUserDetailsService implements UserDetailsService{
         if (user == null){
             System.out.println("User Not Found");
             throw new UsernameNotFoundException("Username not found");
+        }
+
+        if (!user.isEmailVerified()) {
+            throw new DisabledException("Email not verified");
         }
 
         return new UserPrincipal(user);

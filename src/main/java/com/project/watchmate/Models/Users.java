@@ -37,6 +37,9 @@ public class Users {
     @Column(unique = true, nullable = false)
     private String email;
 
+    @Column(nullable = false)
+    private boolean emailVerified;
+    
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     private List<WatchListItem> watchListItem;
 
