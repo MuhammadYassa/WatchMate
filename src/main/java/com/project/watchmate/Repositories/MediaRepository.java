@@ -4,6 +4,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import com.project.watchmate.Models.Media;
+import com.project.watchmate.Models.MediaType;
+
 import java.util.Optional;
 
 
@@ -11,5 +13,7 @@ import java.util.Optional;
 public interface MediaRepository extends JpaRepository<Media, Long>{
 
     Optional<Media> findByTmdbId(Long tmdbId);
+
+    Optional<Media> findByTmdbIdAndType(Long tmdbId, MediaType type);
 
 }

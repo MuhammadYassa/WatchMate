@@ -57,7 +57,7 @@ public class TmdbService {
             .title(item.getTitle())
             .overview(item.getOverview())
             .posterPath(item.getPosterPath())
-            .releaseDate(TmdbMovieDTO.parseDate(item.getReleaseDate()))
+            .releaseDate(TmdbMovieDTO.parseDate(item.getReleaseDate()).orElse(null))
             .rating(item.getVoteAverage())
             .type(mediaType)
             .build()).toList();
@@ -96,4 +96,25 @@ public class TmdbService {
         return savedMedia;
     }
 
+    public Media fetchMediaByTmdbId(Long tmdbId, MediaType type){
+        String typePath = (type == MediaType.MOVIE) ? "movie" : "tv";
+        String uri = "/" + typePath + "/" + tmdbId + "?language=en-US";
+
+        TmdbMovieDTO tmdbMedia = tmdbWebClient.get()
+        .uri(uri)
+        .retrieve()
+        .bodyToMono(TmdbMovieDTO.class)
+        .blockOptional()
+        .orElse(null); 
+
+        return Media.builder()
+            .tmdbId(tmdbMedia.getId())
+            .title(tmdbMedia.getTitle())
+            .overview(tmdbMedia.getOverview())
+            .posterPath(tmdbMedia.getPosterPath())
+            .releaseDate(TmdbMovieDTO.parseDate(tmdbMedia.getReleaseDate()).orElse(null))
+            .rating(tmdbMedia.getVoteAverage())
+            .type(type)
+            .build();
+    }
 }

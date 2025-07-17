@@ -3,14 +3,13 @@ package com.project.watchmate.Models;
 import java.util.ArrayList;
 import java.util.List;
 
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -31,11 +30,17 @@ public class WatchList {
 
     private String name;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
     private Users user;
 
     @Builder.Default
-    @OneToMany(mappedBy = "watchlist", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<WatchListMedia> watchListMedia = new ArrayList<>();
+    @ManyToMany
+    @JoinTable(
+        name = "watchlist_media",
+        joinColumns = @JoinColumn(name = "watchlist_id"),
+        inverseJoinColumns = @JoinColumn(name = "media_id")
+    )
+    private List<Media> media = new ArrayList<>();
+
 }

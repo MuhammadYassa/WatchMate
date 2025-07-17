@@ -2,6 +2,7 @@ package com.project.watchmate.Models;
 
 import java.util.List;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -22,8 +23,11 @@ public class Genre {
     @GeneratedValue
     private Long id;
 
+    @Column(name = "tmdb_id", unique = true)
+    private Long tmdbId;
+
     private String genre;
 
-    @ManyToMany(mappedBy = "genres")
+    @ManyToMany(mappedBy = "genre")
     private List<Media> media;
 }

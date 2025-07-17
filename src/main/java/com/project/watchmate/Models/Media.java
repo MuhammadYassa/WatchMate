@@ -1,7 +1,7 @@
 package com.project.watchmate.Models;
 
 import java.util.ArrayList;
-import java.util.Date;
+import java.time.LocalDate;
 import java.util.List;
 
 import jakarta.persistence.CascadeType;
@@ -44,7 +44,7 @@ public class Media {
 
     private String posterPath;
 
-    private Date releaseDate;
+    private LocalDate releaseDate;
 
     @Enumerated(EnumType.STRING)
     private MediaType type;
@@ -53,7 +53,11 @@ public class Media {
 
     @Builder.Default
     @OneToMany(mappedBy = "media", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<WatchListMedia> watchListMedia = new ArrayList<>();
+    private List<UserMediaStatus> userStatuses = new ArrayList<>();
+
+    @Builder.Default
+    @ManyToMany(mappedBy = "media")
+    private List<WatchList> watchLists = new ArrayList<>();
 
     @ManyToMany
     @JoinTable(

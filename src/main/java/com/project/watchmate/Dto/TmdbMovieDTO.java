@@ -1,8 +1,9 @@
 package com.project.watchmate.Dto;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.Optional;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -15,7 +16,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class TmdbMovieDTO {
 
-    private int id;
+    private Long id;
 
     private String title;
 
@@ -47,15 +48,16 @@ public class TmdbMovieDTO {
         }
     }
 
-    public static Date parseDate(String dateString){
+    public static Optional<LocalDate> parseDate(String dateString){
         if (dateString == null || dateString.isBlank()){
             return null;
         }
         try{
-            return new SimpleDateFormat("yyyy-MM-dd").parse(dateString);
+            DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            return Optional.of(LocalDate.parse(dateString, dateTimeFormatter));
         }
-        catch (ParseException e) {
-            return null;
+        catch (DateTimeParseException e) {
+            return Optional.empty();
         }
     }
 }

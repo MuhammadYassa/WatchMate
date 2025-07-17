@@ -7,12 +7,14 @@ import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.WatchStatus;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 public class MediaDetailsDTO {
     
     private Long tmdbId;

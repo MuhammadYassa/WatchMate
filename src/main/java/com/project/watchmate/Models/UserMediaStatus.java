@@ -1,11 +1,8 @@
 package com.project.watchmate.Models;
 
-import java.time.LocalDateTime;
-
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -20,25 +17,23 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table (name = "watchlist_media")
+@Table (name = "user_media_status")
 @Builder
-public class WatchListMedia {
-
+public class UserMediaStatus {
+    
     @Id
     @GeneratedValue
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "watchlist_id")
-    private WatchList watchlist;
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    private Users user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "media_id")
+    @ManyToOne
+    @JoinColumn(name = "media_id", nullable = false)
     private Media media;
 
     @Enumerated(EnumType.STRING)
-    private WatchStatus watchStatus;
-
-    private LocalDateTime addedAt;
+    private WatchStatus status;
 
 }
