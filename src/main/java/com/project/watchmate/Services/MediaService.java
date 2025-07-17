@@ -50,7 +50,7 @@ public class MediaService {
         .postedAt(r.getDatePosted())
         .build()).toList();
 
-        List<String> genreNames = media.getGenres().stream().map(Genre::getGenre).toList();
+        List<String> genreNames = media.getGenres().stream().map(Genre::getName).toList();
 
         boolean isFavourited = user.getFavorites().contains(media);
 

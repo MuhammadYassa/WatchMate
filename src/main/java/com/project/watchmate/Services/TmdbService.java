@@ -1,20 +1,28 @@
 package com.project.watchmate.Services;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import com.project.watchmate.Dto.TmdbGenreDTO;
+import com.project.watchmate.Dto.TmdbGenreResponseDTO;
 import com.project.watchmate.Dto.TmdbMovieDTO;
 import com.project.watchmate.Dto.TmdbResponseDTO;
+import com.project.watchmate.Models.Genre;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.PopularMedia;
+import com.project.watchmate.Repositories.GenreRepository;
 import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.PopularMediaRepository;
 
+import io.jsonwebtoken.lang.Collections;
+import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
@@ -27,6 +35,49 @@ public class TmdbService {
     private final MediaRepository mediaRepository;
 
     private final PopularMediaRepository  popularMediaRepository;
+    
+    private final GenreRepository genreRepository;
+
+    @PostConstruct
+    public void syncGenres(){
+        List<TmdbGenreDTO> movieGenres = fetchGenres("movie");
+        List<TmdbGenreDTO> showGenres = fetchGenres("tv");
+
+        Map<Long, String> genreMap = new HashMap<>();
+        for (TmdbGenreDTO dto : movieGenres){
+            genreMap.put(dto.getId(), dto.getName());
+        }
+        for (TmdbGenreDTO dto : showGenres){
+            genreMap.put(dto.getId(), dto.getName());
+        }
+
+        for (Map.Entry<Long, String> entry : genreMap.entrySet()){
+            if (!genreRepository.existsById(entry.getKey())){
+
+                Genre genre = Genre.builder()
+                .id(entry.getKey())
+                .name(entry.getValue())
+                .build();
+
+                genreRepository.save(genre);
+            }
+        }
+    }
+
+    public List<TmdbGenreDTO> fetchGenres(String type){
+        try{
+            TmdbGenreResponseDTO response = tmdbWebClient.get()
+            .uri("/genre/{type}/list", type)
+            .retrieve()
+            .bodyToMono(TmdbGenreResponseDTO.class)
+            .block();
+
+            return response != null ? response.getGenres() : Collections.emptyList();
+        }
+        catch (Exception e){
+            return Collections.emptyList();
+        }
+    }
 
     @Scheduled(cron = "0 47 23 * * *")
     public void popularMedia(){

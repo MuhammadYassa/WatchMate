@@ -8,7 +8,7 @@ import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.Users;
 
-public interface UserMediaStatusRepository extends JpaRepository<Long, UserMediaStatus>{
+public interface UserMediaStatusRepository extends JpaRepository<UserMediaStatus, Long>{
 
     Optional<UserMediaStatus> findByUserAndMedia(Users user, Media media);
 
