@@ -1,6 +1,5 @@
 package com.project.watchmate.Services;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -11,11 +10,13 @@ import com.project.watchmate.Models.UserPrincipal;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Repositories.UsersRepository;
 
+import lombok.RequiredArgsConstructor;
+
 @Service
+@RequiredArgsConstructor
 public class WmUserDetailsService implements UserDetailsService{
 
-    @Autowired
-    public UsersRepository userRepo;
+    public final UsersRepository userRepo;
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {

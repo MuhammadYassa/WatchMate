@@ -21,6 +21,9 @@ public class TmdbMovieDTO {
 
     private String overview;
 
+    @JsonProperty("media_type")
+    private String mediaType;
+
     @JsonProperty("poster_path")
     private String posterPath;
 

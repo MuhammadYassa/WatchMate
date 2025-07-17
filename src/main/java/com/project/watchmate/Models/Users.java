@@ -1,5 +1,6 @@
 package com.project.watchmate.Models;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import jakarta.persistence.CascadeType;
@@ -21,7 +22,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table
+@Table (name = "users")
 @Builder
 public class Users {
     @Id
@@ -40,8 +41,9 @@ public class Users {
     @Column(nullable = false)
     private boolean emailVerified;
     
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-    private List<WatchListItem> watchListItem;
+    @Builder.Default
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<WatchList> watchLists = new ArrayList<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     private List<Review> reviews;
