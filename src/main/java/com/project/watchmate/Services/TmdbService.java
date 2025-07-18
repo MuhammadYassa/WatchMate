@@ -8,11 +8,13 @@ import java.util.Map;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import com.project.watchmate.Dto.TmdbGenreDTO;
 import com.project.watchmate.Dto.TmdbGenreResponseDTO;
 import com.project.watchmate.Dto.TmdbMovieDTO;
 import com.project.watchmate.Dto.TmdbResponseDTO;
+import com.project.watchmate.Exception.MediaNotFoundException;
 import com.project.watchmate.Models.Genre;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
@@ -150,13 +152,17 @@ public class TmdbService {
     public Media fetchMediaByTmdbId(Long tmdbId, MediaType type){
         String typePath = (type == MediaType.MOVIE) ? "movie" : "tv";
         String uri = "/" + typePath + "/" + tmdbId + "?language=en-US";
+        TmdbMovieDTO tmdbMedia = new TmdbMovieDTO();
 
-        TmdbMovieDTO tmdbMedia = tmdbWebClient.get()
+        try {tmdbMedia = tmdbWebClient.get()
         .uri(uri)
         .retrieve()
         .bodyToMono(TmdbMovieDTO.class)
         .blockOptional()
-        .orElse(null); 
+        .orElseThrow(() -> new MediaNotFoundException("TMDB media not found for ID: " + tmdbId)); 
+        } catch (WebClientResponseException.NotFound ex) {
+        throw new MediaNotFoundException("TMDB media not found for ID: " + tmdbId);
+    }
 
         List<Long> genreIdsList = tmdbMedia.getGenres().stream().map(g -> g.getId()).toList();
 

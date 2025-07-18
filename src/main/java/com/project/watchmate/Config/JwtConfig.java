@@ -14,8 +14,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import com.project.watchmate.Exception.CustomAuthenticationEntryPoint;
 import com.project.watchmate.Filters.JwtFilter;
-import com.project.watchmate.Services.CustomAuthenticationEntryPointService;
 import com.project.watchmate.Services.WmUserDetailsService;
 
 import lombok.RequiredArgsConstructor;
@@ -29,14 +29,14 @@ public class JwtConfig {
 
     private final JwtFilter jwtFilter;
 
-    private final CustomAuthenticationEntryPointService customAuthenticationEntryPointService;
+    private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
 
     @Bean
     public SecurityFilterChain securityFilterChain (HttpSecurity http) throws Exception{
         return http
                 .csrf(customizer -> customizer.disable())
                 .exceptionHandling(ex -> ex
-                .authenticationEntryPoint(customAuthenticationEntryPointService))
+                .authenticationEntryPoint(customAuthenticationEntryPoint))
                 .authorizeHttpRequests(request -> request
                     .requestMatchers("/register","/login", "/verify/**", "/verify")
                     .permitAll()

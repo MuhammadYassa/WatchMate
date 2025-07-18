@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 
 import com.project.watchmate.Dto.MediaDetailsDTO;
 import com.project.watchmate.Dto.ReviewDTO;
+import com.project.watchmate.Exception.MediaNotFoundException;
 import com.project.watchmate.Models.Genre;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
@@ -44,7 +45,7 @@ public class MediaService {
         Media media = mediaRepository.findByTmdbIdAndType(tmdbId, type).orElse(media = tmdbService.fetchMediaByTmdbId(tmdbId, type));
 
         if (media == null){
-            throw new RuntimeException("Media not found in TMDB");
+            throw new MediaNotFoundException("Media not found for TMDB ID:" + tmdbId);
         }
 
         mediaRepository.save(media);
