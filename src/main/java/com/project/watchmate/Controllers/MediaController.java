@@ -26,7 +26,8 @@ public class MediaController {
     private final MediaService mediaService;
 
     @GetMapping("/{tmdbId}")
-    public ResponseEntity<MediaDetailsDTO> getMediaDetails(@PathVariable Long tmdbId, @RequestParam MediaType type, @AuthenticationPrincipal UserPrincipal userPrincipal) {
+    public ResponseEntity<MediaDetailsDTO> getMediaDetails(@PathVariable Long tmdbId, @RequestParam ("type") String typeStr, @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        MediaType type = MediaType.valueOf(typeStr.toUpperCase());
         Users user = userPrincipal.getUser();;
         MediaDetailsDTO dto = mediaService.getMediaDetails(tmdbId, type, user);
         return ResponseEntity.ok(dto);

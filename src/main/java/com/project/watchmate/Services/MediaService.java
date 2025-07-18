@@ -16,6 +16,7 @@ import com.project.watchmate.Models.WatchStatus;
 import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.ReviewRepository;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
+import com.project.watchmate.Repositories.UsersRepository;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -30,10 +31,16 @@ public class MediaService {
 
     private final UserMediaStatusRepository userMediaStatusRepository;
 
+    private final UsersRepository usersRepository;
+
     private final TmdbService tmdbService;
 
     @Transactional
-    public MediaDetailsDTO getMediaDetails(Long tmdbId, MediaType type, Users user){
+    public MediaDetailsDTO getMediaDetails(Long tmdbId, MediaType type, Users userParam){
+
+        Users user = usersRepository.findById(userParam.getId())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
         Media media = mediaRepository.findByTmdbIdAndType(tmdbId, type).orElse(media = tmdbService.fetchMediaByTmdbId(tmdbId, type));
 
         if (media == null){
@@ -64,6 +71,7 @@ public class MediaService {
         .posterPath(media.getPosterPath())
         .releaseDate(media.getReleaseDate())
         .rating(media.getRating())
+        .type(media.getType())
         .genres(genreNames)
         .reviews(reviewDTOs)
         .isFavourited(isFavourited)

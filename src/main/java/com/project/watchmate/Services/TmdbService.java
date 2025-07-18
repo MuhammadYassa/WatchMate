@@ -86,7 +86,7 @@ public class TmdbService {
 
     public void fetchAndStorePopularMedia(){
         popularMediaRepository.deleteAll();
-        fetchAndStorePopular("tv", MediaType.TV_SHOW);
+        fetchAndStorePopular("tv", MediaType.SHOW);
         fetchAndStorePopular("movie", MediaType.MOVIE);
     }
 
@@ -158,6 +158,10 @@ public class TmdbService {
         .blockOptional()
         .orElse(null); 
 
+        List<Long> genreIdsList = tmdbMedia.getGenres().stream().map(g -> g.getId()).toList();
+
+        List<Genre> genreList = genreRepository.findAllById(genreIdsList);
+
         return Media.builder()
             .tmdbId(tmdbMedia.getId())
             .title(tmdbMedia.getTitle())
@@ -165,6 +169,7 @@ public class TmdbService {
             .posterPath(tmdbMedia.getPosterPath())
             .releaseDate(TmdbMovieDTO.parseDate(tmdbMedia.getReleaseDate()).orElse(null))
             .rating(tmdbMedia.getVoteAverage())
+            .genres(genreList)
             .type(type)
             .build();
     }

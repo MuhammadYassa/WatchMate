@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table (name = "user_media_status")
+@Table
 @Builder
 public class UserMediaStatus {
     

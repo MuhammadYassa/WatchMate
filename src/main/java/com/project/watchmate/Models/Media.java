@@ -59,13 +59,14 @@ public class Media {
     @ManyToMany(mappedBy = "media")
     private List<WatchList> watchLists = new ArrayList<>();
 
+    @Builder.Default
     @ManyToMany
     @JoinTable(
         name = "media_genres",
         joinColumns = @JoinColumn(name = "media_id"),
         inverseJoinColumns = @JoinColumn(name = "genre_id")
     )
-    private List<Genre> genres; 
+    private List<Genre> genres = new ArrayList<>();
 
     @OneToMany(mappedBy = "media")
     private List<Review> reviews;

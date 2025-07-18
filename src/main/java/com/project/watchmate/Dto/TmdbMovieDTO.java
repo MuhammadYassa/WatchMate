@@ -3,6 +3,8 @@ package com.project.watchmate.Dto;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -33,6 +35,9 @@ public class TmdbMovieDTO {
 
     @JsonProperty("vote_average")
     private double voteAverage;
+
+    @JsonProperty("genres")
+    private List<TmdbGenreDTO> genres = new ArrayList<>();
 
     @JsonProperty("name")
     private void mapName(String name) {
