@@ -10,9 +10,11 @@ import java.util.Optional;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+@Builder
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -36,8 +38,13 @@ public class TmdbMovieDTO {
     @JsonProperty("vote_average")
     private double voteAverage;
 
+    @Builder.Default
     @JsonProperty("genres")
     private List<TmdbGenreDTO> genres = new ArrayList<>();
+
+    @Builder.Default
+    @JsonProperty("genre_ids")
+    private List<Long> genreIds = new ArrayList<>();
 
     @JsonProperty("name")
     private void mapName(String name) {

@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class PaginatedSearchResponseDTO {
 
-    private List<TmdbMovieDTO> searchResults;
+    private List<SearchItemDTO> searchResults;
 
     private int currentPage;
 
