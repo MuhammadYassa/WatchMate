@@ -7,7 +7,6 @@ import com.project.watchmate.Dto.RenameWatchListDTO;
 import com.project.watchmate.Dto.WatchListDTO;
 import com.project.watchmate.Models.UserPrincipal;
 import com.project.watchmate.Models.Users;
-import com.project.watchmate.Models.WatchList;
 import com.project.watchmate.Services.WatchListService;
 
 import lombok.RequiredArgsConstructor;
@@ -40,9 +39,9 @@ public class WatchListController {
     }
 
     @PostMapping("/create")
-    public ResponseEntity<WatchList> createWatchList(@AuthenticationPrincipal UserPrincipal userPrincipal, @RequestBody CreateWatchListDTO dto) {
+    public ResponseEntity<WatchListDTO> createWatchList(@AuthenticationPrincipal UserPrincipal userPrincipal, @RequestBody CreateWatchListDTO dto) {
         Users user = userPrincipal.getUser();
-        WatchList created = watchListService.createWatchList(user, dto.getName());
+        WatchListDTO created = watchListService.createWatchList(user, dto.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
     
@@ -54,10 +53,24 @@ public class WatchListController {
     }
 
     @PostMapping("/rename/{id}")
-    public ResponseEntity<WatchList> renameWatchList(@AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable Long id, @RequestBody RenameWatchListDTO dto) {
+    public ResponseEntity<WatchListDTO> renameWatchList(@AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable Long id, @RequestBody RenameWatchListDTO dto) {
         Users user = userPrincipal.getUser();
-        WatchList updated = watchListService.renameWatchList(user, id, dto.getNewName());
-        return ResponseEntity.ok(updated);
+        WatchListDTO renamed = watchListService.renameWatchList(user, id, dto.getNewName());
+        return ResponseEntity.ok(renamed);
+    }
+
+    @PostMapping("/{watchListId}/add/{tmdbId}")
+    public ResponseEntity<WatchListDTO> addMediaToWatchList(@AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable Long watchListId, @PathVariable Long tmdbId) {
+        Users user = userPrincipal.getUser();
+        WatchListDTO dto = watchListService.addMediaToWatchList(user, watchListId, tmdbId);
+        return ResponseEntity.ok(dto);
+    }
+    
+    @DeleteMapping("/{watchListId}/remove/{tmdbId}")
+    public ResponseEntity<WatchListDTO> removeMediaFromWatchList(@AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable Long watchListId, @PathVariable Long tmdbId) {
+        Users user = userPrincipal.getUser();
+        WatchListDTO dto = watchListService.removeMediaFromWatchList(user, watchListId, tmdbId);
+        return ResponseEntity.ok(dto);
     }
     
 }

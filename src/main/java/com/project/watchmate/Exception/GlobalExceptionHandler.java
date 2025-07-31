@@ -25,7 +25,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(Map.of("error", ex.getMessage()));
     }
 
-     @ExceptionHandler(WatchListNotFoundException.class)
+    @ExceptionHandler(WatchListNotFoundException.class)
     public ResponseEntity<String> handleWatchlistNotFound(WatchListNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
     }
@@ -33,6 +33,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(UnauthorizedWatchListAccessException.class)
     public ResponseEntity<String> handleUnauthorizedAccess(UnauthorizedWatchListAccessException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(DuplicateWatchListMediaException.class)
+    public ResponseEntity<String> handleDuplicateEntry(DuplicateWatchListMediaException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(MediaNotInWatchListException.class)
+    public ResponseEntity<String> handleMediaNotInWatchList(MediaNotInWatchListException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

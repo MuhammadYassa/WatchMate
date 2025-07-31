@@ -5,9 +5,8 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.project.watchmate.Dto.MediaDetailsDTO;
-import com.project.watchmate.Dto.ReviewDTO;
 import com.project.watchmate.Exception.MediaNotFoundException;
-import com.project.watchmate.Models.Genre;
+import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.Review;
@@ -28,13 +27,15 @@ public class MediaService {
 
     private final MediaRepository mediaRepository;
 
-    private final ReviewRepository reviewRepository;
-
-    private final UserMediaStatusRepository userMediaStatusRepository;
-
     private final UsersRepository usersRepository;
 
     private final TmdbService tmdbService;
+
+    private final WatchMateMapper watchMateMapper;
+
+    private final ReviewRepository reviewRepository;
+
+    private final UserMediaStatusRepository userMediaStatusRepository;
 
     @Transactional
     public MediaDetailsDTO getMediaDetails(Long tmdbId, MediaType type, Users userParam){
@@ -51,32 +52,13 @@ public class MediaService {
         mediaRepository.save(media);
 
         List<Review> reviews = reviewRepository.findByMedia(media);
-        List<ReviewDTO> reviewDTOs = reviews.stream().map(r -> ReviewDTO.builder()
-        .username(r.getUser().getUsername())
-        .starRating(r.getRating())
-        .comment(r.getComment())
-        .postedAt(r.getDatePosted())
-        .build()).toList();
-
-        List<String> genreNames = media.getGenres().stream().map(Genre::getName).toList();
 
         boolean isFavourited = user.getFavorites().contains(media);
 
         UserMediaStatus userStatus= userMediaStatusRepository.findByUserAndMedia(user, media).orElse(null);
         WatchStatus watchStatus = userStatus != null ? userStatus.getStatus() : WatchStatus.NONE;
 
-        return MediaDetailsDTO.builder()
-        .tmdbId(tmdbId)
-        .title(media.getTitle())
-        .overview(media.getOverview())
-        .posterPath(media.getPosterPath())
-        .releaseDate(media.getReleaseDate())
-        .rating(media.getRating())
-        .type(media.getType())
-        .genres(genreNames)
-        .reviews(reviewDTOs)
-        .isFavourited(isFavourited)
-        .watchStatus(watchStatus)
-        .build();
+
+        return watchMateMapper.mapToMediaDetailsDTO(media, reviews, isFavourited, watchStatus);
     }
 }

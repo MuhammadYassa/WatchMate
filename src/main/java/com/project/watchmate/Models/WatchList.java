@@ -35,7 +35,7 @@ public class WatchList {
     private Users user;
 
     @Builder.Default
-    @OneToMany(mappedBy = "watchlist", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "watchList", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<WatchListItem> items = new ArrayList<>();
 
 }
