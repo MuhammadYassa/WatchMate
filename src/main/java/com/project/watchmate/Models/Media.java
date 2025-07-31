@@ -56,8 +56,8 @@ public class Media {
     private List<UserMediaStatus> userStatuses = new ArrayList<>();
 
     @Builder.Default
-    @ManyToMany(mappedBy = "media")
-    private List<WatchList> watchLists = new ArrayList<>();
+    @OneToMany(mappedBy = "media", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<WatchListItem> watchListItems = new ArrayList<>();
 
     @Builder.Default
     @ManyToMany

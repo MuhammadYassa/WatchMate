@@ -1,15 +1,13 @@
 package com.project.watchmate.Models;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.time.LocalDateTime;
 
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,23 +17,25 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Entity
-@Table
 @Builder
-public class WatchList {
+@Entity
+@Table(name = "watchlist_items")
+public class WatchListItem {
 
     @Id
     @GeneratedValue
     private Long id;
 
-    private String name;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "watchlist_id", nullable = false)
+    private WatchList watchList;
 
-    @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private Users user;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "media_id", nullable = false)
+    private Media media;
 
-    @Builder.Default
-    @OneToMany(mappedBy = "watchlist", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<WatchListItem> items = new ArrayList<>();
+    private LocalDateTime addedAt;
+
+    private Integer position;
 
 }

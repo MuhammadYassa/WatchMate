@@ -25,6 +25,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(Map.of("error", ex.getMessage()));
     }
 
+     @ExceptionHandler(WatchListNotFoundException.class)
+    public ResponseEntity<String> handleWatchlistNotFound(WatchListNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(UnauthorizedWatchListAccessException.class)
+    public ResponseEntity<String> handleUnauthorizedAccess(UnauthorizedWatchListAccessException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleGeneric(Exception ex){
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Unexpected Error Occurred"));
