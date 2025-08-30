@@ -5,12 +5,14 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 import com.project.watchmate.Dto.MediaDetailsDTO;
-import com.project.watchmate.Dto.ReviewDTO;
+import com.project.watchmate.Dto.UserMediaStatusDTO;
+import com.project.watchmate.Dto.ReviewResponseDTO;
 import com.project.watchmate.Dto.WatchListDTO;
 import com.project.watchmate.Models.Genre;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.Review;
 import com.project.watchmate.Models.WatchList;
+import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.WatchStatus;
 
 import lombok.RequiredArgsConstructor;
@@ -43,12 +45,30 @@ public class WatchMateMapper {
             .build();
     }
 
-    public ReviewDTO mapToReviewDTO(Review review){
-        return ReviewDTO.builder()
+    public ReviewResponseDTO mapToReviewDTO(Review review){
+        return ReviewResponseDTO.builder()
         .username(review.getUser().getUsername())
         .comment(review.getComment())
         .starRating(review.getRating())
         .postedAt(review.getDatePosted())
         .build();
+    }
+
+    public UserMediaStatusDTO mapToUserMediaStatusDTO(UserMediaStatus userMediaStatus) {
+        return UserMediaStatusDTO.builder()
+            .tmdbId(userMediaStatus.getMedia().getTmdbId())
+            .status(userMediaStatus.getStatus())
+            .build();
+    }
+
+    public ReviewResponseDTO mapToReviewResponseDTO(Review review) {
+        return ReviewResponseDTO.builder()
+            .reviewId(review.getId())
+            .mediaId(review.getMedia().getId())
+            .starRating(review.getRating())
+            .comment(review.getComment())
+            .postedAt(review.getDatePosted())
+            .updatedAt(review.getDateLastModified())
+            .build();
     }
 }

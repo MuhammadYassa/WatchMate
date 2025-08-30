@@ -33,7 +33,7 @@ public class MediaDetailsDTO {
 
     private List<String> genres;
 
-    private List<ReviewDTO> reviews;
+    private List<ReviewResponseDTO> reviews;
 
     private boolean isFavourited;
 

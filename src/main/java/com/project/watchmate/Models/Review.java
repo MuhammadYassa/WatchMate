@@ -38,4 +38,7 @@ public class Review {
     private String comment;
 
     private LocalDateTime datePosted;
+
+    private LocalDateTime dateLastModified;
+    
 }

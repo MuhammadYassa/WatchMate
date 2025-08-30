@@ -1,7 +1,5 @@
 package com.project.watchmate.Dto;
 
-import java.time.LocalDateTime;
-
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,14 +9,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ReviewDTO {
+public class UpdateWatchStatusRequestDTO {
 
-    private String username;
+	private Long tmdbId;
 
-    private String comment;
-
-    private int starRating;
-
-    private LocalDateTime postedAt;
+	private String status;
 
 }
+
+

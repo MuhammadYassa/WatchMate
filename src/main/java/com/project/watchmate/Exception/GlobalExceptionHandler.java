@@ -40,9 +40,24 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
     }
 
+    @ExceptionHandler(InvalidWatchStatusException.class)
+    public ResponseEntity<String> handleInvalidWatchStatus(InvalidWatchStatusException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+    }
+
     @ExceptionHandler(MediaNotInWatchListException.class)
     public ResponseEntity<String> handleMediaNotInWatchList(MediaNotInWatchListException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(ReviewNotFoundException.class)
+    public ResponseEntity<String> handleReviewNotFound(ReviewNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(UnauthorizedReviewAccessException.class)
+    public ResponseEntity<String> handleUnauthorizedReviewAccess(UnauthorizedReviewAccessException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
