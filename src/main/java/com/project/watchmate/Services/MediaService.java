@@ -43,7 +43,7 @@ public class MediaService {
         Users user = usersRepository.findById(userParam.getId())
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-        Media media = mediaRepository.findByTmdbIdAndType(tmdbId, type).orElse(media = tmdbService.fetchMediaByTmdbId(tmdbId, type));
+        Media media = mediaRepository.findByTmdbId(tmdbId).orElse(media = tmdbService.fetchMediaByTmdbId(tmdbId, type));
 
         if (media == null){
             throw new MediaNotFoundException("Media not found for TMDB ID:" + tmdbId);
