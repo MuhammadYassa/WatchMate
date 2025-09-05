@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.project.watchmate.Dto.LoginRequestDTO;
+import com.project.watchmate.Dto.LoginResponseDTO;
+import com.project.watchmate.Dto.LogoutRequestDTO;
+import com.project.watchmate.Dto.RefreshTokenRequestDTO;
 import com.project.watchmate.Dto.RegisterRequestDTO;
 import com.project.watchmate.Services.EmailVerificationTokenService;
 import com.project.watchmate.Services.UserService;
@@ -64,10 +67,40 @@ public class UserController {
          if (bindingResult.hasErrors()) {
             return ResponseEntity.badRequest().body(bindingResult.getAllErrors());
         }
-        String token = userService.verify(loginRequest);
+        
+        try {
+            LoginResponseDTO response = userService.verify(loginRequest);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
+        }
+    }
 
-        return token.equals("fail")
-            ? ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Login Failed")
-            : ResponseEntity.ok(token);
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refreshToken (@Valid @RequestBody RefreshTokenRequestDTO request, BindingResult bindingResult) {
+        if (bindingResult.hasErrors()) {
+            return ResponseEntity.badRequest().body(bindingResult.getAllErrors());
+        }
+
+        try {
+            LoginResponseDTO response = userService.refreshToken(request.getRefreshToken());
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token refresh failed: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout (@Valid @RequestBody LogoutRequestDTO request, BindingResult bindingResult) {
+        if (bindingResult.hasErrors()) {
+            return ResponseEntity.badRequest().body(bindingResult.getAllErrors());
+        }
+
+        try {
+            userService.logout(request.getRefreshToken());
+            return ResponseEntity.ok("Logged out successfully");
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Logout failed: " + e.getMessage());
+        }
     }
 }

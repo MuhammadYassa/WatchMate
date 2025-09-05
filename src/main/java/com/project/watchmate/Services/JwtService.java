@@ -1,5 +1,6 @@
 package com.project.watchmate.Services;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,17 +23,25 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String secret;
 
-    public String generateToken(String username){
+    public String generateAccessToken(String username){
         Map<String, Object> claims = new HashMap<>();
         return Jwts.builder()
                     .claims()
                     .add(claims)
                     .subject(username)
                     .issuedAt(new Date(System.currentTimeMillis()))
-                    .expiration(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 365 * 10))
+                    .expiration(new Date(System.currentTimeMillis() + 1000L * 60 * 15))
                     .and()
                     .signWith(getKey())
                     .compact();
+    }
+
+    public LocalDateTime getAccessTokenExpiry() {
+        return LocalDateTime.now().plusMinutes(15);
+    }
+
+    public String generateToken (String username) {
+        return generateAccessToken(username);
     }
 
     private SecretKey getKey() {

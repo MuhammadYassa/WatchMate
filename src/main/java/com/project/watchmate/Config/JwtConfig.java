@@ -38,7 +38,7 @@ public class JwtConfig {
                 .exceptionHandling(ex -> ex
                 .authenticationEntryPoint(customAuthenticationEntryPoint))
                 .authorizeHttpRequests(request -> request
-                    .requestMatchers("/register","/login", "/verify/**", "/verify")
+                    .requestMatchers("/register","/login", "/verify/**", "/verify", "/refresh")
                     .permitAll()
                     .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())
