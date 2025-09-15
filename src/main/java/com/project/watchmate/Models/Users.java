@@ -27,7 +27,7 @@ import lombok.NoArgsConstructor;
 public class Users {
     @Id
     @GeneratedValue
-    private Integer id;
+    private Long id;
 
     @Column(unique = true, nullable = false)
     private String username;
@@ -57,14 +57,22 @@ public class Users {
     @JoinTable(name = "user_favorites")
     private List<Media> favorites;
     
+    @Builder.Default
     @ManyToMany
     @JoinTable(
         name = "user_following",
         joinColumns = @JoinColumn(name = "follower_id"),
         inverseJoinColumns = @JoinColumn(name = "following_id")
     )
-    private List<Users> following;
+    private List<Users> following = new ArrayList<>();
 
+    @Builder.Default
     @ManyToMany(mappedBy = "following")
-    private List<Users> followers;
+    private List<Users> followers = new ArrayList<>();
+
+    @Builder.Default
+    @ManyToMany
+    @JoinTable(name = "blocked_users")
+    private List<Users> blockedUsers = new ArrayList<>();
+
 }
