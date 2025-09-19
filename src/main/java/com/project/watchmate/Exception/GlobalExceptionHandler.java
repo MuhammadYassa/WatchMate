@@ -95,6 +95,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
     }
 
+    @ExceptionHandler(UnauthorizedFollowRequestAccessException.class)
+    public ResponseEntity<String> handleUnauthorizedFollowRequestAccess(UnauthorizedFollowRequestAccessException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(FollowRequestNotFoundException.class)
+    public ResponseEntity<String> handleFollowRequestNotFound(FollowRequestNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleGeneric(Exception ex){
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Unexpected Error Occurred"));

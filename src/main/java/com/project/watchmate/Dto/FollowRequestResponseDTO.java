@@ -1,6 +1,6 @@
 package com.project.watchmate.Dto;
 
-import com.project.watchmate.Models.FollowStatuses;
+import com.project.watchmate.Models.FollowRequestStatuses;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,6 +15,6 @@ public class FollowRequestResponseDTO {
 
     private Long requestId;
     
-    private FollowStatuses newStatus;
+    private FollowRequestStatuses newStatus;
     
 }
