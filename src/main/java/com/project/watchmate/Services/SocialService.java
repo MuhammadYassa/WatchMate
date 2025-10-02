@@ -3,7 +3,12 @@ package com.project.watchmate.Services;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.project.watchmate.Dto.FollowListDTO;
 import com.project.watchmate.Dto.FollowRequestDTO;
@@ -17,6 +22,7 @@ import com.project.watchmate.Exception.NotFollowingException;
 import com.project.watchmate.Exception.SelfFollowException;
 import com.project.watchmate.Exception.UnauthorizedFollowRequestAccessException;
 import com.project.watchmate.Exception.UserNotFoundException;
+import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Models.FollowRequest;
 import com.project.watchmate.Models.FollowRequestStatuses;
 import com.project.watchmate.Models.FollowStatuses;
@@ -24,7 +30,6 @@ import com.project.watchmate.Models.Users;
 import com.project.watchmate.Repositories.FollowRequestRepository;
 import com.project.watchmate.Repositories.UsersRepository;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -34,6 +39,8 @@ public class SocialService {
     private final UsersRepository usersRepository;
 
     private final FollowRequestRepository followRequestRepository;
+
+    private final WatchMateMapper watchMateMapper;
 
     private Users findAndValidateTargetUser(Long userId){
         return usersRepository.findById(userId)
@@ -130,10 +137,6 @@ public class SocialService {
         FollowRequest request = followRequestRepository.findById(requestId)
             .orElseThrow(() -> new FollowRequestNotFoundException("Request not found"));
         
-        if (!request.getTargetUser().equals(user)) {
-            throw new UnauthorizedFollowRequestAccessException("Not your request");
-        }
-
         if (response == FollowRequestStatuses.CANCELED) {
             if (!request.getRequestUser().equals(user)) {
                 throw new UnauthorizedFollowRequestAccessException("You can only cancel your own requests");
@@ -143,19 +146,22 @@ public class SocialService {
             .newStatus(FollowRequestStatuses.CANCELED)
             .requestId(requestId)
             .build();           
+        } else {
+            if (!request.getTargetUser().equals(user)) {
+                throw new UnauthorizedFollowRequestAccessException("Not your request");
+            }
+            request.setStatus(response);
+            request.setRespondedAt(LocalDateTime.now());
+            
+            if (response == FollowRequestStatuses.ACCEPTED) {
+                performDirectFollow(request.getRequestUser(), request.getTargetUser());
+            }
+            
+            followRequestRepository.save(request);
+            return FollowRequestResponseDTO.builder()
+                .newStatus(response)
+                .build();
         }
-        
-        request.setStatus(response);
-        request.setRespondedAt(LocalDateTime.now());
-        
-        if (response == FollowRequestStatuses.ACCEPTED) {
-            performDirectFollow(request.getRequestUser(), request.getTargetUser());
-        }
-        
-        followRequestRepository.save(request);
-        return FollowRequestResponseDTO.builder()
-            .newStatus(response)
-            .build();
     }
     
     @Transactional
@@ -174,9 +180,12 @@ public class SocialService {
         return handleUnfollow(user, targetUser);
     }
 
-    public List<FollowRequestDTO> getReceivedRequests(Users user) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'allRequests'");
+    @Transactional(readOnly = true)
+    public Page<FollowRequestDTO> getReceivedRequests(Users user, int pageNumber, int size) {
+        Pageable pageable = PageRequest.of(pageNumber, size, Sort.by("requestedAt").descending().and(Sort.by("id").descending()));
+        Page <FollowRequest> page = followRequestRepository.findByTargetUserAndStatus(user, FollowRequestStatuses.PENDING, pageable);
+
+        return page.map(followRequest -> watchMateMapper.mapToFollowRequestDTO(followRequest));
     }
 
     public FollowStatusDTO getFollowStatus(Long userId, Users user) {

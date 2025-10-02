@@ -4,13 +4,13 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.project.watchmate.Exception.InvalidRefreshTokenException;
 import com.project.watchmate.Models.RefreshToken;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Repositories.RefreshTokenRepository;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
 @Service

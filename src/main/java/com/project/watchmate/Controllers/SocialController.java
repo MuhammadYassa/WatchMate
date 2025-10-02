@@ -2,6 +2,7 @@ package com.project.watchmate.Controllers;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.project.watchmate.Dto.FollowListDTO;
@@ -29,6 +31,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @RequestMapping("/social")
 public class SocialController {
+
+    private final int MAX_SIZE = 50;
 
     private final SocialService socialService;
     
@@ -68,9 +72,12 @@ public class SocialController {
     }
 
     @GetMapping("/follow-requests/received")
-    public ResponseEntity<List<FollowRequestDTO>> receivedRequests(@AuthenticationPrincipal UserPrincipal userPrincipal) {
+    public ResponseEntity<Page<FollowRequestDTO>> receivedRequests(@AuthenticationPrincipal UserPrincipal userPrincipal, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
+        size = Math.min(size, MAX_SIZE);
+        size = Math.max(size, 1);
+        page = Math.max(page, 0);
         Users user = userPrincipal.getUser();
-        List<FollowRequestDTO> response = socialService.getReceivedRequests(user);
+        Page<FollowRequestDTO> response = socialService.getReceivedRequests(user, page, size);
         return ResponseEntity.ok(response);
     }
     
@@ -97,7 +104,7 @@ public class SocialController {
     }
 
     @GetMapping("/following-list")
-    public ResponseEntity<FollowListDTO> getFollowingLIst(@AuthenticationPrincipal UserPrincipal userPrincipal) {
+    public ResponseEntity<FollowListDTO> getFollowingList(@AuthenticationPrincipal UserPrincipal userPrincipal) {
         Users user = userPrincipal.getUser();
         FollowListDTO response = socialService.getFollowingList(user);
         return ResponseEntity.ok(response);
@@ -106,8 +113,8 @@ public class SocialController {
     @GetMapping("/user-profile/{userId}")
     public ResponseEntity<UserProfileDTO> getUserProfile(@AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable Long userId) {
         Users user = userPrincipal.getUser();
-        UserProfileDTO resonse = socialService.getUserProfile(userId, user);
-        return ResponseEntity.ok(resonse);
+        UserProfileDTO response = socialService.getUserProfile(userId, user);
+        return ResponseEntity.ok(response);
     }
 
 }

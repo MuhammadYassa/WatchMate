@@ -5,13 +5,13 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.project.watchmate.Models.EmailVerificationToken;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Repositories.EmailVerificationTokenRepository;
 import com.project.watchmate.Repositories.UsersRepository;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import software.amazon.awssdk.services.ses.SesClient;
 import software.amazon.awssdk.services.ses.model.Body;
