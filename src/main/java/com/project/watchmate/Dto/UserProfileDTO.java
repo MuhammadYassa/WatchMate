@@ -1,7 +1,8 @@
 package com.project.watchmate.Dto;
 
-import java.util.List;
+import org.springframework.data.domain.Page;
 
+import com.project.watchmate.Models.FollowStatuses;
 import com.project.watchmate.Models.PrivacyStatuses;
 
 import lombok.AllArgsConstructor;
@@ -19,17 +20,21 @@ public class UserProfileDTO {
 
     private Long followersCount;
 
-    private Long FollowingCount;
+    private Long followingCount;
 
-    private List<WatchListDTO> watchlists;
+    private Page<WatchListDTO> watchlists;
 
-    private List<ReviewResponseDTO> reviews;
+    private Page<ReviewResponseDTO> reviews;
 
     private Long moviesWatchedCount;
 
     private Long showsWatchedCount;
 
-    private FollowStatusDTO followStatus;
+    private Page<SearchItemDTO> moviesWatched;
+
+    private Page<SearchItemDTO> showsWatched;
+
+    private FollowStatuses followStatus;
 
     private PrivacyStatuses privacyStatus;
     

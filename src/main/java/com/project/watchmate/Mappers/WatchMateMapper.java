@@ -9,6 +9,7 @@ import com.project.watchmate.Dto.FollowRequestDTO;
 import com.project.watchmate.Dto.MediaDetailsDTO;
 import com.project.watchmate.Dto.UserMediaStatusDTO;
 import com.project.watchmate.Dto.ReviewResponseDTO;
+import com.project.watchmate.Dto.SearchItemDTO;
 import com.project.watchmate.Dto.WatchListDTO;
 import com.project.watchmate.Models.FollowRequest;
 import com.project.watchmate.Models.Genre;
@@ -38,6 +39,19 @@ public class WatchMateMapper {
             .reviews(reviews.stream().map(r -> mapToReviewDTO(r)).toList())
             .isFavourited(isFavourited)
             .watchStatus(watchStatus)
+            .build();
+    }
+
+    public SearchItemDTO mapToSearchItemDTO(Media m){
+        return SearchItemDTO.builder()
+            .id(m.getTmdbId())
+            .title(m.getTitle())
+            .posterPath(m.getPosterPath())
+            .mediaType(m.getType().toString())
+            .releaseDate(m.getReleaseDate().toString())
+            .voteAverage(m.getRating())
+            .overview(m.getOverview())
+            .genres(m.getGenres().stream().map(Genre::getName).toList())
             .build();
     }
 

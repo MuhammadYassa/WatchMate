@@ -1,7 +1,5 @@
 package com.project.watchmate.Controllers;
 
-import java.util.List;
-
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -13,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.project.watchmate.Dto.FollowListDTO;
+import com.project.watchmate.Dto.FollowListUserDetailsDTO;
 import com.project.watchmate.Dto.FollowRequestDTO;
 import com.project.watchmate.Dto.FollowRequestResponseDTO;
 import com.project.watchmate.Dto.FollowStatusDTO;
@@ -97,16 +95,22 @@ public class SocialController {
     }
     
     @GetMapping("/followers-list")
-    public ResponseEntity<FollowListDTO> getFollowersList(@AuthenticationPrincipal UserPrincipal userPrincipal) {
+    public ResponseEntity<Page<FollowListUserDetailsDTO>> getFollowersList(@AuthenticationPrincipal UserPrincipal userPrincipal, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
+        size = Math.min(size, MAX_SIZE);
+        size = Math.max(size, 1);
+        page = Math.max(page, 0);
         Users user = userPrincipal.getUser();
-        FollowListDTO response = socialService.getFollowersList(user);
+        Page<FollowListUserDetailsDTO> response = socialService.getFollowersList(user, page, size);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/following-list")
-    public ResponseEntity<FollowListDTO> getFollowingList(@AuthenticationPrincipal UserPrincipal userPrincipal) {
+    public ResponseEntity<Page<FollowListUserDetailsDTO>> getFollowingList(@AuthenticationPrincipal UserPrincipal userPrincipal, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
+        size = Math.min(size, MAX_SIZE);
+        size = Math.max(size, 1);
+        page = Math.max(page, 0);
         Users user = userPrincipal.getUser();
-        FollowListDTO response = socialService.getFollowingList(user);
+        Page<FollowListUserDetailsDTO> response = socialService.getFollowingList(user, page, size);
         return ResponseEntity.ok(response);
     }
     

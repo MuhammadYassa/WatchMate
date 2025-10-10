@@ -1,9 +1,11 @@
 package com.project.watchmate.Repositories;
 
-import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -22,13 +24,17 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
 
     boolean existsByFollowerAndFollowing(Users follower, Users following);
 
-    Long countFollowers(Users user);
+    @Query("select count(f) from Users u join u.followers f where u.id = :userId")
+    long countFollowersByUserId(@Param("userId") Long userId);
 
-    Long countFollowing(Users user);
+    @Query("select count(f) from Users u join u.following f where u.id = :userId")
+    long countFollowingByUserId(@Param("userId") Long userId);
 
-    List<Users> findFollowersByUser(Users user);
+    @Query("select f from Users u join u.followers f where u = :user order by f.username asc, f.id desc")
+    Page<Users> findFollowersByUser(@Param("user") Users user, Pageable pageable);
 
-    List<Users> findFollowingByUser(Users user);
+    @Query("select f from Users u join u.following f where u = :user order by f.username asc, f.id desc")
+    Page<Users> findFollowingByUser(@Param("user") Users user, Pageable pageable);
 
     @Query("SELECT u FROM Users u LEFT JOIN FETCH u.following WHERE u.id = :userId")
     Optional<Users> findByIdWithFollowing(@Param("userId") Long userId);
@@ -47,4 +53,9 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
     
     @Query("SELECT COUNT(b) > 0 FROM Users u JOIN u.blockedUsers b WHERE u.id = :blockerId AND b.id = :targetId")
     boolean isBlockingUser(@Param("blockerId") Long blockerId, @Param("targetId") Long targetId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "delete from user_following where follower_id = :followerId and following_id = :followingId", nativeQuery = true)
+    int deleteFollowRelation(@Param("followerId") Long followerId, @Param("followingId") Long followingId);
+
 }

@@ -4,18 +4,22 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import com.project.watchmate.Dto.CreateReviewRequestDTO;
 import com.project.watchmate.Dto.ReviewResponseDTO;
 import com.project.watchmate.Dto.UpdateReviewRequestDTO;
-import com.project.watchmate.Exception.MediaNotFoundException;
 import com.project.watchmate.Exception.DuplicateReviewException;
+import com.project.watchmate.Exception.MediaNotFoundException;
 import com.project.watchmate.Exception.ReviewNotFoundException;
 import com.project.watchmate.Exception.UnauthorizedReviewAccessException;
+import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Models.Review;
 import com.project.watchmate.Models.Users;
-import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.ReviewRepository;
 
@@ -75,6 +79,11 @@ public class ReviewService {
     public ReviewResponseDTO getReview(Users user, Long reviewId) {
         Review review = reviewRepository.findById(reviewId).orElseThrow(() -> new ReviewNotFoundException("Review not found"));
         return watchMateMapper.mapToReviewResponseDTO(review);
+    }
+
+    public Page<Review> getReviewPage(Users user){
+        Pageable pageable = PageRequest.of(0, 5, Sort.by("dateLastModified").descending().and(Sort.by("datePosted").descending()));
+        return reviewRepository.findAllByUser(user, pageable);
     }
 
 }

@@ -3,6 +3,10 @@ package com.project.watchmate.Services;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +45,11 @@ public class WatchListService {
     private final ReviewRepository reviewsRepo;
 
     private final UserMediaStatusRepository userMediaStatusRepository;
+
+    public Page<WatchList> getWatchListPage(Users user){
+        Pageable pageable = PageRequest.of(0, 5, Sort.by("name").descending().and(Sort.by("id").ascending()));
+        return watchListRepository.findAllByUser(user, pageable);
+    }
     
     public WatchListDTO createWatchList(Users user, String name) {
         if (watchListRepository.existsByUserAndNameIgnoreCase(user, name)){

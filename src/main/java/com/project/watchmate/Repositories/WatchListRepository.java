@@ -3,6 +3,8 @@ package com.project.watchmate.Repositories;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.project.watchmate.Models.Users;
@@ -15,5 +17,7 @@ public interface WatchListRepository extends JpaRepository<WatchList, Long>{
     List<WatchList> findAllByUser(Users user);
 
     boolean existsByUserAndNameIgnoreCase(Users user, String Name);
+
+    Page<WatchList> findAllByUser(Users user, Pageable pageable);
     
 }

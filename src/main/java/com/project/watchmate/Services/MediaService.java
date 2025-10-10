@@ -2,6 +2,10 @@ package com.project.watchmate.Services;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,5 +64,15 @@ public class MediaService {
 
 
         return watchMateMapper.mapToMediaDetailsDTO(media, reviews, isFavourited, watchStatus);
+    }
+
+    public Page<Media> getMoviesWatchedPage(Users user){
+        Pageable pageable = PageRequest.of(0, 5, Sort.by("releaseDate").descending().and(Sort.by("title")).descending());
+        return userMediaStatusRepository.findWatchedMoviesByUser(user, pageable);
+    }
+
+    public Page<Media> getShowsWatchedPage(Users user){
+        Pageable pageable = PageRequest.of(0, 5, Sort.by("releaseDate").descending().and(Sort.by("title")).descending());
+        return userMediaStatusRepository.findWatchedShowsByUser(user, pageable);
     }
 }

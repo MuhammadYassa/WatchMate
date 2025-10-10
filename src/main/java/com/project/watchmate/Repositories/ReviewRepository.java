@@ -2,6 +2,8 @@ package com.project.watchmate.Repositories;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.project.watchmate.Models.Media;
@@ -12,6 +14,8 @@ public interface ReviewRepository extends JpaRepository<Review, Long>{
 
     List<Review> findByMedia(Media media);
 
-    boolean existsByUserAndMedia(Users user, Media media)  ;
+    boolean existsByUserAndMedia(Users user, Media media);
+
+    Page<Review> findAllByUser(Users user, Pageable pageable);
 
 }
