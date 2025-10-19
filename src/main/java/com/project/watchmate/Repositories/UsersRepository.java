@@ -22,7 +22,8 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
 
     boolean existsByUsername(String username);
 
-    boolean existsByFollowerAndFollowing(Users follower, Users following);
+    @Query("SELECT COUNT(f) > 0 FROM Users u JOIN u.following f WHERE u.id = :followerId AND f.id = :followingId")
+    boolean existsByFollowerAndFollowing(@Param("followerId") Long followerId, @Param("followingId") Long followingId);
 
     @Query("select count(f) from Users u join u.followers f where u.id = :userId")
     long countFollowersByUserId(@Param("userId") Long userId);
