@@ -1,6 +1,7 @@
 package com.project.watchmate.Services;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -10,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.project.watchmate.Dto.MediaDetailsDTO;
-import com.project.watchmate.Exception.MediaNotFoundException;
 import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
@@ -43,16 +43,12 @@ public class MediaService {
 
     @Transactional
     public MediaDetailsDTO getMediaDetails(Long tmdbId, MediaType type, Users userParam){
-
-        Users user = usersRepository.findById(userParam.getId())
+        Long id = Objects.requireNonNull(tmdbId, "tmdbId");
+        Long userId = Objects.requireNonNull(Objects.requireNonNull(userParam, "userParam").getId(), "userParam.id");
+        Users user = usersRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-        Media media = mediaRepository.findByTmdbId(tmdbId).orElse(media = tmdbService.fetchMediaByTmdbId(tmdbId, type));
-
-        if (media == null){
-            throw new MediaNotFoundException("Media not found for TMDB ID:" + tmdbId);
-        }
-
+        Media media = Objects.requireNonNull(mediaRepository.findByTmdbId(id).orElseGet(() -> tmdbService.fetchMediaByTmdbId(id, type)), "media");
         mediaRepository.save(media);
 
         List<Review> reviews = reviewRepository.findByMedia(media);

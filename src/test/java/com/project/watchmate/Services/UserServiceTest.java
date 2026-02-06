@@ -7,6 +7,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Objects;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -17,6 +19,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import com.project.watchmate.Dto.RegisterRequestDTO;
@@ -26,6 +29,7 @@ import com.project.watchmate.Models.Users;
 import com.project.watchmate.Repositories.UsersRepository;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class UserServiceTest {
 
     @Mock
@@ -36,6 +40,9 @@ class UserServiceTest {
 
     @Mock
     private JwtService jwtService;
+
+    @Mock
+    private AuthenticationManager authManager;
 
     @Mock
     private RefreshTokenService refreshTokenService;
@@ -63,7 +70,7 @@ class UserServiceTest {
         void register_WithValidData_ShouldSaveUserAndSendEmail() {
             when(usersRepository.existsByUsername("testuser")).thenReturn(false);
             when(usersRepository.existsByEmail("test@example.com")).thenReturn(false);
-            when(usersRepository.save(any(Users.class))).thenReturn(new Users());
+            when(usersRepository.save(any(Users.class))).thenReturn(Objects.requireNonNull(new Users()));
             when(emailService.createToken(any(Users.class))).thenReturn("verification-token");
 
             userService.register(validRegisterRequest);
@@ -71,7 +78,7 @@ class UserServiceTest {
             ArgumentCaptor<Users> userCaptor = ArgumentCaptor.forClass(Users.class);
             verify(usersRepository).save(userCaptor.capture());
             
-            Users savedUser = userCaptor.getValue();
+            Users savedUser = Objects.requireNonNull(userCaptor.getValue(), "savedUser");
             assertEquals("testuser", savedUser.getUsername());
             assertEquals("test@example.com", savedUser.getEmail());
 
@@ -84,7 +91,7 @@ class UserServiceTest {
             when(usersRepository.existsByUsername("testuser")).thenReturn(false);
             when(usersRepository.existsByEmail("test@example.com")).thenReturn(false);
             when(encoder.encode("password123")).thenReturn(expectedEncodedPassword);
-            when(usersRepository.save(any(Users.class))).thenReturn(new Users());
+            when(usersRepository.save(any(Users.class))).thenReturn(Objects.requireNonNull(new Users()));
             when(emailService.createToken(any(Users.class))).thenReturn("verification-token");
 
             userService.register(validRegisterRequest);
@@ -92,7 +99,7 @@ class UserServiceTest {
             ArgumentCaptor<Users> userCaptor = ArgumentCaptor.forClass(Users.class);
             verify(usersRepository).save(userCaptor.capture());
             
-            Users savedUser = userCaptor.getValue();
+            Users savedUser = Objects.requireNonNull(userCaptor.getValue(), "savedUser");
             assertEquals(expectedEncodedPassword, savedUser.getPassword());
         }
 
@@ -100,7 +107,7 @@ class UserServiceTest {
         void register_WithValidData_ShouldSaveUserWithEmailVerifiedToFalse() {
             when(usersRepository.existsByUsername("testuser")).thenReturn(false);
             when(usersRepository.existsByEmail("test@example.com")).thenReturn(false);
-            when(usersRepository.save(any(Users.class))).thenReturn(new Users());
+            when(usersRepository.save(any(Users.class))).thenReturn(Objects.requireNonNull(new Users()));
             when(emailService.createToken(any(Users.class))).thenReturn("verification-token");
 
             userService.register(validRegisterRequest);
@@ -108,7 +115,7 @@ class UserServiceTest {
             ArgumentCaptor<Users> userCaptor = ArgumentCaptor.forClass(Users.class);
             verify(usersRepository).save(userCaptor.capture());
             
-            Users savedUser = userCaptor.getValue();
+            Users savedUser = Objects.requireNonNull(userCaptor.getValue(), "savedUser");
             assertEquals(false, savedUser.isEmailVerified());
         }
 
@@ -155,4 +162,21 @@ class UserServiceTest {
         }
     }
     
+    /**@Nested
+    @DisplayName("Verify Method Tests")
+    class VerifyTests{
+        @Test
+        void verify_WithValidData_ShouldReturnToken(){
+            RefreshToken refreshToken = new RefreshToken();
+            when(authManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(new UsernamePasswordAuthenticationToken("testuser", "password123"));
+            when(usersRepository.findByUsername("testuser")).thenReturn(java.util.Optional.of(new Users()));
+            when(jwtService.generateAccessToken("testuser")).thenReturn("access-token");
+            when(refreshTokenService.createRefreshToken(new Users())).thenReturn(refreshToken);
+            when(jwtService.getAccessTokenExpiry()).thenReturn(LocalDateTime.now().plusMinutes(15));
+            when(refreshToken.getToken()).thenReturn("refresh-token");
+            when()
+
+        }
+        
+    }**/
 }

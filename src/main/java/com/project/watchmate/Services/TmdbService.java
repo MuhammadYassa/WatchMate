@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -54,12 +55,13 @@ public class TmdbService {
         }
 
         for (Map.Entry<Long, String> entry : genreMap.entrySet()){
-            if (!genreRepository.existsById(entry.getKey())){
+            Long genreId = Objects.requireNonNull(entry.getKey(), "genreId");
+            if (!genreRepository.existsById(genreId)){
 
-                Genre genre = Genre.builder()
-                .id(entry.getKey())
+                Genre genre = Objects.requireNonNull(Genre.builder()
+                .id(genreId)
                 .name(entry.getValue())
-                .build();
+                .build());
 
                 genreRepository.save(genre);
             }
@@ -164,9 +166,10 @@ public class TmdbService {
         throw new MediaNotFoundException("TMDB media not found for ID: " + tmdbId);
     }
 
-        List<Long> genreIdsList = tmdbMedia.getGenres().stream().map(g -> g.getId()).toList();
+        List<Long> genreIdsList = (tmdbMedia.getGenres() != null ? tmdbMedia.getGenres() : List.<TmdbGenreDTO>of())
+                .stream().map(g -> g.getId()).toList();
 
-        List<Genre> genreList = genreRepository.findAllById(genreIdsList);
+        List<Genre> genreList = genreRepository.findAllById(Objects.requireNonNull(genreIdsList, "genreIdsList"));
 
         return Media.builder()
             .tmdbId(tmdbMedia.getId())

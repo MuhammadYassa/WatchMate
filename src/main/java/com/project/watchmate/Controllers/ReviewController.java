@@ -50,14 +50,14 @@ public class ReviewController {
         return ResponseEntity.noContent().build();
     }
     
-    @GetMapping("/get/{mediaId}")
+    @GetMapping("/get/reviews/{mediaId}")
     public ResponseEntity<List<ReviewResponseDTO>> getReviews(@AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable Long mediaId) {
         Users user = userPrincipal.getUser();
         List<ReviewResponseDTO> reviewResponses = reviewService.getReviews(user, mediaId);
         return ResponseEntity.ok(reviewResponses);
     }
     
-    @GetMapping("/get/{reviewId}")
+    @GetMapping("/get/review/{reviewId}")
     public ResponseEntity<ReviewResponseDTO> getReview(@AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable Long reviewId) {
         Users user = userPrincipal.getUser();
         ReviewResponseDTO reviewResponse = reviewService.getReview(user, reviewId);

@@ -1,6 +1,7 @@
 package com.project.watchmate.Services;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -44,7 +45,7 @@ public class SearchService {
                 .posterPath(result.getPosterPath())
                 .releaseDate(result.getReleaseDate())
                 .voteAverage(result.getVoteAverage())
-                .genres(genreRepository.findAllById(result.getGenreIds()).stream().map(Genre::getName).toList())
+                .genres(genreRepository.findAllById(Objects.requireNonNull(result.getGenreIds(), "genreIds")).stream().map(Genre::getName).toList())
                 .build())
                 .toList();
             return new PaginatedSearchResponseDTO(

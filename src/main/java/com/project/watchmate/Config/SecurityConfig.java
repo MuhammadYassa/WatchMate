@@ -23,7 +23,7 @@ import lombok.RequiredArgsConstructor;
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
-public class JwtConfig {
+public class SecurityConfig {
 
     public final WmUserDetailsService userDetailsService;
 
@@ -59,5 +59,10 @@ public class JwtConfig {
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception{
         return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public BCryptPasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(12);
     }
 }

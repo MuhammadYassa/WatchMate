@@ -1,6 +1,7 @@
 package com.project.watchmate.Services;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -23,12 +24,12 @@ public class RefreshTokenService {
     public RefreshToken createRefreshToken(Users user) {
         refreshTokenRepository.deleteByUser(user);
 
-        RefreshToken refreshToken = RefreshToken.builder()
+        RefreshToken refreshToken = Objects.requireNonNull(RefreshToken.builder()
             .token(UUID.randomUUID().toString())
             .user(user)
             .expiryDate(LocalDateTime.now().plusDays(7))
             .revoked(false)
-            .build();
+            .build());
 
         return refreshTokenRepository.save(refreshToken);
     }

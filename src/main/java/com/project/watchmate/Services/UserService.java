@@ -1,5 +1,7 @@
 package com.project.watchmate.Services;
 
+import java.util.Objects;
+
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -32,7 +34,7 @@ public class UserService {
 
     private final RefreshTokenService refreshTokenService;
 
-    private BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
+    private final BCryptPasswordEncoder encoder;
 
     public void register(RegisterRequestDTO registerRequest){
         if (userRepo.existsByUsername(registerRequest.getUsername())) {
@@ -42,12 +44,13 @@ public class UserService {
         throw new EmailException("Email is already in use.");
         }
 
-        try { Users user = Users.builder()
+        try {
+        Users user = Objects.requireNonNull(Users.builder()
         .username(registerRequest.getUsername())
         .password(encoder.encode(registerRequest.getPassword()))
         .email(registerRequest.getEmail())
         .emailVerified(false)
-        .build();
+        .build());
         userRepo.save(user);
 
         emailService.sendVerificationEmail(user.getEmail(), emailService.createToken(user));
@@ -60,10 +63,8 @@ public class UserService {
         Authentication auth = authManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
 
         if (auth.isAuthenticated()){
-            Users user = userRepo.findByUsername(loginRequest.getUsername());
-            if (user == null) {
-                throw new RuntimeException("User not Found");
-            }
+            Users user = userRepo.findByUsername(loginRequest.getUsername())
+                    .orElseThrow(() -> new RuntimeException("User not Found"));
             String accessToken = jwtService.generateAccessToken(loginRequest.getUsername());
             RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
 

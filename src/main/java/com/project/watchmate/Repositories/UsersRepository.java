@@ -14,9 +14,9 @@ import com.project.watchmate.Models.Users;
 
 @Repository
 public interface UsersRepository extends JpaRepository<Users, Long> {
-    Users findByUsername(String username);
+    Optional<Users> findByUsername(String username);
 
-    Users findByEmail(String email);
+    Optional<Users> findByEmail(String email);
 
     boolean existsByEmail(String email);
 

@@ -62,7 +62,7 @@ public class TmdbMovieDTO {
 
     public static Optional<LocalDate> parseDate(String dateString){
         if (dateString == null || dateString.isBlank()){
-            return null;
+            return Optional.empty();
         }
         try{
             DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");

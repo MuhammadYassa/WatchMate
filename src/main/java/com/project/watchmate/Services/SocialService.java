@@ -1,6 +1,7 @@
 package com.project.watchmate.Services;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -52,7 +53,7 @@ public class SocialService {
     private final ReviewService reviewService;
 
     private Users findAndValidateTargetUser(Long userId){
-        return usersRepository.findById(userId)
+        return usersRepository.findById(Objects.requireNonNull(userId, "userId"))
         .orElseThrow(() -> new UserNotFoundException("User not found"));
     }
 
@@ -130,12 +131,12 @@ public class SocialService {
         if (followRequestRepository.existsByRequestUserAndTargetUserAndStatus(user, targetUser, FollowRequestStatuses.PENDING)) {
             throw new AlreadyFollowingException("Follow request already pending");
         }
-        followRequestRepository.save(FollowRequest.builder()
+        followRequestRepository.save(Objects.requireNonNull(FollowRequest.builder()
         .targetUser(targetUser)
         .requestUser(user)
         .requestedAt(LocalDateTime.now())
         .status(FollowRequestStatuses.PENDING)
-        .build());
+        .build()));
         return FollowStatusDTO.builder()
         .followStatus(FollowStatuses.NOT_FOLLOWING)
         .build();
@@ -143,7 +144,7 @@ public class SocialService {
 
     @Transactional
     public FollowRequestResponseDTO respondToFollowRequest(Long requestId, Users user, FollowRequestStatuses response) {
-        FollowRequest request = followRequestRepository.findById(requestId)
+        FollowRequest request = followRequestRepository.findById(Objects.requireNonNull(requestId, "requestId"))
             .orElseThrow(() -> new FollowRequestNotFoundException("Request not found"));
         
         if (response == FollowRequestStatuses.CANCELED) {
@@ -153,7 +154,7 @@ public class SocialService {
             followRequestRepository.delete(request);
             return FollowRequestResponseDTO.builder()
             .newStatus(FollowRequestStatuses.CANCELED)
-            .requestId(requestId)
+            .requestId(Objects.requireNonNull(requestId, "requestId"))
             .build();           
         } else {
             if (!request.getTargetUser().equals(user)) {

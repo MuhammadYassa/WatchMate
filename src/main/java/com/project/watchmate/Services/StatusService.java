@@ -52,7 +52,7 @@ public class StatusService {
 		String normalized = statusString.trim().toUpperCase();
 		switch (normalized) {
 			case "TO_WATCH":
-				return WatchStatus.TO_wATCH;
+				return WatchStatus.TO_WATCH;
 			case "WATCHING":
 				return WatchStatus.WATCHING;
 			case "WATCHED":

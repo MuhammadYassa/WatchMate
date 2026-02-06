@@ -2,6 +2,7 @@ package com.project.watchmate.Services;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -55,10 +56,10 @@ public class WatchListService {
         if (watchListRepository.existsByUserAndNameIgnoreCase(user, name)){
             throw new IllegalArgumentException("Watchlist Already Exists.");
         }
-        WatchList watchList = WatchList.builder()
+        WatchList watchList = Objects.requireNonNull(WatchList.builder()
         .name(name)
         .user(user)
-        .build();
+        .build());
 
         watchListRepository.save(watchList);
 
@@ -66,7 +67,7 @@ public class WatchListService {
     }
 
     public void deleteWatchList(Users user, Long id) {
-        WatchList watchList = watchListRepository.findById(id).orElseThrow(() -> new WatchListNotFoundException("WatchList not Found"));
+        WatchList watchList = watchListRepository.findById(Objects.requireNonNull(id, "id")).orElseThrow(() -> new WatchListNotFoundException("WatchList not Found"));
 
         if (!watchList.getUser().getId().equals(user.getId())){
             throw new UnauthorizedWatchListAccessException("You do not own this watchlist");
@@ -76,7 +77,7 @@ public class WatchListService {
     }
 
     public WatchListDTO renameWatchList(Users user, Long id, String newName) {
-        WatchList watchList = watchListRepository.findById(id).orElseThrow(() -> new WatchListNotFoundException("WatchList not Found."));
+        WatchList watchList = watchListRepository.findById(Objects.requireNonNull(id, "id")).orElseThrow(() -> new WatchListNotFoundException("WatchList not Found."));
 
         if (!watchList.getUser().getId().equals(user.getId())){
             throw new UnauthorizedWatchListAccessException("You do not own this WatchList.");
@@ -103,13 +104,13 @@ public class WatchListService {
     }
 
     public WatchListDTO addMediaToWatchList(Users user, Long watchListId, Long tmdbId) {
-        WatchList watchList = watchListRepository.findById(watchListId).orElseThrow(() -> new WatchListNotFoundException("WatchList does not exist."));
+        WatchList watchList = watchListRepository.findById(Objects.requireNonNull(watchListId, "watchListId")).orElseThrow(() -> new WatchListNotFoundException("WatchList does not exist."));
 
         if(!watchList.getUser().getId().equals(user.getId())){
             throw new UnauthorizedWatchListAccessException("You do not own this WatchList");
         }
         
-        Media media = mediaRepository.findByTmdbId(tmdbId).orElseThrow(() -> new MediaNotFoundException("Media does not exist."));
+        Media media = mediaRepository.findByTmdbId(Objects.requireNonNull(tmdbId, "tmdbId")).orElseThrow(() -> new MediaNotFoundException("Media does not exist."));
 
         boolean alreadyExists = watchList.getItems().stream().anyMatch(item -> item.getMedia().getId().equals(media.getId()));
 
@@ -117,11 +118,11 @@ public class WatchListService {
             throw new DuplicateWatchListMediaException("Media already exists in current WatchList");
         }
 
-        WatchListItem newItem = WatchListItem.builder()
+        WatchListItem newItem = Objects.requireNonNull(WatchListItem.builder()
         .watchList(watchList)
         .media(media)
         .addedAt(LocalDateTime.now())
-        .build();
+        .build());
 
         watchList.getItems().add(newItem);
         watchListRepository.save(watchList);
@@ -130,13 +131,13 @@ public class WatchListService {
     }   
 
     public WatchListDTO removeMediaFromWatchList(Users user, Long watchListId, Long tmdbId) {
-        WatchList watchList = watchListRepository.findById(watchListId).orElseThrow(() -> new WatchListNotFoundException("WatchList does not exist."));
+        WatchList watchList = watchListRepository.findById(Objects.requireNonNull(watchListId, "watchListId")).orElseThrow(() -> new WatchListNotFoundException("WatchList does not exist."));
 
         if(!watchList.getUser().getId().equals(user.getId())){
             throw new UnauthorizedWatchListAccessException("You do not own this WatchList");
         }
 
-        Media media = mediaRepository.findByTmdbId(tmdbId).orElseThrow(() -> new MediaNotFoundException("Media does not exist."));
+        Media media = mediaRepository.findByTmdbId(Objects.requireNonNull(tmdbId, "tmdbId")).orElseThrow(() -> new MediaNotFoundException("Media does not exist."));
 
         WatchListItem itemToRemove = watchList.getItems().stream()
         .filter(item -> item.getMedia().getId().equals(media.getId()))

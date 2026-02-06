@@ -1,6 +1,8 @@
 package com.project.watchmate.Services;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -40,11 +42,11 @@ public class EmailVerificationTokenService {
     public String createToken(Users user){
         String token = UUID.randomUUID().toString();
 
-        EmailVerificationToken verificationToken = EmailVerificationToken.builder()
+        EmailVerificationToken verificationToken = Objects.requireNonNull(EmailVerificationToken.builder()
         .token(token)
         .user(user)
         .expiresAt(LocalDateTime.now().plusMinutes(15))
-        .build();
+        .build());
 
         tokenRepository.save(verificationToken);
         return token;
@@ -52,11 +54,11 @@ public class EmailVerificationTokenService {
 
     @Transactional
     public boolean verifyToken(String token){
-        EmailVerificationToken verificationToken = tokenRepository.getByToken(token);
-
-        if (verificationToken == null){
+        Optional<EmailVerificationToken> tokenOpt = tokenRepository.getByToken(token);
+        if (tokenOpt.isEmpty()){
             return false;
         }
+        EmailVerificationToken verificationToken = tokenOpt.get();
 
         if (verificationToken.getExpiresAt().isBefore(LocalDateTime.now())){
             tokenRepository.delete(verificationToken);
@@ -122,11 +124,8 @@ public class EmailVerificationTokenService {
 
     @Transactional
     public void resendVerificationEmail(String email){
-        Users user = usersRepository.findByEmail(email);
-
-        if (user == null){
-            throw new IllegalArgumentException("User not Found");
-        }
+        Users user = usersRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not Found"));
         if (user.isEmailVerified()){
             throw new IllegalStateException("Email already Verified");
         }
