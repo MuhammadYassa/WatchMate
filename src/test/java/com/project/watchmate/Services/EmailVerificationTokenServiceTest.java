@@ -33,7 +33,6 @@ import software.amazon.awssdk.services.ses.SesClient;
 import software.amazon.awssdk.services.ses.model.SendEmailRequest;
 
 @ExtendWith(MockitoExtension.class)
-@SuppressWarnings("null")
 public class EmailVerificationTokenServiceTest {
 
     @Mock

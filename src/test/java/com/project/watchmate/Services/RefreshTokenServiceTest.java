@@ -27,7 +27,6 @@ import com.project.watchmate.Models.Users;
 import com.project.watchmate.Repositories.RefreshTokenRepository;
 
 @ExtendWith(MockitoExtension.class)
-@SuppressWarnings("null")
 class RefreshTokenServiceTest {
 
     @Mock

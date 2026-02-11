@@ -37,7 +37,6 @@ import com.project.watchmate.Models.Users;
 import com.project.watchmate.Repositories.UsersRepository;
 
 @ExtendWith(MockitoExtension.class)
-@SuppressWarnings("null")
 class UserServiceTest {
 
     @Mock
