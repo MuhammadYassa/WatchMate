@@ -4,8 +4,8 @@ import java.util.List;
 import java.util.Objects;
 
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 
+import com.project.watchmate.Clients.TmdbClient;
 import com.project.watchmate.Dto.PaginatedSearchResponseDTO;
 import com.project.watchmate.Dto.SearchItemDTO;
 import com.project.watchmate.Dto.TmdbResponseDTO;
@@ -20,22 +20,17 @@ public class SearchService {
 
     private final GenreRepository genreRepository;
 
-    private final WebClient tmdbWebClient;
+    private final TmdbClient tmdbClient;
 
     public PaginatedSearchResponseDTO search(String query, int page){
         
-        return tmdbWebClient.get()
-        .uri(uriBuilder -> uriBuilder
-        .path("/search/multi")
-        .queryParam("query", query)
-        .queryParam("language", "en-US")
-        .queryParam("page", page)
-        .build())
-        .retrieve()
-        .bodyToMono(TmdbResponseDTO.class)
-        .blockOptional()
-        .map(dto -> {
-            List<SearchItemDTO> filtered = dto.getResults().stream()
+        TmdbResponseDTO dto = tmdbClient.searchMulti(query, page);
+
+        if (dto == null || dto.getResults() == null) {
+            return new PaginatedSearchResponseDTO(List.of(), page, 0, 0);
+        }
+
+        List<SearchItemDTO> filtered = dto.getResults().stream()
             .filter(result -> result.getTitle() != null && !result.getTitle().isBlank())
             .map(result -> SearchItemDTO.builder()
                 .id(result.getId())
@@ -45,17 +40,23 @@ public class SearchService {
                 .posterPath(result.getPosterPath())
                 .releaseDate(result.getReleaseDate())
                 .voteAverage(result.getVoteAverage())
-                .genres(genreRepository.findAllById(Objects.requireNonNull(result.getGenreIds(), "genreIds")).stream().map(Genre::getName).toList())
+                .genres(
+                    genreRepository
+                        .findAllById(
+                            Objects.requireNonNull(result.getGenreIds(), "genreIds")
+                        )
+                        .stream()
+                        .map(Genre::getName)
+                        .toList()
+                )
                 .build())
-                .toList();
-            return new PaginatedSearchResponseDTO(
-                filtered,
-                dto.getPage(),
-                dto.getTotalPages(),
-                dto.getTotalResults()
+            .toList();
 
-            );
-        })
-        .orElseGet(() -> new PaginatedSearchResponseDTO(List.of(), page, 0, 0));
+        return new PaginatedSearchResponseDTO(
+            filtered,
+            dto.getPage(),
+            dto.getTotalPages(),
+            dto.getTotalResults()
+        );
     }
 }

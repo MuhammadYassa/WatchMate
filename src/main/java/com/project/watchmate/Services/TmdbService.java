@@ -4,19 +4,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import com.project.watchmate.Clients.TmdbClient;
 import com.project.watchmate.Dto.TmdbGenreDTO;
-import com.project.watchmate.Dto.TmdbGenreResponseDTO;
 import com.project.watchmate.Dto.TmdbMovieDTO;
-import com.project.watchmate.Dto.TmdbResponseDTO;
-import com.project.watchmate.Exception.MediaNotFoundException;
 import com.project.watchmate.Models.Genre;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
@@ -25,7 +20,6 @@ import com.project.watchmate.Repositories.GenreRepository;
 import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.PopularMediaRepository;
 
-import io.jsonwebtoken.lang.Collections;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 
@@ -33,7 +27,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class TmdbService {
 
-    private final WebClient tmdbWebClient;
+    private final TmdbClient tmdbClient;
 
     private final MediaRepository mediaRepository;
 
@@ -43,44 +37,20 @@ public class TmdbService {
 
     @PostConstruct
     public void syncGenres(){
-        List<TmdbGenreDTO> movieGenres = fetchGenres("movie");
-        List<TmdbGenreDTO> showGenres = fetchGenres("tv");
+        List<TmdbGenreDTO> movieGenres = tmdbClient.fetchGenres("movie");
+        List<TmdbGenreDTO> showGenres = tmdbClient.fetchGenres("tv");
 
         Map<Long, String> genreMap = new HashMap<>();
-        for (TmdbGenreDTO dto : movieGenres){
-            genreMap.put(dto.getId(), dto.getName());
-        }
-        for (TmdbGenreDTO dto : showGenres){
-            genreMap.put(dto.getId(), dto.getName());
-        }
+        movieGenres.forEach(g -> genreMap.put(g.getId(), g.getName()));
+        showGenres.forEach(g -> genreMap.put(g.getId(), g.getName()));
 
-        for (Map.Entry<Long, String> entry : genreMap.entrySet()){
-            Long genreId = Objects.requireNonNull(entry.getKey(), "genreId");
-            if (!genreRepository.existsById(genreId)){
-
-                Genre genre = Objects.requireNonNull(Genre.builder()
-                .id(genreId)
-                .name(entry.getValue())
-                .build());
-
-                genreRepository.save(genre);
+        genreMap.forEach((id, name) -> {
+            if (!genreRepository.existsById(id)) {
+                genreRepository.save(
+                    Genre.builder().id(id).name(name).build()
+                );
             }
-        }
-    }
-
-    public List<TmdbGenreDTO> fetchGenres(String type){
-        try{
-            TmdbGenreResponseDTO response = tmdbWebClient.get()
-            .uri("/genre/{type}/list", type)
-            .retrieve()
-            .bodyToMono(TmdbGenreResponseDTO.class)
-            .block();
-
-            return response != null ? response.getGenres() : Collections.emptyList();
-        }
-        catch (Exception e){
-            return Collections.emptyList();
-        }
+        });
     }
 
     @Scheduled(cron = "0 47 23 * * *")
@@ -96,15 +66,7 @@ public class TmdbService {
 
     @Transactional
     public void fetchAndStorePopular(String type, MediaType mediaType){
-        String uri = "/" + type + "/popular?language=en-US&page=1";
-
-        List<TmdbMovieDTO> results = tmdbWebClient.get()
-        .uri(uri)
-        .retrieve()
-        .bodyToMono(TmdbResponseDTO.class)
-        .blockOptional()
-        .map(TmdbResponseDTO::getResults)
-        .orElse(List.of());
+        List<TmdbMovieDTO> results = tmdbClient.fetchPopular(type);
 
         List<Media> mediaList = results.stream()
         .map(item -> Media.builder()
@@ -152,24 +114,13 @@ public class TmdbService {
     }
 
     public Media fetchMediaByTmdbId(Long tmdbId, MediaType type){
-        String typePath = (type == MediaType.MOVIE) ? "movie" : "tv";
-        String uri = "/" + typePath + "/" + tmdbId + "?language=en-US";
-        TmdbMovieDTO tmdbMedia = new TmdbMovieDTO();
+        TmdbMovieDTO tmdbMedia = tmdbClient.fetchMediaById(tmdbId, type);
 
-        try {tmdbMedia = tmdbWebClient.get()
-        .uri(uri)
-        .retrieve()
-        .bodyToMono(TmdbMovieDTO.class)
-        .blockOptional()
-        .orElseThrow(() -> new MediaNotFoundException("TMDB media not found for ID: " + tmdbId)); 
-        } catch (WebClientResponseException.NotFound ex) {
-        throw new MediaNotFoundException("TMDB media not found for ID: " + tmdbId);
-    }
+        List<Long> genreIds = tmdbMedia.getGenres() == null
+            ? List.of()
+            : tmdbMedia.getGenres().stream().map(TmdbGenreDTO::getId).toList();
 
-        List<Long> genreIdsList = (tmdbMedia.getGenres() != null ? tmdbMedia.getGenres() : List.<TmdbGenreDTO>of())
-                .stream().map(g -> g.getId()).toList();
-
-        List<Genre> genreList = genreRepository.findAllById(Objects.requireNonNull(genreIdsList, "genreIdsList"));
+        List<Genre> genres = genreRepository.findAllById(genreIds);
 
         return Media.builder()
             .tmdbId(tmdbMedia.getId())
@@ -178,7 +129,7 @@ public class TmdbService {
             .posterPath(tmdbMedia.getPosterPath())
             .releaseDate(TmdbMovieDTO.parseDate(tmdbMedia.getReleaseDate()).orElse(null))
             .rating(tmdbMedia.getVoteAverage())
-            .genres(genreList)
+            .genres(genres)
             .type(type)
             .build();
     }

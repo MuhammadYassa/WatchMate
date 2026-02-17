@@ -27,7 +27,7 @@ public class WmUserDetailsService implements UserDetailsService{
             throw new DisabledException("Email not verified");
         }
 
-        return new UserPrincipal(user);
+        return UserPrincipal.builder().user(user).build();
     }
 
 }

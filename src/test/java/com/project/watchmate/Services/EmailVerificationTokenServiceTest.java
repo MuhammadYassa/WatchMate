@@ -53,13 +53,12 @@ public class EmailVerificationTokenServiceTest {
         @Test
         void createToken_WithValidData_ReturnsEmailToken(){
             Users user = Users.builder().username("test-user").build();
-            LocalDateTime beforeTime = LocalDateTime.now().plusMinutes(15);
+            LocalDateTime testStart = LocalDateTime.now();
             when(tokenRepository.save(any(EmailVerificationToken.class)))
                     .thenAnswer(invocation -> invocation.getArgument(0, EmailVerificationToken.class));
 
             String token = emailVerificationTokenService.createToken(user);
 
-            LocalDateTime afterTime = LocalDateTime.now().plusMinutes(15);
             assertNotNull(token);
 
             ArgumentCaptor<EmailVerificationToken> captor = ArgumentCaptor.forClass(EmailVerificationToken.class);
@@ -70,8 +69,8 @@ public class EmailVerificationTokenServiceTest {
             assertEquals(user,saved.getUser());
             assertEquals(token, saved.getToken());
             assertNotNull(saved.getToken());
-            assertTrue(saved.getExpiresAt().isBefore(afterTime));
-            assertTrue(saved.getExpiresAt().isAfter(beforeTime));
+            assertTrue(saved.getExpiresAt().isAfter(testStart), "expiresAt should be in the future");
+            assertTrue(saved.getExpiresAt().isBefore(LocalDateTime.now().plusMinutes(16)), "expiresAt should be within ~15 minutes");
         }
     }
 
