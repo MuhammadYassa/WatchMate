@@ -39,11 +39,11 @@ public class RefreshTokenService {
             .orElseThrow(() -> new InvalidRefreshTokenException("Invalid refresh token"));
 
         if (refreshToken.isRevoked()) {
-            throw new RuntimeException("Refresh token has been revoked");
+            throw new InvalidRefreshTokenException("Refresh token has been revoked");
         }
 
         if (refreshToken.getExpiryDate().isBefore(LocalDateTime.now())){
-            throw new RuntimeException("Refresh token has expired");
+            throw new InvalidRefreshTokenException("Refresh token has expired");
         }
 
         return refreshToken;

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.validation.annotation.Validated;
 
 import com.project.watchmate.Dto.FollowListUserDetailsDTO;
 import com.project.watchmate.Dto.FollowRequestDTO;
@@ -22,58 +23,62 @@ import com.project.watchmate.Models.Users;
 import com.project.watchmate.Services.SocialService;
 
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
 
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/social")
+@RequestMapping("/api/v1/social")
+@Validated
 public class SocialController {
 
-    private final int MAX_SIZE = 50;
+    private static final int MAX_SIZE = 50;
 
     private final SocialService socialService;
     
     @PostMapping("/follow/{userId}")
-    public ResponseEntity<FollowStatusDTO> followUser(@PathVariable Long userId, @AuthenticationPrincipal UserPrincipal userPrincipal) {
+    public ResponseEntity<FollowStatusDTO> followUser(@PathVariable @Min(1) Long userId, @AuthenticationPrincipal UserPrincipal userPrincipal) {
         Users user = userPrincipal.getUser();
         FollowStatusDTO response = socialService.followUser(userId, user);
         return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/unfollow/{userId}")
-    public ResponseEntity<FollowStatusDTO> unfollowUser(@PathVariable Long userId, @AuthenticationPrincipal UserPrincipal userPrincipal){
+    public ResponseEntity<FollowStatusDTO> unfollowUser(@PathVariable @Min(1) Long userId, @AuthenticationPrincipal UserPrincipal userPrincipal){
         Users user = userPrincipal.getUser();
         FollowStatusDTO response = socialService.unfollowUser(userId, user);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/follow-request/{requestId}/accept")
-    public ResponseEntity<FollowRequestResponseDTO> acceptFollowRequest(@PathVariable Long requestId, @AuthenticationPrincipal UserPrincipal userPrincipal) {
+    public ResponseEntity<FollowRequestResponseDTO> acceptFollowRequest(@PathVariable @Min(1) Long requestId, @AuthenticationPrincipal UserPrincipal userPrincipal) {
         Users user = userPrincipal.getUser();
         FollowRequestResponseDTO response = socialService.respondToFollowRequest(requestId, user, FollowRequestStatuses.ACCEPTED);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/follow-request/{requestId}/reject")
-    public ResponseEntity<FollowRequestResponseDTO> rejectFollowRequest(@PathVariable Long requestId, @AuthenticationPrincipal UserPrincipal userPrincipal) {
+    public ResponseEntity<FollowRequestResponseDTO> rejectFollowRequest(@PathVariable @Min(1) Long requestId, @AuthenticationPrincipal UserPrincipal userPrincipal) {
         Users user = userPrincipal.getUser();
         FollowRequestResponseDTO response = socialService.respondToFollowRequest(requestId, user, FollowRequestStatuses.REJECTED);
         return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/follow-request/{requestId}/cancel")
-    public ResponseEntity<FollowRequestResponseDTO> cancelFollowRequest(@PathVariable Long requestId, @AuthenticationPrincipal UserPrincipal userPrincipal) {
+    public ResponseEntity<FollowRequestResponseDTO> cancelFollowRequest(@PathVariable @Min(1) Long requestId, @AuthenticationPrincipal UserPrincipal userPrincipal) {
         Users user = userPrincipal.getUser();
         FollowRequestResponseDTO response = socialService.respondToFollowRequest(requestId, user, FollowRequestStatuses.CANCELED);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/follow-requests/received")
-    public ResponseEntity<Page<FollowRequestDTO>> receivedRequests(@AuthenticationPrincipal UserPrincipal userPrincipal, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
-        size = Math.min(size, MAX_SIZE);
-        size = Math.max(size, 1);
-        page = Math.max(page, 0);
+    public ResponseEntity<Page<FollowRequestDTO>> receivedRequests(
+        @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "10") @Min(1) @Max(MAX_SIZE) int size
+    ) {
         Users user = userPrincipal.getUser();
         Page<FollowRequestDTO> response = socialService.getReceivedRequests(user, page, size);
         return ResponseEntity.ok(response);
@@ -81,41 +86,43 @@ public class SocialController {
     
     
     @GetMapping("/follow-status/{userId}")
-    public ResponseEntity<FollowStatusDTO> followStatus(@PathVariable Long userId, @AuthenticationPrincipal UserPrincipal userPrincipal) {
+    public ResponseEntity<FollowStatusDTO> followStatus(@PathVariable @Min(1) Long userId, @AuthenticationPrincipal UserPrincipal userPrincipal) {
         Users user = userPrincipal.getUser();
         FollowStatusDTO response = socialService.getFollowStatus(userId, user);
         return ResponseEntity.ok(response);
     }
     
     @PostMapping("/block/{userId}")
-    public ResponseEntity<FollowStatusDTO> blockUser(@PathVariable Long userId, @AuthenticationPrincipal UserPrincipal userPrincipal) {
+    public ResponseEntity<FollowStatusDTO> blockUser(@PathVariable @Min(1) Long userId, @AuthenticationPrincipal UserPrincipal userPrincipal) {
         Users user = userPrincipal.getUser();
         FollowStatusDTO response = socialService.blockUser(userId, user);
         return ResponseEntity.ok(response);
     }
     
     @GetMapping("/followers-list")
-    public ResponseEntity<Page<FollowListUserDetailsDTO>> getFollowersList(@AuthenticationPrincipal UserPrincipal userPrincipal, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
-        size = Math.min(size, MAX_SIZE);
-        size = Math.max(size, 1);
-        page = Math.max(page, 0);
+    public ResponseEntity<Page<FollowListUserDetailsDTO>> getFollowersList(
+        @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "10") @Min(1) @Max(MAX_SIZE) int size
+    ) {
         Users user = userPrincipal.getUser();
         Page<FollowListUserDetailsDTO> response = socialService.getFollowersList(user, page, size);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/following-list")
-    public ResponseEntity<Page<FollowListUserDetailsDTO>> getFollowingList(@AuthenticationPrincipal UserPrincipal userPrincipal, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
-        size = Math.min(size, MAX_SIZE);
-        size = Math.max(size, 1);
-        page = Math.max(page, 0);
+    public ResponseEntity<Page<FollowListUserDetailsDTO>> getFollowingList(
+        @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "10") @Min(1) @Max(MAX_SIZE) int size
+    ) {
         Users user = userPrincipal.getUser();
         Page<FollowListUserDetailsDTO> response = socialService.getFollowingList(user, page, size);
         return ResponseEntity.ok(response);
     }
     
     @GetMapping("/user-profile/{userId}")
-    public ResponseEntity<UserProfileDTO> getUserProfile(@AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable Long userId) {
+    public ResponseEntity<UserProfileDTO> getUserProfile(@AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable @Min(1) Long userId) {
         Users user = userPrincipal.getUser();
         UserProfileDTO response = socialService.getUserProfile(userId, user);
         return ResponseEntity.ok(response);

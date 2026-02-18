@@ -42,7 +42,8 @@ public class MediaService {
     private final UserMediaStatusRepository userMediaStatusRepository;
 
     @Transactional
-    public MediaDetailsDTO getMediaDetails(Long tmdbId, MediaType type, Users userParam){
+    public MediaDetailsDTO getMediaDetails(Long tmdbId, String typeStr, Users userParam){
+        MediaType type = MediaType.valueOf(typeStr.toUpperCase());
         Long id = Objects.requireNonNull(tmdbId, "tmdbId");
         Long userId = Objects.requireNonNull(Objects.requireNonNull(userParam, "userParam").getId(), "userParam.id");
         Users user = usersRepository.findById(userId)

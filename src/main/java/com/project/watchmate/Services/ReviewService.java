@@ -54,8 +54,7 @@ public class ReviewService {
         return watchMateMapper.mapToReviewResponseDTO(review);
     }
 
-    public ReviewResponseDTO updateReview(Users user, UpdateReviewRequestDTO updateReviewRequest) {
-        Long reviewId = Objects.requireNonNull(updateReviewRequest.getReviewId(), "reviewId");
+    public ReviewResponseDTO updateReview(Users user, UpdateReviewRequestDTO updateReviewRequest, Long reviewId) {
         Review review = reviewRepository.findById(reviewId).orElseThrow(() -> new ReviewNotFoundException("Review not found"));
         if (!review.getUser().getId().equals(user.getId())) {
             throw new UnauthorizedReviewAccessException("You do not own this review");

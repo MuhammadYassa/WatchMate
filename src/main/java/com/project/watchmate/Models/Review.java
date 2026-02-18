@@ -8,6 +8,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,7 +21,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Entity
 @Builder
-@Table
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "media_id"}))
 public class Review {
 
     @Id
@@ -33,6 +36,8 @@ public class Review {
     @JoinColumn(name = "media_id")
     private Media media;
 
+    @Min(1)
+    @Max(5)
     private int rating;
 
     private String comment;

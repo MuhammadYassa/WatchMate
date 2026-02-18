@@ -67,7 +67,7 @@ public class WatchListService {
     }
 
     public void deleteWatchList(Users user, Long id) {
-        WatchList watchList = watchListRepository.findById(Objects.requireNonNull(id, "id")).orElseThrow(() -> new WatchListNotFoundException("WatchList not Found"));
+        WatchList watchList = watchListRepository.findById(Objects.requireNonNull(id, "id")).orElseThrow(() -> new WatchListNotFoundException("WatchList not found"));
 
         if (!watchList.getUser().getId().equals(user.getId())){
             throw new UnauthorizedWatchListAccessException("You do not own this watchlist");
@@ -77,7 +77,7 @@ public class WatchListService {
     }
 
     public WatchListDTO renameWatchList(Users user, Long id, String newName) {
-        WatchList watchList = watchListRepository.findById(Objects.requireNonNull(id, "id")).orElseThrow(() -> new WatchListNotFoundException("WatchList not Found."));
+        WatchList watchList = watchListRepository.findById(Objects.requireNonNull(id, "id")).orElseThrow(() -> new WatchListNotFoundException("WatchList not found"));
 
         if (!watchList.getUser().getId().equals(user.getId())){
             throw new UnauthorizedWatchListAccessException("You do not own this WatchList.");

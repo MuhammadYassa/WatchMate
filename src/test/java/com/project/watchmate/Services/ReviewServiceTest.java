@@ -112,13 +112,13 @@ class ReviewServiceTest {
 
         @Test
         void updateReview_WhenOwner_UpdatesAndSaves() {
-            UpdateReviewRequestDTO request = UpdateReviewRequestDTO.builder().reviewId(REVIEW_ID).starRating(4).comment("Updated").build();
+            UpdateReviewRequestDTO request = UpdateReviewRequestDTO.builder().starRating(4).comment("Updated").build();
             when(reviewRepository.findById(REVIEW_ID)).thenReturn(Optional.of(review));
             when(reviewRepository.save(any(Review.class))).thenReturn(review);
             ReviewResponseDTO dto = ReviewResponseDTO.builder().reviewId(REVIEW_ID).build();
             when(watchMateMapper.mapToReviewResponseDTO(any(Review.class))).thenReturn(dto);
 
-            reviewService.updateReview(user, request);
+            reviewService.updateReview(user, request, REVIEW_ID);
 
             assertEquals(4, review.getRating());
             assertEquals("Updated", review.getComment());
@@ -127,21 +127,21 @@ class ReviewServiceTest {
 
         @Test
         void updateReview_WhenNotOwner_ThrowsUnauthorizedReviewAccessException() {
-            UpdateReviewRequestDTO request = UpdateReviewRequestDTO.builder().reviewId(REVIEW_ID).build();
+            UpdateReviewRequestDTO request = UpdateReviewRequestDTO.builder().build();
             when(reviewRepository.findById(REVIEW_ID)).thenReturn(Optional.of(review));
 
             UnauthorizedReviewAccessException e = assertThrows(UnauthorizedReviewAccessException.class,
-                () -> reviewService.updateReview(otherUser, request));
+                () -> reviewService.updateReview(otherUser, request, REVIEW_ID));
             assertEquals("You do not own this review", e.getMessage());
             verify(reviewRepository, never()).save(any(Review.class));
         }
 
         @Test
         void updateReview_WhenReviewNotFound_ThrowsReviewNotFoundException() {
-            UpdateReviewRequestDTO request = UpdateReviewRequestDTO.builder().reviewId(999L).build();
+            UpdateReviewRequestDTO request = UpdateReviewRequestDTO.builder().build();
             when(reviewRepository.findById(999L)).thenReturn(Optional.empty());
 
-            ReviewNotFoundException e = assertThrows(ReviewNotFoundException.class, () -> reviewService.updateReview(user, request));
+            ReviewNotFoundException e = assertThrows(ReviewNotFoundException.class, () -> reviewService.updateReview(user, request, 999L));
             assertEquals("Review not found", e.getMessage());
             verify(reviewRepository, never()).save(any(Review.class));
         }

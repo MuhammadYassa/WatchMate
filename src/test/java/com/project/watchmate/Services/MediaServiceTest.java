@@ -85,7 +85,7 @@ class MediaServiceTest {
             when(userMediaStatusRepository.findByUserAndMedia(user, media)).thenReturn(Optional.empty());
             when(watchMateMapper.mapToMediaDetailsDTO(media, List.of(), false, WatchStatus.NONE)).thenReturn(expectedDto);
 
-            MediaDetailsDTO result = mediaService.getMediaDetails(TMDB_ID, MediaType.MOVIE, user);
+            MediaDetailsDTO result = mediaService.getMediaDetails(TMDB_ID, "movie", user);
 
             assertNotNull(result);
             assertEquals(TMDB_ID, result.getTmdbId());
@@ -108,7 +108,7 @@ class MediaServiceTest {
             when(userMediaStatusRepository.findByUserAndMedia(user, media)).thenReturn(Optional.empty());
             when(watchMateMapper.mapToMediaDetailsDTO(any(), any(), eq(false), eq(WatchStatus.NONE))).thenReturn(expectedDto);
 
-            MediaDetailsDTO result = mediaService.getMediaDetails(TMDB_ID, MediaType.MOVIE, user);
+            MediaDetailsDTO result = mediaService.getMediaDetails(TMDB_ID, "movie", user);
 
             assertNotNull(result);
             assertEquals(TMDB_ID, result.getTmdbId());
@@ -126,7 +126,7 @@ class MediaServiceTest {
             when(usersRepository.findById(1L)).thenReturn(Optional.empty());
 
             RuntimeException exception = assertThrows(RuntimeException.class,
-                () -> mediaService.getMediaDetails(TMDB_ID, MediaType.MOVIE, user));
+                () -> mediaService.getMediaDetails(TMDB_ID, "movie", user));
             assertEquals("User not found", exception.getMessage());
             verify(mediaRepository, never()).save(any(Media.class));
         }
@@ -139,7 +139,7 @@ class MediaServiceTest {
                 .thenThrow(new MediaNotFoundException("TMDB media not found for ID: " + TMDB_ID));
 
             MediaNotFoundException exception = assertThrows(MediaNotFoundException.class,
-                () -> mediaService.getMediaDetails(TMDB_ID, MediaType.MOVIE, user));
+                () -> mediaService.getMediaDetails(TMDB_ID, "movie", user));
             assertEquals("TMDB media not found for ID: " + TMDB_ID, exception.getMessage());
         }
     }
