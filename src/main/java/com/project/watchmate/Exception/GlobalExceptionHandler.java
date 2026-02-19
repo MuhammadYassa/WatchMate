@@ -25,12 +25,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(EmailException.class)
     public ResponseEntity<ApiError> handleDuplicate(EmailException ex){
-        return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(new ApiError(ex.getMessage(), "DUPLICATE_EMAIL", null));
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError(ex.getMessage(), "DUPLICATE_EMAIL", null));
     }
 
     @ExceptionHandler(UsernameException.class)
     public ResponseEntity<ApiError> handleDuplicate(UsernameException ex){
-        return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(new ApiError(ex.getMessage(), "DUPLICATE_USERNAME", null));
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError(ex.getMessage(), "DUPLICATE_USERNAME", null));
     }
 
     @ExceptionHandler(InvalidRefreshTokenException.class)

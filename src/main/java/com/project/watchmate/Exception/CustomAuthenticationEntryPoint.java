@@ -13,10 +13,13 @@ import com.project.watchmate.Dto.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 @RequiredArgsConstructor
 public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint{
+
+    private final ObjectMapper objectMapper;
 
     @Override
     public void commence(HttpServletRequest request,
@@ -31,8 +34,6 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint{
 
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.getWriter().write(
-            "{\"message\":\"" + error.message() + "\",\"code\":\"" + error.code() + "\",\"fields\":null}"
-        );
+        response.getWriter().write(objectMapper.writeValueAsString(error));
     }
 }
