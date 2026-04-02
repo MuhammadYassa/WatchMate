@@ -22,8 +22,10 @@ import com.project.watchmate.Repositories.PopularMediaRepository;
 
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class TmdbService {
 
@@ -44,18 +46,28 @@ public class TmdbService {
         movieGenres.forEach(g -> genreMap.put(g.getId(), g.getName()));
         showGenres.forEach(g -> genreMap.put(g.getId(), g.getName()));
 
+        final int[] createdCount = {0};
         genreMap.forEach((id, name) -> {
             if (!genreRepository.existsById(id)) {
                 genreRepository.save(
                     Genre.builder().id(id).name(name).build()
                 );
+                createdCount[0]++;
             }
         });
+        log.info("TMDB genre sync completed totalFetched={} newGenresCreated={}", genreMap.size(), createdCount[0]);
     }
 
     @Scheduled(cron = "0 47 23 * * *")
     public void popularMedia(){
-        fetchAndStorePopularMedia();
+        log.info("TMDB popular media sync started");
+        try {
+            fetchAndStorePopularMedia();
+            log.info("TMDB popular media sync completed");
+        } catch (RuntimeException ex) {
+            log.error("TMDB popular media sync failed", ex);
+            throw ex;
+        }
     }
 
     public void fetchAndStorePopularMedia(){
@@ -90,6 +102,7 @@ public class TmdbService {
             .build());
         }
         popularMediaRepository.saveAll(popularList);
+        log.info("Stored popular media type={} itemCount={}", mediaType, popularList.size());
     }
 
     public List<Media> saveAndUpdateMedia(List<Media> mediaList){
@@ -122,7 +135,7 @@ public class TmdbService {
 
         List<Genre> genres = genreRepository.findAllById(genreIds);
 
-        return Media.builder()
+        Media media = Media.builder()
             .tmdbId(tmdbMedia.getId())
             .title(tmdbMedia.getTitle())
             .overview(tmdbMedia.getOverview())
@@ -132,5 +145,7 @@ public class TmdbService {
             .genres(genres)
             .type(type)
             .build();
+        log.info("Fetched media details from TMDB tmdbId={} type={} genreCount={}", tmdbId, type, genres.size());
+        return media;
     }
 }

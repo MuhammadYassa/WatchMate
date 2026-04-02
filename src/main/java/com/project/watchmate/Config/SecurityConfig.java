@@ -40,6 +40,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(request -> request
                     .requestMatchers("/api/v1/auth/register","/api/v1/auth/login", "/api/v1/auth/verify/**", "/api/v1/auth/verify", "/api/v1/auth/refresh")
                     .permitAll()
+                    .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/v3/api-docs.yaml")
+                    .permitAll()
                     .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())
                 .sessionManagement(session ->

@@ -15,8 +15,10 @@ import com.project.watchmate.Models.MediaType;
 
 import io.jsonwebtoken.lang.Collections;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Component
+@Slf4j
 @RequiredArgsConstructor
 public class TmdbClientImpl implements TmdbClient {
 
@@ -33,19 +35,28 @@ public class TmdbClientImpl implements TmdbClient {
 
             return response != null ? response.getGenres() : Collections.emptyList();
         } catch (Exception e) {
+            log.warn("TMDB genre fetch failed type={} reason={}", type, e.getClass().getSimpleName());
             return Collections.emptyList();
         }
     }
 
     @Override
     public List<TmdbMovieDTO> fetchPopular(String type) {
-        return tmdbWebClient.get()
-            .uri("/" + type + "/popular?language=en-US&page=1")
-            .retrieve()
-            .bodyToMono(TmdbResponseDTO.class)
-            .blockOptional()
-            .map(TmdbResponseDTO::getResults)
-            .orElse(List.of());
+        try {
+            return tmdbWebClient.get()
+                .uri("/" + type + "/popular?language=en-US&page=1")
+                .retrieve()
+                .bodyToMono(TmdbResponseDTO.class)
+                .blockOptional()
+                .map(TmdbResponseDTO::getResults)
+                .orElse(List.of());
+        } catch (WebClientResponseException ex) {
+            log.warn("TMDB popular fetch failed type={} status={}", type, ex.getStatusCode().value());
+            return List.of();
+        } catch (Exception ex) {
+            log.error("TMDB popular fetch failed type={}", type, ex);
+            return List.of();
+        }
     }
 
     @Override
@@ -62,21 +73,33 @@ public class TmdbClientImpl implements TmdbClient {
                 .orElseThrow(() ->
                     new MediaNotFoundException("TMDB media not found for ID: " + tmdbId));
         } catch (WebClientResponseException.NotFound ex) {
+            log.warn("TMDB media not found tmdbId={} type={}", tmdbId, type);
             throw new MediaNotFoundException("TMDB media not found for ID: " + tmdbId);
+        } catch (WebClientResponseException ex) {
+            log.error("TMDB media lookup failed tmdbId={} type={} status={}", tmdbId, type, ex.getStatusCode().value(), ex);
+            throw ex;
         }
     }
 
     @Override
     public TmdbResponseDTO searchMulti(String query, int page) {
-        return tmdbWebClient.get()
-            .uri(uriBuilder -> uriBuilder
-                .path("/search/multi")
-                .queryParam("query", query)
-                .queryParam("language", "en-US")
-                .queryParam("page", page)
-                .build())
-            .retrieve()
-            .bodyToMono(TmdbResponseDTO.class)
-            .block();
+        try {
+            return tmdbWebClient.get()
+                .uri(uriBuilder -> uriBuilder
+                    .path("/search/multi")
+                    .queryParam("query", query)
+                    .queryParam("language", "en-US")
+                    .queryParam("page", page)
+                    .build())
+                .retrieve()
+                .bodyToMono(TmdbResponseDTO.class)
+                .block();
+        } catch (WebClientResponseException ex) {
+            log.warn("TMDB search failed page={} status={}", page, ex.getStatusCode().value());
+            throw ex;
+        } catch (Exception ex) {
+            log.error("TMDB search failed page={}", page, ex);
+            throw ex;
+        }
     }
 }

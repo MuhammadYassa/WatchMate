@@ -33,8 +33,10 @@ import com.project.watchmate.Repositories.UserMediaStatusRepository;
 import com.project.watchmate.Repositories.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class SocialService {
 
@@ -107,6 +109,7 @@ public class SocialService {
 
         usersRepository.save(user);
         usersRepository.save(targetUser);
+        log.info("User unfollowed target username={} targetUsername={}", user.getUsername(), targetUser.getUsername());
 
         return FollowStatusDTO.builder()
         .followStatus(FollowStatuses.NOT_FOLLOWING)
@@ -120,6 +123,7 @@ public class SocialService {
 
         usersRepository.save(user);
         usersRepository.save(targetUser);
+        log.info("User followed target username={} targetUsername={}", user.getUsername(), targetUser.getUsername());
 
         return FollowStatusDTO.builder()
         .followStatus(FollowStatuses.FOLLOWING)
@@ -137,6 +141,7 @@ public class SocialService {
         .requestedAt(LocalDateTime.now())
         .status(FollowRequestStatuses.PENDING)
         .build()));
+        log.info("Follow request created username={} targetUsername={}", user.getUsername(), targetUser.getUsername());
         return FollowStatusDTO.builder()
         .followStatus(FollowStatuses.NOT_FOLLOWING)
         .build();
@@ -152,6 +157,10 @@ public class SocialService {
                 throw new UnauthorizedFollowRequestAccessException("You can only cancel your own requests");
             }
             followRequestRepository.delete(request);
+            log.info("Follow request canceled requestId={} username={} targetUsername={}",
+                requestId,
+                request.getRequestUser().getUsername(),
+                request.getTargetUser().getUsername());
             return FollowRequestResponseDTO.builder()
             .newStatus(FollowRequestStatuses.CANCELED)
             .requestId(Objects.requireNonNull(requestId, "requestId"))
@@ -168,6 +177,11 @@ public class SocialService {
             }
             
             followRequestRepository.save(request);
+            log.info("Follow request responded requestId={} response={} requestUsername={} targetUsername={}",
+                requestId,
+                response,
+                request.getRequestUser().getUsername(),
+                request.getTargetUser().getUsername());
             return FollowRequestResponseDTO.builder()
                 .newStatus(response)
                 .build();
@@ -230,6 +244,7 @@ public class SocialService {
         if (usersRepository.isBlockingUser(user.getId(), targetUser.getId())){
             user.getBlockedUsers().remove(targetUser);
             usersRepository.save(user);
+            log.info("User unblocked target username={} targetUsername={}", user.getUsername(), targetUser.getUsername());
             return FollowStatusDTO.builder()
             .followStatus(FollowStatuses.NOT_FOLLOWING)
             .build();
@@ -239,6 +254,8 @@ public class SocialService {
             usersRepository.deleteFollowRelation(targetUser.getId(), user.getId());
             followRequestRepository.deleteByRequestUserAndTargetUser(user, targetUser);
             followRequestRepository.deleteByRequestUserAndTargetUser(targetUser, user);
+            usersRepository.save(user);
+            log.info("User blocked target username={} targetUsername={}", user.getUsername(), targetUser.getUsername());
             return FollowStatusDTO.builder()
             .followStatus(FollowStatuses.BLOCKED)
             .build();

@@ -2,6 +2,7 @@ package com.project.watchmate.Filters;
 
 import java.io.IOException;
 
+import org.slf4j.MDC;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -17,8 +18,10 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Component
+@Slf4j
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter{
 
@@ -32,19 +35,28 @@ public class JwtFilter extends OncePerRequestFilter{
         String token = null;
         String username = null;
 
-        if (authHeader != null && authHeader.startsWith("Bearer ")){
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
-            username = jwtService.extractUsername(token);
-        }
+            try {
+                username = jwtService.extractUsername(token);
 
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null){
-            
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                if (username != null && SecurityContextHolder.getContext().getAuthentication() == null){
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-            if (jwtService.validateToken(token, userDetails)){
-                UsernamePasswordAuthenticationToken token2 = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                token2.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(token2);
+                    if (jwtService.validateToken(token, userDetails)){
+                        UsernamePasswordAuthenticationToken token2 = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                        token2.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(token2);
+                        log.info("Authenticated request via JWT username={} path={}", username, request.getRequestURI());
+                    } else {
+                        log.warn("Rejected JWT for username={} path={}", username, request.getRequestURI());
+                    }
+                }
+            } catch (RuntimeException ex) {
+                log.warn("JWT authentication failed path={} reason={} correlationId={}",
+                    request.getRequestURI(),
+                    ex.getClass().getSimpleName(),
+                    MDC.get(CorrelationIdFilter.CORRELATION_ID_KEY));
             }
         }
         filterChain.doFilter(request, response);

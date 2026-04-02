@@ -15,14 +15,17 @@ import com.project.watchmate.Repositories.EmailVerificationTokenRepository;
 import com.project.watchmate.Repositories.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import software.amazon.awssdk.services.ses.SesClient;
 import software.amazon.awssdk.services.ses.model.Body;
 import software.amazon.awssdk.services.ses.model.Content;
 import software.amazon.awssdk.services.ses.model.Destination;
 import software.amazon.awssdk.services.ses.model.Message;
 import software.amazon.awssdk.services.ses.model.SendEmailRequest;
+import software.amazon.awssdk.services.ses.model.SesException;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class EmailVerificationTokenService {
 
@@ -49,6 +52,7 @@ public class EmailVerificationTokenService {
         .build());
 
         tokenRepository.save(verificationToken);
+        log.info("Created email verification token username={}", user.getUsername());
         return token;
     }
 
@@ -56,12 +60,14 @@ public class EmailVerificationTokenService {
     public boolean verifyToken(String token){
         Optional<EmailVerificationToken> tokenOpt = tokenRepository.getByToken(token);
         if (tokenOpt.isEmpty()){
+            log.warn("Email verification failed reason=token_not_found");
             return false;
         }
         EmailVerificationToken verificationToken = tokenOpt.get();
 
         if (verificationToken.getExpiresAt().isBefore(LocalDateTime.now())){
             tokenRepository.delete(verificationToken);
+            log.warn("Email verification failed reason=token_expired username={}", verificationToken.getUser().getUsername());
             return false;
         }
 
@@ -70,6 +76,7 @@ public class EmailVerificationTokenService {
         usersRepository.save(user);
 
         tokenRepository.delete(verificationToken);
+        log.info("Email verified username={}", user.getUsername());
 
         return true;
     }
@@ -119,7 +126,16 @@ public class EmailVerificationTokenService {
             .source(verifiedSender)
             .build();
 
+            try {
             sesClient.sendEmail(emailRequest);
+            log.info("Verification email sent");
+            } catch (SesException ex) {
+                log.error("Verification email send failed reason={} statusCode={}",
+                    ex.awsErrorDetails() != null ? ex.awsErrorDetails().errorCode() : "unknown",
+                    ex.statusCode(),
+                    ex);
+                throw ex;
+            }
     }
 
     @Transactional
@@ -135,5 +151,6 @@ public class EmailVerificationTokenService {
         String token = createToken(user);
 
         sendVerificationEmail(email, token);
+        log.info("Verification email resent username={}", user.getUsername());
     }
 }
