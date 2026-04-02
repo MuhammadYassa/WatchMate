@@ -151,7 +151,7 @@ public class EmailVerificationTokenServiceTest {
             assertTrue(request.destination().toAddresses().contains(toEmail));
             assertEquals("Verify Your Email - WatchMate", request.message().subject().data());
             assertTrue(request.message().body().html().data().contains(token));
-            assertTrue(request.message().body().html().data().contains("https://app.example.com/verify?token=" + token));
+            assertTrue(request.message().body().html().data().contains("https://app.example.com/api/v1/auth/verify?token=" + token));
         }
     }
 
