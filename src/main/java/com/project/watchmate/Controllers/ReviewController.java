@@ -15,11 +15,20 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.project.watchmate.Models.UserPrincipal;
 import com.project.watchmate.Models.Users;
+import com.project.watchmate.Dto.ApiError;
 import com.project.watchmate.Dto.CreateReviewRequestDTO;
 import com.project.watchmate.Dto.ReviewResponseDTO;
 import com.project.watchmate.Dto.UpdateReviewRequestDTO;
 import com.project.watchmate.Services.ReviewService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -28,13 +37,24 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/reviews")
 @Validated
+@Tag(name = "Reviews", description = "Authenticated review management endpoints.")
+@SecurityRequirement(name = "bearerAuth")
 public class ReviewController {
 
     private final ReviewService reviewService;
 
     @PostMapping("/create")
+    @Operation(summary = "Create review", description = "Creates a new review for a media item.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "Review created", content = @Content(schema = @Schema(implementation = ReviewResponseDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Validation failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "404", description = "Media not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "409", description = "Review already exists for this media", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
     public ResponseEntity<ReviewResponseDTO> createReview(
-        @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
         @Valid @RequestBody CreateReviewRequestDTO reviewRequest
     ) {
         Users user = userPrincipal.getUser();
@@ -43,8 +63,17 @@ public class ReviewController {
     }
 
     @PatchMapping("/{reviewId}")
+    @Operation(summary = "Update review", description = "Updates an existing review owned by the authenticated user.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Review updated", content = @Content(schema = @Schema(implementation = ReviewResponseDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Validation failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "403", description = "Review not owned by user", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "404", description = "Review not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
     public ResponseEntity<ReviewResponseDTO> updateReview(
-        @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
         @Valid @RequestBody UpdateReviewRequestDTO updateReviewRequest,
         @PathVariable @Min(1) Long reviewId
     ) {
@@ -54,8 +83,17 @@ public class ReviewController {
     }
     
     @DeleteMapping("/{reviewId}")
+    @Operation(summary = "Delete review", description = "Deletes an existing review owned by the authenticated user.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Review deleted"),
+        @ApiResponse(responseCode = "400", description = "Invalid path parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "403", description = "Review not owned by user", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "404", description = "Review not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
     public ResponseEntity<Void> deleteReview(
-        @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
         @PathVariable @Min(1) Long reviewId
     ) {
         Users user = userPrincipal.getUser();
@@ -64,8 +102,16 @@ public class ReviewController {
     }
     
     @GetMapping("/{reviewId}")
+    @Operation(summary = "Get review", description = "Returns a review by its identifier.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Review returned", content = @Content(schema = @Schema(implementation = ReviewResponseDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid path parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "404", description = "Review not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
     public ResponseEntity<ReviewResponseDTO> getReview(
-        @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
         @PathVariable @Min(1) Long reviewId
     ) {
         Users user = userPrincipal.getUser();
