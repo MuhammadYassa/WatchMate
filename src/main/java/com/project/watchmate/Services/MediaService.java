@@ -2,6 +2,7 @@ package com.project.watchmate.Services;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.project.watchmate.Dto.MediaDetailsDTO;
+import com.project.watchmate.Dto.PopularMediaResponseDTO;
 import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
@@ -19,6 +21,7 @@ import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
 import com.project.watchmate.Repositories.MediaRepository;
+import com.project.watchmate.Repositories.PopularMediaRepository;
 import com.project.watchmate.Repositories.ReviewRepository;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
 import com.project.watchmate.Repositories.UsersRepository;
@@ -32,6 +35,8 @@ public class MediaService {
     private final MediaRepository mediaRepository;
 
     private final UsersRepository usersRepository;
+
+    private final PopularMediaRepository popularMediaRepository;
 
     private final TmdbService tmdbService;
 
@@ -71,5 +76,18 @@ public class MediaService {
     public Page<Media> getShowsWatchedPage(Users user){
         Pageable pageable = PageRequest.of(0, 5, Sort.by("releaseDate").descending().and(Sort.by("title")).descending());
         return userMediaStatusRepository.findWatchedShowsByUser(user, pageable);
+    }
+
+    public List<PopularMediaResponseDTO> getPopularMedia() {
+        return popularMediaRepository.findAll().stream()
+            .map(pm -> PopularMediaResponseDTO.builder()
+                .rank(pm.getPopularityRank())
+                .title(pm.getMedia().getTitle())
+                .overview(pm.getMedia().getOverview())
+                .posterPath(pm.getMedia().getPosterPath())
+                .rating(pm.getMedia().getRating())
+                .type(pm.getMedia().getType().toString())
+                .build()
+            ).collect(Collectors.toList());
     }
 }

@@ -1,7 +1,6 @@
 package com.project.watchmate.Services;
 
 import java.util.List;
-import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 
@@ -43,7 +42,7 @@ public class SearchService {
                 .genres(
                     genreRepository
                         .findAllById(
-                            Objects.requireNonNull(result.getGenreIds(), "genreIds")
+                            result.getGenreIds() != null ? result.getGenreIds() : List.of()
                         )
                         .stream()
                         .map(Genre::getName)

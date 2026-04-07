@@ -36,7 +36,7 @@ public class TmdbMovieDTO {
     private String releaseDate;
 
     @JsonProperty("vote_average")
-    private double voteAverage;
+    private Double voteAverage;
 
     @Builder.Default
     @JsonProperty("genres")
