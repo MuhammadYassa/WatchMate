@@ -28,6 +28,7 @@ public class RefreshTokenService {
             .token(UUID.randomUUID().toString())
             .user(user)
             .expiryDate(LocalDateTime.now().plusDays(7))
+            .createdAt(LocalDateTime.now())
             .revoked(false)
             .build());
 
