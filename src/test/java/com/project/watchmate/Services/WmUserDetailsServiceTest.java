@@ -33,7 +33,7 @@ class WmUserDetailsServiceTest {
     private WmUserDetailsService wmUserDetailsService;
 
     @Nested
-    @DisplayName("loadUserByUsername")
+    @DisplayName("Load User By Username Tests")
     class LoadUserByUsernameTests {
 
         @Test

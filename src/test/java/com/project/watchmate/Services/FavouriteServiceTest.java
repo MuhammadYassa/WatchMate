@@ -74,7 +74,7 @@ class FavouriteServiceTest {
     }
 
     @Nested
-    @DisplayName("addToFavourites")
+    @DisplayName("Add to Favourites Tests")
     class AddToFavouritesTests {
 
         @Test
@@ -119,7 +119,7 @@ class FavouriteServiceTest {
     }
 
     @Nested
-    @DisplayName("removeFromFavourites")
+    @DisplayName("Remove from Favourites Tests")
     class RemoveFromFavouritesTests {
 
         @Test
@@ -163,7 +163,7 @@ class FavouriteServiceTest {
     }
 
     @Nested
-    @DisplayName("isFavourited")
+    @DisplayName("Is Favourited Tests")
     class IsFavouritedTests {
 
         @Test
@@ -202,7 +202,7 @@ class FavouriteServiceTest {
     }
 
     @Nested
-    @DisplayName("getUserFavourites")
+    @DisplayName("Get User Favourites Tests")
     class GetUserFavouritesTests {
 
         @Test

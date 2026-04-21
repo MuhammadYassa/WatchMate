@@ -74,7 +74,7 @@ class MediaServiceTest {
     }
 
     @Nested
-    @DisplayName("getMediaDetails")
+    @DisplayName("Get Media Details Tests")
     class GetMediaDetailsTests {
 
         @Test
@@ -145,7 +145,7 @@ class MediaServiceTest {
     }
 
     @Nested
-    @DisplayName("getMoviesWatchedPage / getShowsWatchedPage")
+    @DisplayName("Get Watched Pages Tests")
     class GetWatchedPagesTests {
 
         @Test

@@ -36,7 +36,7 @@ class SearchServiceTest {
     private SearchService searchService;
 
     @Nested
-    @DisplayName("search")
+    @DisplayName("Search Tests")
     class SearchTests {
 
         @Test

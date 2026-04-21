@@ -74,7 +74,7 @@ class UserServiceTest {
             .build();
     }
     @Nested
-    @DisplayName("Register Method Tests")
+    @DisplayName("Register Tests")
     class RegisterTests{
         @Test
         void register_WithValidData_ShouldSaveUserAndSendEmail() {
@@ -173,7 +173,7 @@ class UserServiceTest {
     }
     
     @Nested
-    @DisplayName("Verify Method Tests")
+    @DisplayName("Verify Tests")
     class VerifyTests{
         @Test
         void verify_WithValidCredentials_ShouldReturnAccessAndRefreshToken(){
@@ -228,7 +228,7 @@ class UserServiceTest {
     }
 
     @Nested
-    @DisplayName("Refresh Token Method Tests")
+    @DisplayName("Refresh Token Tests")
     class RefreshTokenTests{
         @Test
         void refreshToken_WithValidToken_ShouldReturnNewAccessAndRefreshToken(){

@@ -65,7 +65,7 @@ class ReviewServiceTest {
     }
 
     @Nested
-    @DisplayName("createReview")
+    @DisplayName("Create Review Tests")
     class CreateReviewTests {
 
         @Test
@@ -107,7 +107,7 @@ class ReviewServiceTest {
     }
 
     @Nested
-    @DisplayName("updateReview")
+    @DisplayName("Update Review Tests")
     class UpdateReviewTests {
 
         @Test
@@ -148,7 +148,7 @@ class ReviewServiceTest {
     }
 
     @Nested
-    @DisplayName("deleteReview")
+    @DisplayName("Delete Review Tests")
     class DeleteReviewTests {
 
         @Test
@@ -183,7 +183,7 @@ class ReviewServiceTest {
     }
 
     @Nested
-    @DisplayName("getReviews")
+    @DisplayName("Get All Reviews Tests")
     class GetReviewsTests {
 
         @Test
@@ -210,7 +210,7 @@ class ReviewServiceTest {
     }
 
     @Nested
-    @DisplayName("getReview")
+    @DisplayName("Get Review Tests")
     class GetReviewTests {
 
         @Test

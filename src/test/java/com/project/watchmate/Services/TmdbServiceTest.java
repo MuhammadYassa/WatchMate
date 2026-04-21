@@ -63,7 +63,7 @@ class TmdbServiceTest {
     }
 
     @Nested
-    @DisplayName("fetchMediaByTmdbId")
+    @DisplayName("Fetch Media By TMDB ID Tests")
     class FetchMediaByTmdbIdTests {
 
         @Test
@@ -100,7 +100,7 @@ class TmdbServiceTest {
     }
 
     @Nested
-    @DisplayName("saveAndUpdateMedia")
+    @DisplayName("Save and Update Media Tests")
     class SaveAndUpdateMediaTests {
 
         @Test

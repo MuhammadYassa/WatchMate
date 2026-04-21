@@ -76,7 +76,7 @@ class WatchListServiceTest {
     }
 
     @Nested
-    @DisplayName("createWatchList")
+    @DisplayName("Create WatchList Tests")
     class CreateWatchListTests {
 
         @Test
@@ -109,7 +109,7 @@ class WatchListServiceTest {
     }
 
     @Nested
-    @DisplayName("deleteWatchList")
+    @DisplayName("Delete WatchList Tests")
     class DeleteWatchListTests {
 
         @Test
@@ -145,7 +145,7 @@ class WatchListServiceTest {
     }
 
     @Nested
-    @DisplayName("addMediaToWatchList")
+    @DisplayName("Add Media to WatchList Tests")
     class AddMediaToWatchListTests {
 
         @Test
@@ -205,7 +205,7 @@ class WatchListServiceTest {
     }
 
     @Nested
-    @DisplayName("removeMediaFromWatchList")
+    @DisplayName("Remove Media from WatchList Tests")
     class RemoveMediaFromWatchListTests {
 
         @Test
@@ -250,7 +250,7 @@ class WatchListServiceTest {
     }
 
     @Nested
-    @DisplayName("renameWatchList")
+    @DisplayName("Rename WatchList Tests")
     class RenameWatchListTests {
 
         @Test

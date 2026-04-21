@@ -52,7 +52,7 @@ class StatusServiceTest {
     }
 
     @Nested
-    @DisplayName("updateWatchStatus")
+    @DisplayName("Update Watch Status Tests")
     class UpdateWatchStatusTests {
 
         @Test

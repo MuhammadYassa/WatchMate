@@ -77,7 +77,7 @@ class SocialServiceTest {
     }
 
     @Nested
-    @DisplayName("followUser")
+    @DisplayName("Follow User Tests")
     class FollowUserTests {
 
         @Test
@@ -128,7 +128,7 @@ class SocialServiceTest {
     }
 
     @Nested
-    @DisplayName("unfollowUser")
+    @DisplayName("Unfollow User Tests")
     class UnfollowUserTests {
 
         @Test
@@ -160,7 +160,7 @@ class SocialServiceTest {
     }
 
     @Nested
-    @DisplayName("respondToFollowRequest")
+    @DisplayName("Respond to Follow Request Tests")
     class RespondToFollowRequestTests {
 
         @Test
@@ -207,7 +207,7 @@ class SocialServiceTest {
     }
 
     @Nested
-    @DisplayName("blockUser")
+    @DisplayName("Block User Tests")
     class BlockUserTests {
 
         @Test
@@ -232,7 +232,7 @@ class SocialServiceTest {
     }
 
     @Nested
-    @DisplayName("getFollowStatus")
+    @DisplayName("Get Follow Status Tests")
     class GetFollowStatusTests {
 
         @Test
