@@ -78,7 +78,11 @@ public class Users {
 
     @Builder.Default
     @ManyToMany
-    @JoinTable(name = "blocked_users")
+    @JoinTable(
+        name = "blocked_users",
+        joinColumns = @JoinColumn(name = "blocker_id"),
+        inverseJoinColumns = @JoinColumn(name = "blocked_id")
+    )
     private List<Users> blockedUsers = new ArrayList<>();
-
+    
 }

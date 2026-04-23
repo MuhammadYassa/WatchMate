@@ -2,7 +2,6 @@ package com.project.watchmate.Services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -90,10 +89,7 @@ class SocialServiceTest {
             FollowStatusDTO result = socialService.followUser(TARGET_ID, user);
 
             assertEquals(FollowStatuses.FOLLOWING, result.getFollowStatus());
-            assertTrue(targetUser.getFollowers().contains(user));
-            assertTrue(user.getFollowing().contains(targetUser));
-            verify(usersRepository).save(user);
-            verify(usersRepository).save(targetUser);
+            verify(usersRepository).insertFollowRelation(USER_ID, TARGET_ID);
         }
 
         @Test
@@ -133,19 +129,15 @@ class SocialServiceTest {
 
         @Test
         void unfollowUser_WhenFollowing_RemovesAndSaves() {
-            user.getFollowing().add(targetUser);
-            targetUser.getFollowers().add(user);
             when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.of(targetUser));
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(true);
             when(usersRepository.isBlockedByUser(TARGET_ID, USER_ID)).thenReturn(false);
             when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
-            when(usersRepository.save(any(Users.class))).thenAnswer(inv -> inv.getArgument(0));
 
             FollowStatusDTO result = socialService.unfollowUser(TARGET_ID, user);
 
             assertEquals(FollowStatuses.NOT_FOLLOWING, result.getFollowStatus());
-            verify(usersRepository).save(user);
-            verify(usersRepository).save(targetUser);
+            verify(usersRepository).deleteFollowRelation(USER_ID, TARGET_ID);
         }
 
         @Test
@@ -173,14 +165,12 @@ class SocialServiceTest {
                 .status(FollowRequestStatuses.PENDING)
                 .build();
             when(followRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
-            when(usersRepository.save(any(Users.class))).thenAnswer(inv -> inv.getArgument(0));
 
             FollowRequestResponseDTO result = socialService.respondToFollowRequest(requestId, targetUser, FollowRequestStatuses.ACCEPTED);
 
             assertEquals(FollowRequestStatuses.ACCEPTED, result.getNewStatus());
+            verify(usersRepository).insertFollowRelation(USER_ID, TARGET_ID);
             verify(followRequestRepository).save(request);
-            verify(usersRepository).save(user);
-            verify(usersRepository).save(targetUser);
         }
 
         @Test
@@ -217,9 +207,11 @@ class SocialServiceTest {
             FollowStatusDTO result = socialService.blockUser(TARGET_ID, user);
 
             assertEquals(FollowStatuses.BLOCKED, result.getFollowStatus());
+            verify(usersRepository).insertBlockRelation(USER_ID, TARGET_ID);
             verify(usersRepository).deleteFollowRelation(USER_ID, TARGET_ID);
             verify(usersRepository).deleteFollowRelation(TARGET_ID, USER_ID);
-            assertTrue(user.getBlockedUsers().contains(targetUser));
+            verify(followRequestRepository).deleteByRequestUserAndTargetUser(user, targetUser);
+            verify(followRequestRepository).deleteByRequestUserAndTargetUser(targetUser, user);
         }
 
         @Test

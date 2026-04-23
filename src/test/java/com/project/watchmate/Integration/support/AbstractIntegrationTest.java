@@ -11,6 +11,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -19,13 +20,18 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.project.watchmate.Clients.TmdbClient;
 import com.project.watchmate.Dto.LoginRequestDTO;
-import com.project.watchmate.Dto.TmdbGenreDTO;
-import com.project.watchmate.Dto.TmdbMovieDTO;
 import com.project.watchmate.Dto.TmdbResponseDTO;
+import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Repositories.EmailVerificationTokenRepository;
+import com.project.watchmate.Repositories.FollowRequestRepository;
+import com.project.watchmate.Repositories.GenreRepository;
+import com.project.watchmate.Repositories.MediaRepository;
+import com.project.watchmate.Repositories.PopularMediaRepository;
 import com.project.watchmate.Repositories.RefreshTokenRepository;
+import com.project.watchmate.Repositories.ReviewRepository;
+import com.project.watchmate.Repositories.UserMediaStatusRepository;
 import com.project.watchmate.Repositories.UsersRepository;
 import com.project.watchmate.Repositories.WatchListRepository;
 import com.project.watchmate.Services.JwtService;
@@ -36,8 +42,11 @@ import software.amazon.awssdk.services.ses.model.SendEmailRequest;
 import software.amazon.awssdk.services.ses.model.SendEmailResponse;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 @AutoConfigureMockMvc
 @Import(AbstractIntegrationTest.ExternalClientTestConfig.class)
@@ -69,6 +78,24 @@ public abstract class AbstractIntegrationTest {
 	protected WatchListRepository watchListRepository;
 
 	@Autowired
+	protected FollowRequestRepository followRequestRepository;
+
+	@Autowired
+	protected MediaRepository mediaRepository;
+
+	@Autowired
+	protected ReviewRepository reviewRepository;
+
+	@Autowired
+	protected UserMediaStatusRepository userMediaStatusRepository;
+
+	@Autowired
+	protected PopularMediaRepository popularMediaRepository;
+
+	@Autowired
+	protected GenreRepository genreRepository;
+
+	@Autowired
 	protected BCryptPasswordEncoder passwordEncoder;
 
 	@Autowired
@@ -78,7 +105,13 @@ public abstract class AbstractIntegrationTest {
 	protected SesClient sesClient;
 
 	@Autowired
+	protected TmdbClient tmdbClient;
+
+	@Autowired
 	protected ObjectMapper objectMapper;
+
+	@Autowired
+	protected JdbcTemplate jdbcTemplate;
 
 	@DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -90,11 +123,25 @@ public abstract class AbstractIntegrationTest {
 	@BeforeEach
 	void cleanDatabase() {
 		reset(sesClient);
+		reset(tmdbClient);
 		when(sesClient.sendEmail(any(SendEmailRequest.class)))
 			.thenReturn(SendEmailResponse.builder().messageId("test-message-id").build());
+		when(tmdbClient.fetchGenres(anyString())).thenReturn(List.of());
+		when(tmdbClient.fetchPopular(anyString())).thenReturn(List.of());
+		when(tmdbClient.searchMulti(anyString(), anyInt())).thenReturn(new TmdbResponseDTO(List.of(), 1, 0, 0));
+		jdbcTemplate.update("delete from user_following");
+		jdbcTemplate.update("delete from blocked_users");
+		jdbcTemplate.update("delete from user_favorites");
+		jdbcTemplate.update("delete from watchlist_items");
+		jdbcTemplate.update("delete from media_genres");
 		emailVerificationTokenRepository.deleteAll();
+		followRequestRepository.deleteAll();
 		refreshTokenRepository.deleteAll();
+		reviewRepository.deleteAll();
+		userMediaStatusRepository.deleteAll();
+		popularMediaRepository.deleteAll();
 		watchListRepository.deleteAll();
+		mediaRepository.deleteAll();
 		usersRepository.deleteAll();
 	}
 
@@ -116,32 +163,32 @@ public abstract class AbstractIntegrationTest {
 		return objectMapper.writeValueAsString(new LoginRequestDTO(username, TEST_PASSWORD));
 	}
 
+	protected String bearerToken(Users user) {
+		return "Bearer " + createAccessToken(user);
+	}
+
+	protected Media saveMedia(Long tmdbId, String title, MediaType type) {
+		return mediaRepository.save(Media.builder()
+			.tmdbId(tmdbId)
+			.title(title)
+			.overview(title + " overview")
+			.posterPath("/" + tmdbId + ".jpg")
+			.type(type)
+			.rating(8.0)
+			.genres(new ArrayList<>())
+			.build());
+	}
+
 	@TestConfiguration
 	public static class ExternalClientTestConfig {
 		@Bean
 		@Primary
 		TmdbClient tmdbClient() {
-			return new TmdbClient() {
-				@Override
-				public List<TmdbGenreDTO> fetchGenres(String type) {
-					return List.of();
-				}
-
-				@Override
-				public List<TmdbMovieDTO> fetchPopular(String type) {
-					return List.of();
-				}
-
-				@Override
-				public TmdbMovieDTO fetchMediaById(Long tmdbId, MediaType type) {
-					throw new UnsupportedOperationException("TMDB media fetch is not used by auth integration tests.");
-				}
-
-				@Override
-				public TmdbResponseDTO searchMulti(String query, int page) {
-					throw new UnsupportedOperationException("TMDB search is not used by auth integration tests.");
-				}
-			};
+			return mock(TmdbClient.class, invocation -> switch (invocation.getMethod().getName()) {
+				case "fetchGenres", "fetchPopular" -> List.of();
+				case "searchMulti" -> new TmdbResponseDTO(List.of(), 1, 0, 0);
+				default -> null;
+			});
 		}
 	}
 }

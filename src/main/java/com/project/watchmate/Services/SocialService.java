@@ -102,13 +102,9 @@ public class SocialService {
         };
     }
 
-    @Transactional
     private FollowStatusDTO handleUnfollow(Users user, Users targetUser){
-        user.getFollowing().remove(targetUser);
-        targetUser.getFollowers().remove(user);
+        usersRepository.deleteFollowRelation(user.getId(), targetUser.getId());
 
-        usersRepository.save(user);
-        usersRepository.save(targetUser);
         log.info("User unfollowed target username={} targetUsername={}", user.getUsername(), targetUser.getUsername());
 
         return FollowStatusDTO.builder()
@@ -116,13 +112,9 @@ public class SocialService {
         .build();
     }
 
-    @Transactional
     private FollowStatusDTO performDirectFollow(Users user, Users targetUser){
-        targetUser.getFollowers().add(user);
-        user.getFollowing().add(targetUser);
+        usersRepository.insertFollowRelation(user.getId(), targetUser.getId());
 
-        usersRepository.save(user);
-        usersRepository.save(targetUser);
         log.info("User followed target username={} targetUsername={}", user.getUsername(), targetUser.getUsername());
 
         return FollowStatusDTO.builder()
@@ -130,7 +122,6 @@ public class SocialService {
         .build();
     }
 
-    @Transactional
     private FollowStatusDTO createFollowRequest(Users user, Users targetUser){
         if (followRequestRepository.existsByRequestUserAndTargetUserAndStatus(user, targetUser, FollowRequestStatuses.PENDING)) {
             throw new AlreadyFollowingException("Follow request already pending");
@@ -153,7 +144,7 @@ public class SocialService {
             .orElseThrow(() -> new FollowRequestNotFoundException("Request not found"));
         
         if (response == FollowRequestStatuses.CANCELED) {
-            if (!request.getRequestUser().equals(user)) {
+            if (!request.getRequestUser().getId().equals(user.getId())) {
                 throw new UnauthorizedFollowRequestAccessException("You can only cancel your own requests");
             }
             followRequestRepository.delete(request);
@@ -166,7 +157,7 @@ public class SocialService {
             .requestId(Objects.requireNonNull(requestId, "requestId"))
             .build();           
         } else {
-            if (!request.getTargetUser().equals(user)) {
+            if (!request.getTargetUser().getId().equals(user.getId())) {
                 throw new UnauthorizedFollowRequestAccessException("Not your request");
             }
             request.setStatus(response);
@@ -214,7 +205,7 @@ public class SocialService {
 
     @Transactional
     public FollowStatusDTO getFollowStatus(Long userId, Users user) {
-        if (user.getId() == userId){
+        if (user.getId().equals(userId)){
             return FollowStatusDTO.builder()
            .followStatus(FollowStatuses.NOT_FOLLOWING)
            .build();
@@ -238,23 +229,21 @@ public class SocialService {
     @Transactional
     public FollowStatusDTO blockUser(Long userId, Users user) {
         Users targetUser = findAndValidateTargetUser(userId);
-        if (user.getId() == userId){
+        if (user.getId().equals(userId)){
             throw new SelfFollowException("Cannot block yourself!");
         }
         if (usersRepository.isBlockingUser(user.getId(), targetUser.getId())){
-            user.getBlockedUsers().remove(targetUser);
-            usersRepository.save(user);
+            usersRepository.deleteBlockRelation(user.getId(), targetUser.getId());
             log.info("User unblocked target username={} targetUsername={}", user.getUsername(), targetUser.getUsername());
             return FollowStatusDTO.builder()
             .followStatus(FollowStatuses.NOT_FOLLOWING)
             .build();
         } else {
-            user.getBlockedUsers().add(targetUser);
+            usersRepository.insertBlockRelation(user.getId(), targetUser.getId());
             usersRepository.deleteFollowRelation(user.getId(), targetUser.getId());
             usersRepository.deleteFollowRelation(targetUser.getId(), user.getId());
             followRequestRepository.deleteByRequestUserAndTargetUser(user, targetUser);
             followRequestRepository.deleteByRequestUserAndTargetUser(targetUser, user);
-            usersRepository.save(user);
             log.info("User blocked target username={} targetUsername={}", user.getUsername(), targetUser.getUsername());
             return FollowStatusDTO.builder()
             .followStatus(FollowStatuses.BLOCKED)
@@ -280,10 +269,11 @@ public class SocialService {
     @Transactional(readOnly = true)
     public UserProfileDTO getUserProfile(Long userId, Users user) {
         Users targetUser = findAndValidateTargetUser(userId);
-        if(user.getId() == targetUser.getId()){
+        if(user.getId().equals(targetUser.getId())){
             return retrieveSelfUserProfile(targetUser);
         }
-        if(usersRepository.isBlockedByUser(targetUser.getId(), user.getId()) || usersRepository.isBlockingUser(user.getId(), targetUser.getId())){
+        if(usersRepository.isBlockingUser(targetUser.getId(), user.getId()) 
+    || usersRepository.isBlockingUser(user.getId(), targetUser.getId())){
             return UserProfileDTO.builder()
             .username(targetUser.getUsername())
             .followersCount(0L)

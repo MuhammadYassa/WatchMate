@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
 import com.project.watchmate.Integration.support.AbstractIntegrationTest;
+import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchList;
 
@@ -95,15 +96,58 @@ class WatchListIntegrationTest extends AbstractIntegrationTest {
 		assertThat(watchListRepository.findById(watchList.getId())).isPresent();
 	}
 
+	@Test
+	void addMediaToWatchlist_returns200_andPersistsItem() throws Exception {
+		Users owner = saveUser("watchlist-add-owner", true);
+		WatchList watchList = saveWatchList(owner, "With Items");
+		Media media = saveMedia(9001L, "Item Movie", com.project.watchmate.Models.MediaType.MOVIE);
+
+		mockMvc.perform(post("/api/v1/watchlists/{watchListId}/items/{tmdbId}", watchList.getId(), media.getTmdbId())
+			.header("Authorization", bearerToken(owner)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.id").value(watchList.getId().intValue()))
+			.andExpect(jsonPath("$.media[0].tmdbId").value(media.getTmdbId().intValue()))
+			.andExpect(jsonPath("$.media[0].title").value(media.getTitle()));
+
+		Integer itemCount = jdbcTemplate.queryForObject(
+			"select count(*) from watchlist_items where watchlist_id = ? and media_id = ?",
+			Integer.class,
+			watchList.getId(),
+			media.getId());
+
+		assertThat(itemCount).isEqualTo(1);
+	}
+
+	@Test
+	void removeMediaFromWatchlist_returns200_andRemovesItem() throws Exception {
+		Users owner = saveUser("watchlist-remove-owner", true);
+		WatchList watchList = saveWatchList(owner, "Remove Items");
+		Media media = saveMedia(9002L, "Removable Movie", com.project.watchmate.Models.MediaType.MOVIE);
+
+		mockMvc.perform(post("/api/v1/watchlists/{watchListId}/items/{tmdbId}", watchList.getId(), media.getTmdbId())
+			.header("Authorization", bearerToken(owner)))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(delete("/api/v1/watchlists/{watchListId}/items/{tmdbId}", watchList.getId(), media.getTmdbId())
+			.header("Authorization", bearerToken(owner)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.id").value(watchList.getId().intValue()))
+			.andExpect(jsonPath("$.media").isEmpty());
+
+		Integer itemCount = jdbcTemplate.queryForObject(
+			"select count(*) from watchlist_items where watchlist_id = ? and media_id = ?",
+			Integer.class,
+			watchList.getId(),
+			media.getId());
+
+		assertThat(itemCount).isZero();
+	}
+
 	private WatchList saveWatchList(Users user, String name) {
 		return watchListRepository.save(WatchList.builder()
 			.name(name)
 			.user(user)
 			.build());
-	}
-
-	private String bearerToken(Users user) {
-		return "Bearer " + createAccessToken(user);
 	}
 
 	private String createWatchListBody(String name) {

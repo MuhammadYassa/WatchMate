@@ -59,4 +59,15 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
     @Query(value = "delete from user_following where follower_id = :followerId and following_id = :followingId", nativeQuery = true)
     int deleteFollowRelation(@Param("followerId") Long followerId, @Param("followingId") Long followingId);
 
+    @Modifying
+    @Query(value = "insert into user_following (follower_id, following_id) values (:followerId, :followingId)", nativeQuery = true)
+    void insertFollowRelation(@Param("followerId") Long followerId, @Param("followingId") Long followingId);
+
+    @Modifying
+    @Query(value = "insert into blocked_users (blocker_id, blocked_id) values (:userId, :blockedUserId)", nativeQuery = true)
+    void insertBlockRelation(@Param("userId") Long userId, @Param("blockedUserId") Long blockedUserId);
+
+    @Modifying
+    @Query(value = "delete from blocked_users where blocker_id = :userId and blocked_id = :blockedUserId", nativeQuery = true)
+    void deleteBlockRelation(@Param("userId") Long userId, @Param("blockedUserId") Long blockedUserId);
 }

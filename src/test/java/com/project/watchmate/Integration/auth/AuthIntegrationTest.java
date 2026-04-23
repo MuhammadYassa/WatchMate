@@ -129,6 +129,27 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
 	}
 
 	@Test
+	void logout_revokesRefreshToken() throws Exception {
+		Users user = saveUser("logout-user", true);
+		String responseBody = mockMvc.perform(post("/api/v1/auth/login")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(loginRequestBody(user.getUsername())))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+		LoginResponseDTO response = objectMapper.readValue(responseBody, LoginResponseDTO.class);
+
+		mockMvc.perform(post("/api/v1/auth/logout")
+			.header("Authorization", "Bearer " + response.getAccessToken())
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(refreshRequestBody(response.getRefreshToken())))
+			.andExpect(status().isOk());
+
+		assertThat(refreshTokenRepository.findByToken(response.getRefreshToken()).orElseThrow().isRevoked()).isTrue();
+	}
+
+	@Test
 	void login_returnsTokens_forVerifiedUser() throws Exception {
 		Users user = saveUser("verified-user", true);
 
