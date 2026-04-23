@@ -24,6 +24,7 @@ import com.project.watchmate.Dto.TmdbResponseDTO;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.MediaType;
+import com.project.watchmate.Models.Role;
 import com.project.watchmate.Repositories.EmailVerificationTokenRepository;
 import com.project.watchmate.Repositories.FollowRequestRepository;
 import com.project.watchmate.Repositories.GenreRepository;
@@ -146,11 +147,16 @@ public abstract class AbstractIntegrationTest {
 	}
 
 	protected Users saveUser(String username, boolean emailVerified) {
+		return saveUser(username, emailVerified, Role.USER);
+	}
+
+	protected Users saveUser(String username, boolean emailVerified, Role role) {
 		return usersRepository.save(Users.builder()
 			.username(username)
 			.password(passwordEncoder.encode(TEST_PASSWORD))
 			.email(username + "@example.com")
 			.emailVerified(emailVerified)
+			.role(role)
 			.favorites(new ArrayList<>())
 			.build());
 	}

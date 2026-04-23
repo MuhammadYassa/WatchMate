@@ -21,6 +21,7 @@ import com.project.watchmate.Exception.UnauthorizedReviewAccessException;
 import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.Review;
+import com.project.watchmate.Models.Role;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.ReviewRepository;
@@ -68,7 +69,7 @@ public class ReviewService {
 
     public void deleteReview(Users user, Long reviewId) {
         Review review = reviewRepository.findById(Objects.requireNonNull(reviewId, "reviewId")).orElseThrow(() -> new ReviewNotFoundException("Review not found"));
-        if (!review.getUser().getId().equals(user.getId())) {
+        if (!canDeleteReview(user, review)) {
             throw new UnauthorizedReviewAccessException("You do not own this review");
         }
         reviewRepository.delete(review);
@@ -88,6 +89,12 @@ public class ReviewService {
     public Page<Review> getReviewPage(Users user){
         Pageable pageable = PageRequest.of(0, 5, Sort.by("dateLastModified").descending().and(Sort.by("datePosted").descending()));
         return reviewRepository.findAllByUser(user, pageable);
+    }
+
+    private boolean canDeleteReview(Users user, Review review) {
+        return review.getUser().getId().equals(user.getId())
+            || user.getRole() == Role.MODERATOR
+            || user.getRole() == Role.ADMIN;
     }
 
 }

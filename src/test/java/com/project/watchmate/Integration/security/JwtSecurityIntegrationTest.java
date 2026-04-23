@@ -3,6 +3,7 @@ package com.project.watchmate.Integration.security;
 import org.junit.jupiter.api.Test;
 
 import com.project.watchmate.Integration.support.AbstractIntegrationTest;
+import com.project.watchmate.Models.Role;
 import com.project.watchmate.Models.Users;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -36,5 +37,32 @@ class JwtSecurityIntegrationTest extends AbstractIntegrationTest {
 			.andExpect(status().isUnauthorized())
 			.andExpect(jsonPath("$.message").value("Authentication failed"))
 			.andExpect(jsonPath("$.code").value("AUTH_FAILED"));
+	}
+
+	@Test
+	void actuator_returns403_forUser() throws Exception {
+		Users user = saveUser("actuator-user", true);
+
+		mockMvc.perform(get("/actuator")
+			.header("Authorization", bearerToken(user)))
+			.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void actuator_returns403_forModerator() throws Exception {
+		Users moderator = saveUser("actuator-moderator", true, Role.MODERATOR);
+
+		mockMvc.perform(get("/actuator")
+			.header("Authorization", bearerToken(moderator)))
+			.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void actuator_returns200_forAdmin() throws Exception {
+		Users admin = saveUser("actuator-admin", true, Role.ADMIN);
+
+		mockMvc.perform(get("/actuator")
+			.header("Authorization", bearerToken(admin)))
+			.andExpect(status().isOk());
 	}
 }

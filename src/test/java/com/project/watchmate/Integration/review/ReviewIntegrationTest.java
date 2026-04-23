@@ -8,9 +8,11 @@ import org.springframework.http.MediaType;
 import com.project.watchmate.Integration.support.AbstractIntegrationTest;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.Review;
+import com.project.watchmate.Models.Role;
 import com.project.watchmate.Models.Users;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -74,6 +76,82 @@ class ReviewIntegrationTest extends AbstractIntegrationTest {
 
 		assertThat(unchanged.getRating()).isEqualTo(4);
 		assertThat(unchanged.getComment()).isEqualTo("Owner review");
+	}
+
+	@Test
+	void reviewUpdate_byModeratorNonOwner_returns403() throws Exception {
+		Users owner = saveUser("review-update-mod-owner", true);
+		Users moderator = saveUser("review-update-moderator", true, Role.MODERATOR);
+		Media media = saveMedia(7004L, "Moderator Update Movie", com.project.watchmate.Models.MediaType.MOVIE);
+		Review review = saveReview(owner, media, 4, "Owner review");
+
+		mockMvc.perform(patch("/api/v1/reviews/{reviewId}", review.getId())
+			.header("Authorization", bearerToken(moderator))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(updateReviewBody(2, "Moderator edit")))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("UNAUTHORIZED_REVIEW_ACCESS"));
+
+		Review unchanged = reviewRepository.findById(review.getId()).orElseThrow();
+
+		assertThat(unchanged.getRating()).isEqualTo(4);
+		assertThat(unchanged.getComment()).isEqualTo("Owner review");
+	}
+
+	@Test
+	void deleteReview_byOwner_returns204() throws Exception {
+		Users owner = saveUser("review-delete-owner", true);
+		Media media = saveMedia(7005L, "Owner Delete Movie", com.project.watchmate.Models.MediaType.MOVIE);
+		Review review = saveReview(owner, media, 4, "Owner review");
+
+		mockMvc.perform(delete("/api/v1/reviews/{reviewId}", review.getId())
+			.header("Authorization", bearerToken(owner)))
+			.andExpect(status().isNoContent());
+
+		assertThat(reviewRepository.findById(review.getId())).isEmpty();
+	}
+
+	@Test
+	void deleteReview_byNonOwnerUser_returns403() throws Exception {
+		Users owner = saveUser("review-delete-user-owner", true);
+		Users nonOwner = saveUser("review-delete-non-owner-user", true);
+		Media media = saveMedia(7006L, "User Delete Movie", com.project.watchmate.Models.MediaType.MOVIE);
+		Review review = saveReview(owner, media, 4, "Owner review");
+
+		mockMvc.perform(delete("/api/v1/reviews/{reviewId}", review.getId())
+			.header("Authorization", bearerToken(nonOwner)))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("UNAUTHORIZED_REVIEW_ACCESS"));
+
+		assertThat(reviewRepository.findById(review.getId())).isPresent();
+	}
+
+	@Test
+	void deleteReview_byModerator_returns204() throws Exception {
+		Users owner = saveUser("review-delete-mod-owner", true);
+		Users moderator = saveUser("review-delete-moderator", true, Role.MODERATOR);
+		Media media = saveMedia(7007L, "Moderator Delete Movie", com.project.watchmate.Models.MediaType.MOVIE);
+		Review review = saveReview(owner, media, 4, "Owner review");
+
+		mockMvc.perform(delete("/api/v1/reviews/{reviewId}", review.getId())
+			.header("Authorization", bearerToken(moderator)))
+			.andExpect(status().isNoContent());
+
+		assertThat(reviewRepository.findById(review.getId())).isEmpty();
+	}
+
+	@Test
+	void deleteReview_byAdmin_returns204() throws Exception {
+		Users owner = saveUser("review-delete-admin-owner", true);
+		Users admin = saveUser("review-delete-admin", true, Role.ADMIN);
+		Media media = saveMedia(7008L, "Admin Delete Movie", com.project.watchmate.Models.MediaType.MOVIE);
+		Review review = saveReview(owner, media, 4, "Owner review");
+
+		mockMvc.perform(delete("/api/v1/reviews/{reviewId}", review.getId())
+			.header("Authorization", bearerToken(admin)))
+			.andExpect(status().isNoContent());
+
+		assertThat(reviewRepository.findById(review.getId())).isEmpty();
 	}
 
 	private Review saveReview(Users user, Media media, int rating, String comment) {
