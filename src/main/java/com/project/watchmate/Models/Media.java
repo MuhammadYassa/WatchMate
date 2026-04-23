@@ -10,6 +10,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
@@ -17,6 +18,7 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -26,15 +28,15 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
-@Table
+@Table(uniqueConstraints = @UniqueConstraint(name = "uq_media_tmdb_id", columnNames = "tmdb_id"))
 @Builder
 public class Media {
     
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "tmdb_id", unique = true, nullable = false)
+    @Column(name = "tmdb_id", nullable = false)
     private Long tmdbId;
 
     private String title;
@@ -64,7 +66,8 @@ public class Media {
     @JoinTable(
         name = "media_genres",
         joinColumns = @JoinColumn(name = "media_id"),
-        inverseJoinColumns = @JoinColumn(name = "genre_id")
+        inverseJoinColumns = @JoinColumn(name = "genre_id"),
+        uniqueConstraints = @UniqueConstraint(name = "uq_media_genres_media_genre", columnNames = {"media_id", "genre_id"})
     )
     private List<Genre> genres = new ArrayList<>();
 

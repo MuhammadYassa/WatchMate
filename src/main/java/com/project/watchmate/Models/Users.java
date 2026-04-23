@@ -9,12 +9,14 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,20 +26,23 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table
+@Table(uniqueConstraints = {
+    @UniqueConstraint(name = "uq_users_email", columnNames = "email"),
+    @UniqueConstraint(name = "uq_users_username", columnNames = "username")
+})
 @Builder
 public class Users {
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false)
+    @Column(nullable = false)
     private String username;
 
     @Column(nullable = false)
     private String password;
     
-    @Column(unique = true, nullable = false)
+    @Column(nullable = false)
     private String email;
 
     @Column(nullable = false)
@@ -65,7 +70,12 @@ public class Users {
     private List<Review> reviews = new ArrayList<>();
 
     @ManyToMany
-    @JoinTable(name = "user_favorites")
+    @JoinTable(
+        name = "user_favorites",
+        joinColumns = @JoinColumn(name = "users_id"),
+        inverseJoinColumns = @JoinColumn(name = "favorites_id"),
+        uniqueConstraints = @UniqueConstraint(name = "uq_user_favorites_user_media", columnNames = {"users_id", "favorites_id"})
+    )
     private List<Media> favorites;
     
     @Builder.Default
@@ -73,7 +83,8 @@ public class Users {
     @JoinTable(
         name = "user_following",
         joinColumns = @JoinColumn(name = "follower_id"),
-        inverseJoinColumns = @JoinColumn(name = "following_id")
+        inverseJoinColumns = @JoinColumn(name = "following_id"),
+        uniqueConstraints = @UniqueConstraint(name = "uq_user_following_follower_following", columnNames = {"follower_id", "following_id"})
     )
     private List<Users> following = new ArrayList<>();
 
@@ -86,7 +97,8 @@ public class Users {
     @JoinTable(
         name = "blocked_users",
         joinColumns = @JoinColumn(name = "blocker_id"),
-        inverseJoinColumns = @JoinColumn(name = "blocked_id")
+        inverseJoinColumns = @JoinColumn(name = "blocked_id"),
+        uniqueConstraints = @UniqueConstraint(name = "uq_blocked_users_blocker_blocked", columnNames = {"blocker_id", "blocked_id"})
     )
     private List<Users> blockedUsers = new ArrayList<>();
     

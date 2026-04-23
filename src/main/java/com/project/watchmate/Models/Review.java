@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -21,19 +22,19 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Entity
 @Builder
-@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "media_id"}))
+@Table(uniqueConstraints = @UniqueConstraint(name = "uq_review_user_media", columnNames = {"user_id", "media_id"}))
 public class Review {
 
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "user_id", nullable = false)
     private Users user;
 
     @ManyToOne
-    @JoinColumn(name = "media_id")
+    @JoinColumn(name = "media_id", nullable = false)
     private Media media;
 
     @Min(1)
