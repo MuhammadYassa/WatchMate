@@ -134,7 +134,7 @@ public class WatchListService {
     public WatchListDTO removeMediaFromWatchList(Users user, Long watchListId, Long tmdbId) {
         WatchList watchList = watchListRepository.findById(Objects.requireNonNull(watchListId, "watchListId")).orElseThrow(() -> new WatchListNotFoundException("WatchList does not exist."));
 
-        if(!watchList.getUser().getId().equals(user.getId())){
+        if(!watchList.getUser().getId().equals(user.getId()) && user.getRole() != Role.ADMIN){
             throw new UnauthorizedWatchListAccessException("You do not own this WatchList");
         }
 

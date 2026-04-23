@@ -27,6 +27,7 @@ import com.project.watchmate.Models.FollowRequest;
 import com.project.watchmate.Models.FollowRequestStatuses;
 import com.project.watchmate.Models.FollowStatuses;
 import com.project.watchmate.Models.PrivacyStatuses;
+import com.project.watchmate.Models.Role;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Repositories.FollowRequestRepository;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
@@ -302,7 +303,7 @@ public class SocialService {
     }
 
     private UserProfileDTO retrieveTargetUserProfile(Users user, Users targetUser){
-        if (usersRepository.isFollowing(user.getId(), targetUser.getId()) || targetUser.getPrivacyStatus() == PrivacyStatuses.PUBLIC){
+        if (usersRepository.isFollowing(user.getId(), targetUser.getId()) || targetUser.getPrivacyStatus() == PrivacyStatuses.PUBLIC || canViewPrivateProfile(user)){
             return UserProfileDTO.builder()
                 .username(targetUser.getUsername())
                 .privacyStatus(targetUser.getPrivacyStatus())
@@ -322,5 +323,9 @@ public class SocialService {
                 .followingCount(usersRepository.countFollowingByUserId(targetUser.getId()))
                 .build();
         }
+    }
+
+    private boolean canViewPrivateProfile(Users user) {
+        return user.getRole() == Role.MODERATOR || user.getRole() == Role.ADMIN;
     }
 }

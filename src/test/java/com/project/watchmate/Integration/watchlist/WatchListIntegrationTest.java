@@ -1,12 +1,16 @@
 package com.project.watchmate.Integration.watchlist;
 
+import java.time.LocalDateTime;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
 import com.project.watchmate.Integration.support.AbstractIntegrationTest;
 import com.project.watchmate.Models.Media;
+import com.project.watchmate.Models.Role;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchList;
+import com.project.watchmate.Models.WatchListItem;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -143,11 +147,79 @@ class WatchListIntegrationTest extends AbstractIntegrationTest {
 		assertThat(itemCount).isZero();
 	}
 
+	@Test
+	void removeMediaFromWatchlist_returns403_forNonOwnerUser() throws Exception {
+		Users owner = saveUser("watchlist-remove-user-owner", true);
+		Users nonOwner = saveUser("watchlist-remove-non-owner", true);
+		WatchList watchList = saveWatchList(owner, "User Protected Items");
+		Media media = saveMedia(9003L, "Protected Movie", com.project.watchmate.Models.MediaType.MOVIE);
+		saveWatchListItem(watchList, media);
+
+		mockMvc.perform(delete("/api/v1/watchlists/{watchListId}/items/{tmdbId}", watchList.getId(), media.getTmdbId())
+			.header("Authorization", bearerToken(nonOwner)))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("UNAUTHORIZED_WATCHLIST_ACCESS"));
+
+		assertWatchListItemCount(watchList, media, 1);
+	}
+
+	@Test
+	void removeMediaFromWatchlist_returns403_forModeratorNonOwner() throws Exception {
+		Users owner = saveUser("watchlist-remove-mod-owner", true);
+		Users moderator = saveUser("watchlist-remove-moderator", true, Role.MODERATOR);
+		WatchList watchList = saveWatchList(owner, "Moderator Protected Items");
+		Media media = saveMedia(9004L, "Moderator Protected Movie", com.project.watchmate.Models.MediaType.MOVIE);
+		saveWatchListItem(watchList, media);
+
+		mockMvc.perform(delete("/api/v1/watchlists/{watchListId}/items/{tmdbId}", watchList.getId(), media.getTmdbId())
+			.header("Authorization", bearerToken(moderator)))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("UNAUTHORIZED_WATCHLIST_ACCESS"));
+
+		assertWatchListItemCount(watchList, media, 1);
+	}
+
+	@Test
+	void removeMediaFromWatchlist_returns200_forAdminNonOwner() throws Exception {
+		Users owner = saveUser("watchlist-remove-admin-owner", true);
+		Users admin = saveUser("watchlist-remove-admin", true, Role.ADMIN);
+		WatchList watchList = saveWatchList(owner, "Admin Removable Items");
+		Media media = saveMedia(9005L, "Admin Removable Movie", com.project.watchmate.Models.MediaType.MOVIE);
+		saveWatchListItem(watchList, media);
+
+		mockMvc.perform(delete("/api/v1/watchlists/{watchListId}/items/{tmdbId}", watchList.getId(), media.getTmdbId())
+			.header("Authorization", bearerToken(admin)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.id").value(watchList.getId().intValue()))
+			.andExpect(jsonPath("$.media").isEmpty());
+
+		assertWatchListItemCount(watchList, media, 0);
+	}
+
 	private WatchList saveWatchList(Users user, String name) {
 		return watchListRepository.save(WatchList.builder()
 			.name(name)
 			.user(user)
 			.build());
+	}
+
+	private void saveWatchListItem(WatchList watchList, Media media) {
+		watchList.getItems().add(WatchListItem.builder()
+			.watchList(watchList)
+			.media(media)
+			.addedAt(LocalDateTime.now())
+			.build());
+		watchListRepository.save(watchList);
+	}
+
+	private void assertWatchListItemCount(WatchList watchList, Media media, int expectedCount) {
+		Integer itemCount = jdbcTemplate.queryForObject(
+			"select count(*) from watchlist_items where watchlist_id = ? and media_id = ?",
+			Integer.class,
+			watchList.getId(),
+			media.getId());
+
+		assertThat(itemCount).isEqualTo(expectedCount);
 	}
 
 	private String createWatchListBody(String name) {

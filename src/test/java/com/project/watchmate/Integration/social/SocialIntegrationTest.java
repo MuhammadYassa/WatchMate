@@ -8,7 +8,9 @@ import com.project.watchmate.Integration.support.AbstractIntegrationTest;
 import com.project.watchmate.Models.FollowRequest;
 import com.project.watchmate.Models.FollowRequestStatuses;
 import com.project.watchmate.Models.PrivacyStatuses;
+import com.project.watchmate.Models.Role;
 import com.project.watchmate.Models.Users;
+import com.project.watchmate.Models.WatchList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -132,6 +134,50 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 	}
 
 	@Test
+	void userProfile_forPrivateUser_hidesSensitiveSectionsFromNonFollowingUser() throws Exception {
+		Users viewer = saveUser("social-private-profile-viewer", true);
+		Users target = savePrivateUser("social-private-profile-target");
+		saveWatchList(target, "Private Watchlist");
+
+		mockMvc.perform(get("/api/v1/social/user-profile/{userId}", target.getId())
+			.header("Authorization", bearerToken(viewer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.username").value(target.getUsername()))
+			.andExpect(jsonPath("$.privacyStatus").value("PRIVATE"))
+			.andExpect(jsonPath("$.watchlists").doesNotExist());
+	}
+
+	@Test
+	void userProfile_forPrivateUser_returnsSensitiveSectionsToModerator() throws Exception {
+		Users moderator = saveUser("social-private-profile-moderator", true, Role.MODERATOR);
+		Users target = savePrivateUser("social-private-profile-mod-target");
+		saveWatchList(target, "Moderator Visible Watchlist");
+
+		mockMvc.perform(get("/api/v1/social/user-profile/{userId}", target.getId())
+			.header("Authorization", bearerToken(moderator)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.username").value(target.getUsername()))
+			.andExpect(jsonPath("$.privacyStatus").value("PRIVATE"))
+			.andExpect(jsonPath("$.watchlists.content.length()").value(1))
+			.andExpect(jsonPath("$.watchlists.content[0].name").value("Moderator Visible Watchlist"));
+	}
+
+	@Test
+	void userProfile_forPrivateUser_returnsSensitiveSectionsToAdmin() throws Exception {
+		Users admin = saveUser("social-private-profile-admin", true, Role.ADMIN);
+		Users target = savePrivateUser("social-private-profile-admin-target");
+		saveWatchList(target, "Admin Visible Watchlist");
+
+		mockMvc.perform(get("/api/v1/social/user-profile/{userId}", target.getId())
+			.header("Authorization", bearerToken(admin)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.username").value(target.getUsername()))
+			.andExpect(jsonPath("$.privacyStatus").value("PRIVATE"))
+			.andExpect(jsonPath("$.watchlists.content.length()").value(1))
+			.andExpect(jsonPath("$.watchlists.content[0].name").value("Admin Visible Watchlist"));
+	}
+
+	@Test
 	void receivedFollowRequests_returnsPendingRequestsOnly() throws Exception {
 		Users pendingRequester = saveUser("social-pending-requester", true);
 		Users acceptedRequester = saveUser("social-accepted-requester", true);
@@ -169,6 +215,13 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 			.targetUser(target)
 			.requestedAt(LocalDateTime.now())
 			.status(status)
+			.build());
+	}
+
+	private WatchList saveWatchList(Users user, String name) {
+		return watchListRepository.save(WatchList.builder()
+			.name(name)
+			.user(user)
 			.build());
 	}
 
