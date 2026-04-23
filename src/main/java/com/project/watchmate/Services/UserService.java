@@ -16,6 +16,7 @@ import com.project.watchmate.Dto.RegisterRequestDTO;
 import com.project.watchmate.Exception.EmailException;
 import com.project.watchmate.Exception.UsernameException;
 import com.project.watchmate.Models.RefreshToken;
+import com.project.watchmate.Models.Role;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Repositories.UsersRepository;
 
@@ -55,6 +56,7 @@ public class UserService {
                 .password(encoder.encode(registerRequest.getPassword()))
                 .email(registerRequest.getEmail())
                 .emailVerified(false)
+                .role(Role.USER)
                 .build());
             userRepo.save(user);
 

@@ -44,6 +44,11 @@ public class Users {
     private boolean emailVerified;
 
     @Builder.Default
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    private Role role = Role.USER;
+
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     private PrivacyStatuses privacyStatus = PrivacyStatuses.PUBLIC;
     

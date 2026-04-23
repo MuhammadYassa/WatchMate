@@ -21,6 +21,7 @@ import com.project.watchmate.Exception.WatchListNotFoundException;
 import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.Review;
+import com.project.watchmate.Models.Role;
 import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchList;
@@ -69,7 +70,7 @@ public class WatchListService {
     public void deleteWatchList(Users user, Long id) {
         WatchList watchList = watchListRepository.findById(Objects.requireNonNull(id, "id")).orElseThrow(() -> new WatchListNotFoundException("WatchList not found"));
 
-        if (!watchList.getUser().getId().equals(user.getId())){
+        if (!watchList.getUser().getId().equals(user.getId()) && user.getRole() != Role.ADMIN){
             throw new UnauthorizedWatchListAccessException("You do not own this watchlist");
         }
 
