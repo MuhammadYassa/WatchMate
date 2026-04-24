@@ -9,13 +9,16 @@ RUN ./mvnw dependency:go-offline -B
 
 COPY src/ src/
 
-RUN ./mvnw clean package -DskipTests -B
+RUN ./mvnw clean package -Dtest=com.project.watchmate.Services.*Test -B
 
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-RUN addgroup -S spring && adduser -S spring -G spring
+RUN addgroup -S spring \
+    && adduser -S spring -G spring \
+    && mkdir -p /app/logs \
+    && chown -R spring:spring /app/logs
 
 COPY --from=build /workspace/target/*.jar app.jar
 

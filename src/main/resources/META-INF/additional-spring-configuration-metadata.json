@@ -28,5 +28,10 @@
     "name": "spring.flyway.baseline-on-migrate",
     "type": "java.lang.String",
     "description": "A description for 'spring.flyway.baseline-on-migrate'"
+  },
+  {
+    "name": "spring.flyway.baseline-version",
+    "type": "java.lang.String",
+    "description": "A description for 'spring.flyway.baseline-version'"
   }
 ]}
