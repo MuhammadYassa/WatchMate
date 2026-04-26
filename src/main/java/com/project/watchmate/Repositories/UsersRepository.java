@@ -46,6 +46,9 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
     @Query("SELECT u FROM Users u LEFT JOIN FETCH u.following LEFT JOIN FETCH u.followers WHERE u.id = :userId")
     Optional<Users> findByIdWithFollowRelations(@Param("userId") Long userId);
 
+    @Query("SELECT DISTINCT u FROM Users u LEFT JOIN FETCH u.favorites WHERE u.id = :userId")
+    Optional<Users> findByIdWithFavorites(@Param("userId") Long userId);
+
     @Query("SELECT COUNT(f) > 0 FROM Users u JOIN u.following f WHERE u.id = :followerId AND f.id = :targetId")
     boolean isFollowing(@Param("followerId") Long followerId, @Param("targetId") Long targetId);
     
@@ -70,4 +73,5 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
     @Modifying
     @Query(value = "delete from blocked_users where blocker_id = :userId and blocked_id = :blockedUserId", nativeQuery = true)
     void deleteBlockRelation(@Param("userId") Long userId, @Param("blockedUserId") Long blockedUserId);
+
 }

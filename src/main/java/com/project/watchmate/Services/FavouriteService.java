@@ -1,13 +1,16 @@
 package com.project.watchmate.Services;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.project.watchmate.Dto.FavouriteStatusDTO;
 import com.project.watchmate.Dto.UserFavouritesDTO;
 import com.project.watchmate.Dto.MediaDetailsDTO;
 import com.project.watchmate.Exception.MediaNotFoundException;
+import com.project.watchmate.Exception.UserNotFoundException;
 import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Exception.DuplicateFavouriteException;
 import com.project.watchmate.Models.Media;
@@ -32,40 +35,46 @@ public class FavouriteService {
 
     private final UserMediaStatusRepository userMediaStatusRepository;
 
+    @Transactional
     public FavouriteStatusDTO addToFavourites (Long tmdbId, Users user){
+        Users managedUser = loadUserWithFavorites(user);
         Media media = mediaRepository.findByTmdbId(tmdbId).orElseThrow(() -> new MediaNotFoundException("Media does not exist!"));
 
-        if (user.getFavorites().contains(media)){
+        if (managedUser.getFavorites().contains(media)){
             throw new DuplicateFavouriteException ("Media has already been favourited.");
         }
 
-        user.getFavorites().add(media);
-        usersRepository.save(user);
-        return FavouriteStatusDTO.builder().tmdbId(tmdbId).isFavourited(user.getFavorites().contains(media)).build();
+        managedUser.getFavorites().add(media);
+        return FavouriteStatusDTO.builder().tmdbId(tmdbId).isFavourited(managedUser.getFavorites().contains(media)).build();
     }
 
+    @Transactional
     public FavouriteStatusDTO removeFromFavourites (Long tmdbId, Users user){
+        Users managedUser = loadUserWithFavorites(user);
         Media media = mediaRepository.findByTmdbId(tmdbId).orElseThrow(() -> new MediaNotFoundException("Media does not exist!"));
-        if (user.getFavorites().contains(media)){
-            user.getFavorites().remove(media);
+        if (managedUser.getFavorites().contains(media)){
+            managedUser.getFavorites().remove(media);
         }
-        usersRepository.save(user);
-        return FavouriteStatusDTO.builder().tmdbId(tmdbId).isFavourited(user.getFavorites().contains(media)).build();
+        return FavouriteStatusDTO.builder().tmdbId(tmdbId).isFavourited(managedUser.getFavorites().contains(media)).build();
     }
 
+    @Transactional(readOnly = true)
     public FavouriteStatusDTO isFavourited (Long tmdbId, Users user){
+        Users managedUser = loadUserWithFavorites(user);
         Media media = mediaRepository.findByTmdbId(tmdbId).orElseThrow(() -> new MediaNotFoundException("Media does not exist!"));
-        return FavouriteStatusDTO.builder().tmdbId(tmdbId).isFavourited(user.getFavorites().contains(media)).build();
+        return FavouriteStatusDTO.builder().tmdbId(tmdbId).isFavourited(managedUser.getFavorites().contains(media)).build();
     }
 
+    @Transactional(readOnly = true)
     public UserFavouritesDTO getUserFavourites (Users user){
-        List<Media> allMedia = user.getFavorites();
+        Users managedUser = loadUserWithFavorites(user);
+        List<Media> allMedia = managedUser.getFavorites();
         List<MediaDetailsDTO> allMediaDetails = allMedia.stream().map(m -> {
             WatchStatus watchStatus = userMediaStatusRepository
-                .findByUserAndMedia(user, m)
+                .findByUserAndMedia(managedUser, m)
                 .map(UserMediaStatus::getStatus)
                 .orElse(WatchStatus.NONE);
-            boolean isFavourited = user.getFavorites().contains(m);
+            boolean isFavourited = managedUser.getFavorites().contains(m);
 
             return watchMateMapper.mapToMediaDetailsDTO(m, m.getReviews(), isFavourited, watchStatus);
         }).toList();
@@ -74,5 +83,11 @@ public class FavouriteService {
             .favourites(allMediaDetails)
             .totalCount(allMediaDetails.size())
             .build();
+    }
+
+    private Users loadUserWithFavorites(Users user) {
+        Long userId = Objects.requireNonNull(Objects.requireNonNull(user, "user").getId(), "user.id");
+        return usersRepository.findByIdWithFavorites(userId)
+            .orElseThrow(() -> new UserNotFoundException("User not found"));
     }
 }
