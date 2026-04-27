@@ -1,5 +1,7 @@
 package com.project.watchmate.Dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,6 +19,7 @@ public class FavouriteStatusDTO {
     private Long tmdbId;
 
     @Schema(description = "Whether the media item is favourited by the authenticated user.")
+    @JsonProperty("isFavourited")
     private boolean isFavourited;
     
 }

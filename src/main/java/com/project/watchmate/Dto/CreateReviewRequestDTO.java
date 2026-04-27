@@ -27,7 +27,11 @@ public class CreateReviewRequestDTO {
     private int starRating;
 
     @NotNull
-    @Schema(description = "Internal media identifier for the reviewed item.", example = "42")
-    private Long mediaId;
+    @Min(1)
+    @Schema(description = "TMDB identifier for the reviewed media item.", example = "1399")
+    private Long tmdbId;
+
+    @Schema(description = "Media type. Required when the media item has not already been imported.", example = "SHOW", allowableValues = {"MOVIE", "SHOW"})
+    private String type;
 
 }

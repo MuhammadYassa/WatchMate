@@ -34,6 +34,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -110,7 +111,7 @@ public class WatchListController {
     }
 
     @PostMapping("/{watchListId}/items/{tmdbId}")
-    @Operation(summary = "Add watchlist item", description = "Adds an existing media record to a watchlist owned by the authenticated user.")
+    @Operation(summary = "Add watchlist item", description = "Adds a media item to a watchlist owned by the authenticated user. Provide type when the item may need to be imported first.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Media added to watchlist", content = @Content(schema = @Schema(implementation = WatchListDTO.class))),
         @ApiResponse(responseCode = "400", description = "Invalid path parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
@@ -120,14 +121,14 @@ public class WatchListController {
         @ApiResponse(responseCode = "409", description = "Media already in watchlist", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<WatchListDTO> addMediaToWatchList(@Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable @Min(1) Long watchListId, @PathVariable @Min(1) Long tmdbId) {
+    public ResponseEntity<WatchListDTO> addMediaToWatchList(@Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable @Min(1) Long watchListId, @PathVariable @Min(1) Long tmdbId, @RequestParam(value = "type", required = false) String type) {
         Users user = userPrincipal.getUser();
-        WatchListDTO dto = watchListService.addMediaToWatchList(user, watchListId, tmdbId);
+        WatchListDTO dto = watchListService.addMediaToWatchList(user, watchListId, tmdbId, type);
         return ResponseEntity.ok(dto);
     }
     
     @DeleteMapping("/{watchListId}/items/{tmdbId}")
-    @Operation(summary = "Remove watchlist item", description = "Removes a media record from a watchlist owned by the authenticated user.")
+    @Operation(summary = "Remove watchlist item", description = "Removes a media item from a watchlist owned by the authenticated user. Provide type when the item may need to be imported first.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Media removed from watchlist", content = @Content(schema = @Schema(implementation = WatchListDTO.class))),
         @ApiResponse(responseCode = "400", description = "Invalid path parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
@@ -136,9 +137,9 @@ public class WatchListController {
         @ApiResponse(responseCode = "404", description = "Watchlist, media, or watchlist item not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<WatchListDTO> removeMediaFromWatchList(@Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable @Min(1) Long watchListId, @PathVariable @Min(1) Long tmdbId) {
+    public ResponseEntity<WatchListDTO> removeMediaFromWatchList(@Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable @Min(1) Long watchListId, @PathVariable @Min(1) Long tmdbId, @RequestParam(value = "type", required = false) String type) {
         Users user = userPrincipal.getUser();
-        WatchListDTO dto = watchListService.removeMediaFromWatchList(user, watchListId, tmdbId);
+        WatchListDTO dto = watchListService.removeMediaFromWatchList(user, watchListId, tmdbId, type);
         return ResponseEntity.ok(dto);
     }
     

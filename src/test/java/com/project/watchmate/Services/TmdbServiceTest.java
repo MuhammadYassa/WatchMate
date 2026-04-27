@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -81,21 +80,13 @@ class TmdbServiceTest {
         }
 
         @Test
-        void fetchMediaByTmdbId_WhenTmdbReturnsEmpty_ThrowsMediaNotFoundException() {
-            when(tmdbClient.fetchMediaById(anyLong(), any()))
-            .thenThrow(new MediaNotFoundException("Not found"));
+        void fetchMediaByTmdbId_WhenTmdbReturnsNull_ThrowsMediaNotFoundException() {
+            when(tmdbClient.fetchMediaById(TMDB_ID, MediaType.MOVIE)).thenReturn(null);
 
-            assertThrows(MediaNotFoundException.class,
+            MediaNotFoundException exception = assertThrows(MediaNotFoundException.class,
                 () -> tmdbService.fetchMediaByTmdbId(TMDB_ID, MediaType.MOVIE));
-        }
 
-        @Test
-        void fetchMediaByTmdbId_WhenTmdbReturns404_ThrowsMediaNotFoundException() {
-            when(tmdbClient.fetchMediaById(anyLong(), any()))
-                .thenThrow(new MediaNotFoundException("Not found"));
-
-            assertThrows(MediaNotFoundException.class,
-                () -> tmdbService.fetchMediaByTmdbId(TMDB_ID, MediaType.MOVIE));
+            assertEquals("TMDB media not found for ID: " + TMDB_ID, exception.getMessage());
         }
     }
 

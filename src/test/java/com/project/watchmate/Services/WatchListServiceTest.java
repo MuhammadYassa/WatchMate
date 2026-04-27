@@ -26,7 +26,6 @@ import com.project.watchmate.Dto.MediaDetailsDTO;
 import com.project.watchmate.Dto.WatchListDTO;
 import com.project.watchmate.Exception.DuplicateWatchListMediaException;
 import com.project.watchmate.Exception.MediaNotInWatchListException;
-import com.project.watchmate.Exception.MediaNotFoundException;
 import com.project.watchmate.Exception.UnauthorizedWatchListAccessException;
 import com.project.watchmate.Exception.WatchListNotFoundException;
 import com.project.watchmate.Mappers.WatchMateMapper;
@@ -34,7 +33,6 @@ import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.WatchList;
 import com.project.watchmate.Models.WatchListItem;
 import com.project.watchmate.Models.Users;
-import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.ReviewRepository;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
 import com.project.watchmate.Repositories.WatchListRepository;
@@ -46,7 +44,7 @@ class WatchListServiceTest {
     private WatchListRepository watchListRepository;
 
     @Mock
-    private MediaRepository mediaRepository;
+    private MediaResolutionService mediaResolutionService;
 
     @Mock
     private WatchMateMapper watchMateMapper;
@@ -66,6 +64,7 @@ class WatchListServiceTest {
     private Media media;
     private static final Long WATCHLIST_ID = 1L;
     private static final Long TMDB_ID = 100L;
+    private static final String TYPE = "MOVIE";
 
     @BeforeEach
     void setUp() {
@@ -151,7 +150,7 @@ class WatchListServiceTest {
         @Test
         void addMediaToWatchList_WhenValid_AddsItemAndSaves() {
             when(watchListRepository.findById(WATCHLIST_ID)).thenReturn(Optional.of(watchList));
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.of(media));
+            when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
             when(watchListRepository.save(any(WatchList.class))).thenReturn(watchList);
             when(reviewsRepo.findByMedia(media)).thenReturn(List.of());
             when(userMediaStatusRepository.findByUserAndMedia(user, media)).thenReturn(Optional.empty());
@@ -159,7 +158,7 @@ class WatchListServiceTest {
             when(watchMateMapper.mapToMediaDetailsDTO(any(), any(), any(Boolean.class), any())).thenReturn(MediaDetailsDTO.builder().build());
             when(watchMateMapper.mapToWatchListDTO(any(WatchList.class), any())).thenReturn(dto);
 
-            WatchListDTO result = watchListService.addMediaToWatchList(user, WATCHLIST_ID, TMDB_ID);
+            WatchListDTO result = watchListService.addMediaToWatchList(user, WATCHLIST_ID, TMDB_ID, TYPE);
 
             assertNotNull(result);
             assertEquals(WATCHLIST_ID, result.getId());
@@ -173,21 +172,10 @@ class WatchListServiceTest {
             when(watchListRepository.findById(WATCHLIST_ID)).thenReturn(Optional.of(watchList));
 
             UnauthorizedWatchListAccessException e = assertThrows(UnauthorizedWatchListAccessException.class,
-                () -> watchListService.addMediaToWatchList(otherUser, WATCHLIST_ID, TMDB_ID));
+                () -> watchListService.addMediaToWatchList(otherUser, WATCHLIST_ID, TMDB_ID, TYPE));
             
             assertEquals("You do not own this WatchList", e.getMessage());
             verify(watchListRepository, never()).save(any(WatchList.class));
-        }
-
-        @Test
-        void addMediaToWatchList_WhenMediaNotFound_ThrowsMediaNotFoundException() {
-            when(watchListRepository.findById(WATCHLIST_ID)).thenReturn(Optional.of(watchList));
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.empty());
-
-            MediaNotFoundException e = assertThrows(MediaNotFoundException.class,
-                () -> watchListService.addMediaToWatchList(user, WATCHLIST_ID, TMDB_ID));
-            
-            assertEquals("Media does not exist.", e.getMessage());
         }
 
         @Test
@@ -195,10 +183,10 @@ class WatchListServiceTest {
             WatchListItem existing = WatchListItem.builder().media(media).watchList(watchList).build();
             watchList.getItems().add(existing);
             when(watchListRepository.findById(WATCHLIST_ID)).thenReturn(Optional.of(watchList));
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.of(media));
+            when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
 
             DuplicateWatchListMediaException e = assertThrows(DuplicateWatchListMediaException.class,
-                () -> watchListService.addMediaToWatchList(user, WATCHLIST_ID, TMDB_ID));
+                () -> watchListService.addMediaToWatchList(user, WATCHLIST_ID, TMDB_ID, TYPE));
 
             assertEquals("Media already exists in current WatchList", e.getMessage());
         }
@@ -213,12 +201,12 @@ class WatchListServiceTest {
             WatchListItem item = WatchListItem.builder().media(media).watchList(watchList).build();
             watchList.getItems().add(item);
             when(watchListRepository.findById(WATCHLIST_ID)).thenReturn(Optional.of(watchList));
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.of(media));
+            when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
             when(watchListRepository.save(any(WatchList.class))).thenReturn(watchList);
             WatchListDTO dto = WatchListDTO.builder().id(WATCHLIST_ID).name("My List").build();
             when(watchMateMapper.mapToWatchListDTO(any(WatchList.class), any())).thenReturn(dto);
 
-            WatchListDTO result = watchListService.removeMediaFromWatchList(user, WATCHLIST_ID, TMDB_ID);
+            WatchListDTO result = watchListService.removeMediaFromWatchList(user, WATCHLIST_ID, TMDB_ID, TYPE);
 
             assertNotNull(result);
             assertEquals(WATCHLIST_ID, result.getId());
@@ -230,10 +218,10 @@ class WatchListServiceTest {
         @Test
         void removeMediaFromWatchList_WhenMediaNotInList_ThrowsMediaNotInWatchListException() {
             when(watchListRepository.findById(WATCHLIST_ID)).thenReturn(Optional.of(watchList));
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.of(media));
+            when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
 
             MediaNotInWatchListException e = assertThrows(MediaNotInWatchListException.class,
-                () -> watchListService.removeMediaFromWatchList(user, WATCHLIST_ID, TMDB_ID));
+                () -> watchListService.removeMediaFromWatchList(user, WATCHLIST_ID, TMDB_ID, TYPE));
 
             assertEquals("Media is not in this watchlist", e.getMessage());
         }
@@ -243,7 +231,7 @@ class WatchListServiceTest {
             when(watchListRepository.findById(WATCHLIST_ID)).thenReturn(Optional.of(watchList));
 
             UnauthorizedWatchListAccessException e = assertThrows(UnauthorizedWatchListAccessException.class,
-                () -> watchListService.removeMediaFromWatchList(otherUser, WATCHLIST_ID, TMDB_ID));
+                () -> watchListService.removeMediaFromWatchList(otherUser, WATCHLIST_ID, TMDB_ID, TYPE));
 
             assertEquals("You do not own this WatchList", e.getMessage());
         }

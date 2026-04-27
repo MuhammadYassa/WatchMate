@@ -64,12 +64,7 @@ public class WatchMateMapper {
     }
 
     public ReviewResponseDTO mapToReviewDTO(Review review){
-        return ReviewResponseDTO.builder()
-        .username(review.getUser().getUsername())
-        .comment(review.getComment())
-        .starRating(review.getRating())
-        .postedAt(review.getDatePosted())
-        .build();
+        return mapToReviewResponseDTO(review);
     }
 
     public UserMediaStatusDTO mapToUserMediaStatusDTO(UserMediaStatus userMediaStatus) {
@@ -81,8 +76,9 @@ public class WatchMateMapper {
 
     public ReviewResponseDTO mapToReviewResponseDTO(Review review) {
         return ReviewResponseDTO.builder()
+            .username(review.getUser().getUsername())
             .reviewId(review.getId())
-            .mediaId(review.getMedia().getId())
+            .tmdbId(review.getMedia().getTmdbId())
             .starRating(review.getRating())
             .comment(review.getComment())
             .postedAt(review.getDatePosted())

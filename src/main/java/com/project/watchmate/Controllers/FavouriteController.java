@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import jakarta.validation.constraints.Min;
 
 
@@ -42,7 +43,7 @@ public class FavouriteController {
     private final FavouriteService favouriteService;
 
     @PostMapping("/add/{tmdbId}")
-    @Operation(summary = "Add favourite", description = "Marks a media item as a favourite for the authenticated user.")
+    @Operation(summary = "Add favourite", description = "Marks a media item as a favourite for the authenticated user. Provide type when the item may need to be imported first.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Favourite added", content = @Content(schema = @Schema(implementation = FavouriteStatusDTO.class))),
         @ApiResponse(responseCode = "400", description = "Invalid path parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
@@ -51,14 +52,14 @@ public class FavouriteController {
         @ApiResponse(responseCode = "409", description = "Media already favourited", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<FavouriteStatusDTO> addFavourite(@PathVariable @Min(1) Long tmdbId, @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal) {
+    public ResponseEntity<FavouriteStatusDTO> addFavourite(@PathVariable @Min(1) Long tmdbId, @RequestParam(value = "type", required = false) String type, @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal) {
         Users user = userPrincipal.getUser();
-        FavouriteStatusDTO response = favouriteService.addToFavourites(tmdbId, user);
+        FavouriteStatusDTO response = favouriteService.addToFavourites(tmdbId, type, user);
         return ResponseEntity.ok(response);
     }
     
     @DeleteMapping("/remove/{tmdbId}")
-    @Operation(summary = "Remove favourite", description = "Removes a media item from the authenticated user's favourites.")
+    @Operation(summary = "Remove favourite", description = "Removes a media item from the authenticated user's favourites. Provide type when the item may need to be imported first.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Favourite removed", content = @Content(schema = @Schema(implementation = FavouriteStatusDTO.class))),
         @ApiResponse(responseCode = "400", description = "Invalid path parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
@@ -66,9 +67,9 @@ public class FavouriteController {
         @ApiResponse(responseCode = "404", description = "Media not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<FavouriteStatusDTO> removeFavourite(@PathVariable @Min(1) Long tmdbId, @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal){
+    public ResponseEntity<FavouriteStatusDTO> removeFavourite(@PathVariable @Min(1) Long tmdbId, @RequestParam(value = "type", required = false) String type, @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal){
         Users user = userPrincipal.getUser();
-        FavouriteStatusDTO response = favouriteService.removeFromFavourites(tmdbId, user);
+        FavouriteStatusDTO response = favouriteService.removeFromFavourites(tmdbId, type, user);
         return ResponseEntity.ok(response);
     }
 
@@ -86,7 +87,7 @@ public class FavouriteController {
     }
 
     @GetMapping("/check/{tmdbId}")
-    @Operation(summary = "Check favourite status", description = "Returns whether a media item is favourited by the authenticated user.")
+    @Operation(summary = "Check favourite status", description = "Returns whether a media item is favourited by the authenticated user. Provide type when the item may need to be imported first.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Favourite status returned", content = @Content(schema = @Schema(implementation = FavouriteStatusDTO.class))),
         @ApiResponse(responseCode = "400", description = "Invalid path parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
@@ -94,9 +95,9 @@ public class FavouriteController {
         @ApiResponse(responseCode = "404", description = "Media not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<FavouriteStatusDTO> isFavourited(@PathVariable @Min(1) Long tmdbId, @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal) {
+    public ResponseEntity<FavouriteStatusDTO> isFavourited(@PathVariable @Min(1) Long tmdbId, @RequestParam(value = "type", required = false) String type, @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal) {
         Users user = userPrincipal.getUser();
-        FavouriteStatusDTO response = favouriteService.isFavourited(tmdbId, user);
+        FavouriteStatusDTO response = favouriteService.isFavourited(tmdbId, type, user);
         return ResponseEntity.ok(response);
     }
     

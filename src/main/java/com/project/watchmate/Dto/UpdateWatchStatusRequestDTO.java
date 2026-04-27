@@ -21,6 +21,9 @@ public class UpdateWatchStatusRequestDTO {
     @Schema(description = "TMDB identifier of the media item.", example = "550")
 	private Long tmdbId;
 
+    @Schema(description = "Media type. Required when the media item has not already been imported.", example = "MOVIE", allowableValues = {"MOVIE", "SHOW"})
+    private String type;
+
 	@NotBlank
     @Schema(description = "Desired watch status.", example = "WATCHED", allowableValues = {"TO_WATCH", "WATCHING", "WATCHED", "NONE"})
 	private String status;

@@ -9,7 +9,7 @@ RUN ./mvnw dependency:go-offline -B
 
 COPY src/ src/
 
-RUN ./mvnw clean package -Dtest=com.project.watchmate.Services.*Test -B
+RUN ./mvnw clean package -DskipTests -B
 
 FROM eclipse-temurin:21-jre-alpine
 

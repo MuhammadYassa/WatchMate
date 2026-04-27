@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.project.watchmate.Dto.MediaDetailsDTO;
 import com.project.watchmate.Dto.WatchListDTO;
 import com.project.watchmate.Exception.DuplicateWatchListMediaException;
-import com.project.watchmate.Exception.MediaNotFoundException;
 import com.project.watchmate.Exception.MediaNotInWatchListException;
 import com.project.watchmate.Exception.UnauthorizedWatchListAccessException;
 import com.project.watchmate.Exception.WatchListNotFoundException;
@@ -27,7 +26,6 @@ import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchList;
 import com.project.watchmate.Models.WatchListItem;
 import com.project.watchmate.Models.WatchStatus;
-import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.ReviewRepository;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
 import com.project.watchmate.Repositories.WatchListRepository;
@@ -40,7 +38,7 @@ public class WatchListService {
 
     private final WatchListRepository watchListRepository;
 
-    private final MediaRepository mediaRepository;
+    private final MediaResolutionService mediaResolutionService;
 
     private final WatchMateMapper watchMateMapper;
 
@@ -104,14 +102,14 @@ public class WatchListService {
         return watchLists.stream().map(w -> mapToWatchListDTO(w)).toList();
     }
 
-    public WatchListDTO addMediaToWatchList(Users user, Long watchListId, Long tmdbId) {
+    public WatchListDTO addMediaToWatchList(Users user, Long watchListId, Long tmdbId, String type) {
         WatchList watchList = watchListRepository.findById(Objects.requireNonNull(watchListId, "watchListId")).orElseThrow(() -> new WatchListNotFoundException("WatchList does not exist."));
 
         if(!watchList.getUser().getId().equals(user.getId())){
             throw new UnauthorizedWatchListAccessException("You do not own this WatchList");
         }
         
-        Media media = mediaRepository.findByTmdbId(Objects.requireNonNull(tmdbId, "tmdbId")).orElseThrow(() -> new MediaNotFoundException("Media does not exist."));
+        Media media = mediaResolutionService.resolveMediaByTmdbId(tmdbId, type);
 
         boolean alreadyExists = watchList.getItems().stream().anyMatch(item -> item.getMedia().getId().equals(media.getId()));
 
@@ -131,14 +129,14 @@ public class WatchListService {
         return mapToWatchListDTO(watchList);
     }   
 
-    public WatchListDTO removeMediaFromWatchList(Users user, Long watchListId, Long tmdbId) {
+    public WatchListDTO removeMediaFromWatchList(Users user, Long watchListId, Long tmdbId, String type) {
         WatchList watchList = watchListRepository.findById(Objects.requireNonNull(watchListId, "watchListId")).orElseThrow(() -> new WatchListNotFoundException("WatchList does not exist."));
 
         if(!watchList.getUser().getId().equals(user.getId()) && user.getRole() != Role.ADMIN){
             throw new UnauthorizedWatchListAccessException("You do not own this WatchList");
         }
 
-        Media media = mediaRepository.findByTmdbId(Objects.requireNonNull(tmdbId, "tmdbId")).orElseThrow(() -> new MediaNotFoundException("Media does not exist."));
+        Media media = mediaResolutionService.resolveMediaByTmdbId(tmdbId, type);
 
         WatchListItem itemToRemove = watchList.getItems().stream()
         .filter(item -> item.getMedia().getId().equals(media.getId()))

@@ -25,13 +25,11 @@ import com.project.watchmate.Dto.FavouriteStatusDTO;
 import com.project.watchmate.Dto.MediaDetailsDTO;
 import com.project.watchmate.Dto.UserFavouritesDTO;
 import com.project.watchmate.Exception.DuplicateFavouriteException;
-import com.project.watchmate.Exception.MediaNotFoundException;
 import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
-import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
 import com.project.watchmate.Repositories.UsersRepository;
 
@@ -39,7 +37,7 @@ import com.project.watchmate.Repositories.UsersRepository;
 class FavouriteServiceTest {
 
     @Mock
-    private MediaRepository mediaRepository;
+    private MediaResolutionService mediaResolutionService;
 
     @Mock
     private UsersRepository usersRepository;
@@ -54,6 +52,7 @@ class FavouriteServiceTest {
     private FavouriteService favouriteService;
 
     private static final Long TMDB_ID = 12345L;
+    private static final String TYPE = "MOVIE";
     private Media media;
     private Users user;
     private Users managedUser;
@@ -85,9 +84,9 @@ class FavouriteServiceTest {
         @Test
         void addToFavourites_WhenMediaExistsAndNotFavourited_AddsMediaAndReturnsDtoWithTrue() {
             when(usersRepository.findByIdWithFavorites(user.getId())).thenReturn(Optional.of(managedUser));
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.of(media));
+            when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
 
-            FavouriteStatusDTO result = favouriteService.addToFavourites(TMDB_ID, user);
+            FavouriteStatusDTO result = favouriteService.addToFavourites(TMDB_ID, TYPE, user);
 
             assertEquals(TMDB_ID, result.getTmdbId());
             assertTrue(result.isFavourited());
@@ -96,27 +95,14 @@ class FavouriteServiceTest {
         }
 
         @Test
-        void addToFavourites_WhenMediaNotFound_ThrowsMediaNotFoundException() {
-            when(usersRepository.findByIdWithFavorites(user.getId())).thenReturn(Optional.of(managedUser));
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.empty());
-
-            MediaNotFoundException exception = assertThrows(
-                MediaNotFoundException.class,
-                () -> favouriteService.addToFavourites(TMDB_ID, user)
-            );
-
-            assertEquals("Media does not exist!", exception.getMessage());
-        }
-
-        @Test
         void addToFavourites_WhenAlreadyFavourited_ThrowsDuplicateFavouriteException() {
             managedUser.getFavorites().add(media);
             when(usersRepository.findByIdWithFavorites(user.getId())).thenReturn(Optional.of(managedUser));
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.of(media));
+            when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
 
             DuplicateFavouriteException exception = assertThrows(
                 DuplicateFavouriteException.class,
-                () -> favouriteService.addToFavourites(TMDB_ID, user)
+                () -> favouriteService.addToFavourites(TMDB_ID, TYPE, user)
             );
 
             assertEquals("Media has already been favourited.", exception.getMessage());
@@ -131,9 +117,9 @@ class FavouriteServiceTest {
         void removeFromFavourites_WhenMediaExistsAndFavourited_RemovesAndReturnsDtoWithFalse() {
             managedUser.getFavorites().add(media);
             when(usersRepository.findByIdWithFavorites(user.getId())).thenReturn(Optional.of(managedUser));
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.of(media));
+            when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
 
-            FavouriteStatusDTO result = favouriteService.removeFromFavourites(TMDB_ID, user);
+            FavouriteStatusDTO result = favouriteService.removeFromFavourites(TMDB_ID, TYPE, user);
 
             assertEquals(TMDB_ID, result.getTmdbId());
             assertFalse(result.isFavourited());
@@ -143,26 +129,14 @@ class FavouriteServiceTest {
         @Test
         void removeFromFavourites_WhenMediaExistsButNotFavourited_ReturnsFalse() {
             when(usersRepository.findByIdWithFavorites(user.getId())).thenReturn(Optional.of(managedUser));
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.of(media));
+            when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
 
-            FavouriteStatusDTO result = favouriteService.removeFromFavourites(TMDB_ID, user);
+            FavouriteStatusDTO result = favouriteService.removeFromFavourites(TMDB_ID, TYPE, user);
 
             assertEquals(TMDB_ID, result.getTmdbId());
             assertFalse(result.isFavourited());
         }
 
-        @Test
-        void removeFromFavourites_WhenMediaNotFound_ThrowsMediaNotFoundException() {
-            when(usersRepository.findByIdWithFavorites(user.getId())).thenReturn(Optional.of(managedUser));
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.empty());
-
-            MediaNotFoundException exception = assertThrows(
-                MediaNotFoundException.class,
-                () -> favouriteService.removeFromFavourites(TMDB_ID, user)
-            );
-
-            assertEquals("Media does not exist!", exception.getMessage());
-        }
     }
 
     @Nested
@@ -173,9 +147,9 @@ class FavouriteServiceTest {
         void isFavourited_WhenMediaExistsAndFavourited_ReturnsDtoWithTrue() {
             managedUser.getFavorites().add(media);
             when(usersRepository.findByIdWithFavorites(user.getId())).thenReturn(Optional.of(managedUser));
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.of(media));
+            when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
 
-            FavouriteStatusDTO result = favouriteService.isFavourited(TMDB_ID, user);
+            FavouriteStatusDTO result = favouriteService.isFavourited(TMDB_ID, TYPE, user);
 
             assertEquals(TMDB_ID, result.getTmdbId());
             assertTrue(result.isFavourited());
@@ -184,26 +158,14 @@ class FavouriteServiceTest {
         @Test
         void isFavourited_WhenMediaExistsAndNotFavourited_ReturnsDtoWithFalse() {
             when(usersRepository.findByIdWithFavorites(user.getId())).thenReturn(Optional.of(managedUser));
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.of(media));
+            when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
 
-            FavouriteStatusDTO result = favouriteService.isFavourited(TMDB_ID, user);
+            FavouriteStatusDTO result = favouriteService.isFavourited(TMDB_ID, TYPE, user);
 
             assertEquals(TMDB_ID, result.getTmdbId());
             assertFalse(result.isFavourited());
         }
 
-        @Test
-        void isFavourited_WhenMediaNotFound_ThrowsMediaNotFoundException() {
-            when(usersRepository.findByIdWithFavorites(user.getId())).thenReturn(Optional.of(managedUser));
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.empty());
-
-            MediaNotFoundException exception = assertThrows(
-                MediaNotFoundException.class,
-                () -> favouriteService.isFavourited(TMDB_ID, user)
-            );
-
-            assertEquals("Media does not exist!", exception.getMessage());
-        }
     }
 
     @Nested

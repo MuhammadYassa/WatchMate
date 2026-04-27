@@ -15,7 +15,6 @@ import com.project.watchmate.Dto.CreateReviewRequestDTO;
 import com.project.watchmate.Dto.ReviewResponseDTO;
 import com.project.watchmate.Dto.UpdateReviewRequestDTO;
 import com.project.watchmate.Exception.DuplicateReviewException;
-import com.project.watchmate.Exception.MediaNotFoundException;
 import com.project.watchmate.Exception.ReviewNotFoundException;
 import com.project.watchmate.Exception.UnauthorizedReviewAccessException;
 import com.project.watchmate.Mappers.WatchMateMapper;
@@ -23,7 +22,6 @@ import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.Review;
 import com.project.watchmate.Models.Role;
 import com.project.watchmate.Models.Users;
-import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.ReviewRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -34,13 +32,12 @@ public class ReviewService {
 
     private final ReviewRepository reviewRepository;
 
-    private final MediaRepository mediaRepository;
+    private final MediaResolutionService mediaResolutionService;
 
     private final WatchMateMapper watchMateMapper;
 
     public ReviewResponseDTO createReview(Users user, CreateReviewRequestDTO createReviewRequest) {
-        Long mediaId = Objects.requireNonNull(createReviewRequest.getMediaId(), "mediaId");
-        Media media = mediaRepository.findById(mediaId).orElseThrow(() -> new MediaNotFoundException("Media not found"));
+        Media media = mediaResolutionService.resolveMediaByTmdbId(createReviewRequest.getTmdbId(), createReviewRequest.getType());
         if (reviewRepository.existsByUserAndMedia(user, media)) {
             throw new DuplicateReviewException("You have already reviewed this media");
         }
@@ -76,8 +73,9 @@ public class ReviewService {
         return;
     }
 
-    public List<ReviewResponseDTO> getReviews(Users user, Long mediaId) {
-        List<Review> reviews = reviewRepository.findByMedia(mediaRepository.findById(Objects.requireNonNull(mediaId, "mediaId")).orElseThrow(() -> new MediaNotFoundException("Media not found")));
+    public List<ReviewResponseDTO> getReviews(Users user, Long tmdbId, String type) {
+        Media media = mediaResolutionService.resolveMediaByTmdbId(tmdbId, type);
+        List<Review> reviews = reviewRepository.findByMedia(media);
         return reviews.stream().map(review -> watchMateMapper.mapToReviewResponseDTO(review)).collect(Collectors.toList());
     }
 

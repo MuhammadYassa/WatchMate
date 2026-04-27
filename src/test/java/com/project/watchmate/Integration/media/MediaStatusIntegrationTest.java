@@ -23,7 +23,7 @@ class MediaStatusIntegrationTest extends AbstractIntegrationTest {
 		mockMvc.perform(post("/api/v1/media/update")
 			.header("Authorization", bearerToken(user))
 			.contentType(MediaType.APPLICATION_JSON)
-			.content(watchStatusBody(media.getTmdbId(), "WATCHED")))
+			.content(watchStatusBody(media.getTmdbId(), "MOVIE", "WATCHED")))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.tmdbId").value(media.getTmdbId().intValue()))
 			.andExpect(jsonPath("$.status").value("WATCHED"));
@@ -40,16 +40,16 @@ class MediaStatusIntegrationTest extends AbstractIntegrationTest {
 		mockMvc.perform(post("/api/v1/media/update")
 			.header("Authorization", bearerToken(user))
 			.contentType(MediaType.APPLICATION_JSON)
-			.content(watchStatusBody(media.getTmdbId(), "DONE")))
+			.content(watchStatusBody(media.getTmdbId(), "MOVIE", "DONE")))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("INVALID_WATCH_STATUS"));
 
 		assertThat(userMediaStatusRepository.findByUserAndMedia(user, media)).isEmpty();
 	}
 
-	private String watchStatusBody(Long tmdbId, String status) {
+	private String watchStatusBody(Long tmdbId, String type, String status) {
 		return """
-			{"tmdbId":%d,"status":"%s"}
-			""".formatted(tmdbId, status);
+			{"tmdbId":%d,"type":"%s","status":"%s"}
+			""".formatted(tmdbId, type, status);
 	}
 }

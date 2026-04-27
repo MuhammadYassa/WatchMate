@@ -9,7 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.project.watchmate.Dto.FavouriteStatusDTO;
 import com.project.watchmate.Dto.UserFavouritesDTO;
 import com.project.watchmate.Dto.MediaDetailsDTO;
-import com.project.watchmate.Exception.MediaNotFoundException;
 import com.project.watchmate.Exception.UserNotFoundException;
 import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Exception.DuplicateFavouriteException;
@@ -17,7 +16,6 @@ import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
-import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
 import com.project.watchmate.Repositories.UsersRepository;
 
@@ -27,7 +25,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class FavouriteService {
 
-    private final MediaRepository mediaRepository;
+    private final MediaResolutionService mediaResolutionService;
 
     private final UsersRepository usersRepository;
 
@@ -36,9 +34,9 @@ public class FavouriteService {
     private final UserMediaStatusRepository userMediaStatusRepository;
 
     @Transactional
-    public FavouriteStatusDTO addToFavourites (Long tmdbId, Users user){
+    public FavouriteStatusDTO addToFavourites (Long tmdbId, String type, Users user){
         Users managedUser = loadUserWithFavorites(user);
-        Media media = mediaRepository.findByTmdbId(tmdbId).orElseThrow(() -> new MediaNotFoundException("Media does not exist!"));
+        Media media = mediaResolutionService.resolveMediaByTmdbId(tmdbId, type);
 
         if (managedUser.getFavorites().contains(media)){
             throw new DuplicateFavouriteException ("Media has already been favourited.");
@@ -49,9 +47,9 @@ public class FavouriteService {
     }
 
     @Transactional
-    public FavouriteStatusDTO removeFromFavourites (Long tmdbId, Users user){
+    public FavouriteStatusDTO removeFromFavourites (Long tmdbId, String type, Users user){
         Users managedUser = loadUserWithFavorites(user);
-        Media media = mediaRepository.findByTmdbId(tmdbId).orElseThrow(() -> new MediaNotFoundException("Media does not exist!"));
+        Media media = mediaResolutionService.resolveMediaByTmdbId(tmdbId, type);
         if (managedUser.getFavorites().contains(media)){
             managedUser.getFavorites().remove(media);
         }
@@ -59,9 +57,9 @@ public class FavouriteService {
     }
 
     @Transactional(readOnly = true)
-    public FavouriteStatusDTO isFavourited (Long tmdbId, Users user){
+    public FavouriteStatusDTO isFavourited (Long tmdbId, String type, Users user){
         Users managedUser = loadUserWithFavorites(user);
-        Media media = mediaRepository.findByTmdbId(tmdbId).orElseThrow(() -> new MediaNotFoundException("Media does not exist!"));
+        Media media = mediaResolutionService.resolveMediaByTmdbId(tmdbId, type);
         return FavouriteStatusDTO.builder().tmdbId(tmdbId).isFavourited(managedUser.getFavorites().contains(media)).build();
     }
 

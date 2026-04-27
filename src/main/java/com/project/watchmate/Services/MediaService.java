@@ -15,12 +15,10 @@ import com.project.watchmate.Dto.MediaDetailsDTO;
 import com.project.watchmate.Dto.PopularMediaResponseDTO;
 import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Models.Media;
-import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.Review;
 import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
-import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.PopularMediaRepository;
 import com.project.watchmate.Repositories.ReviewRepository;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
@@ -32,13 +30,11 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class MediaService {
 
-    private final MediaRepository mediaRepository;
+    private final MediaResolutionService mediaResolutionService;
 
     private final UsersRepository usersRepository;
 
     private final PopularMediaRepository popularMediaRepository;
-
-    private final TmdbService tmdbService;
 
     private final WatchMateMapper watchMateMapper;
 
@@ -48,14 +44,11 @@ public class MediaService {
 
     @Transactional
     public MediaDetailsDTO getMediaDetails(Long tmdbId, String typeStr, Users userParam){
-        MediaType type = MediaType.valueOf(typeStr.toUpperCase());
-        Long id = Objects.requireNonNull(tmdbId, "tmdbId");
         Long userId = Objects.requireNonNull(Objects.requireNonNull(userParam, "userParam").getId(), "userParam.id");
-        Users user = usersRepository.findById(userId)
+        Users user = usersRepository.findByIdWithFavorites(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-        Media media = Objects.requireNonNull(mediaRepository.findByTmdbId(id).orElseGet(() -> tmdbService.fetchMediaByTmdbId(id, type)), "media");
-        mediaRepository.save(media);
+        Media media = mediaResolutionService.resolveMediaByTmdbId(tmdbId, typeStr);
 
         List<Review> reviews = reviewRepository.findByMedia(media);
 
@@ -82,6 +75,7 @@ public class MediaService {
         return popularMediaRepository.findAll().stream()
             .map(pm -> PopularMediaResponseDTO.builder()
                 .rank(pm.getPopularityRank())
+                .tmdbId(pm.getMedia().getTmdbId())
                 .title(pm.getMedia().getTitle())
                 .overview(pm.getMedia().getOverview())
                 .posterPath(pm.getMedia().getPosterPath())

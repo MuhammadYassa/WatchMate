@@ -5,12 +5,10 @@ import org.springframework.stereotype.Service;
 import com.project.watchmate.Dto.UpdateWatchStatusRequestDTO;
 import com.project.watchmate.Dto.UserMediaStatusDTO;
 import com.project.watchmate.Exception.InvalidWatchStatusException;
-import com.project.watchmate.Exception.MediaNotFoundException;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
-import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -19,15 +17,13 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class StatusService {
 
-	private final MediaRepository mediaRepository;
+	private final MediaResolutionService mediaResolutionService;
 
 	private final UserMediaStatusRepository userMediaStatusRepository;
 
 	public UserMediaStatusDTO updateWatchStatus(Users user, UpdateWatchStatusRequestDTO request) {
-		Media media = mediaRepository.findByTmdbId(request.getTmdbId())
-				.orElseThrow(() -> new MediaNotFoundException("Media does not exist."));
-
 		WatchStatus desiredStatus = parseWatchStatus(request.getStatus());
+		Media media = mediaResolutionService.resolveMediaByTmdbId(request.getTmdbId(), request.getType());
 
 		UserMediaStatus userMediaStatus = userMediaStatusRepository.findByUserAndMedia(user, media)
 				.orElse(UserMediaStatus.builder()

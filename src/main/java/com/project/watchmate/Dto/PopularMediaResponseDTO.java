@@ -15,6 +15,9 @@ public class PopularMediaResponseDTO {
         @Schema(description = "Popularity rank in the current response.", example = "1") 
         private int rank;
 
+        @Schema(description = "TMDB identifier for the media item.", example = "550")
+        private Long tmdbId;
+
         @Schema(description = "Title of the media item.", example = "The Dark Knight") 
         private String title;
 

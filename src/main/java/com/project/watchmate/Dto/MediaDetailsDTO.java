@@ -3,6 +3,7 @@ package com.project.watchmate.Dto;
 import java.time.LocalDate;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.WatchStatus;
 
@@ -47,6 +48,7 @@ public class MediaDetailsDTO {
     private List<ReviewResponseDTO> reviews;
 
     @Schema(description = "Whether the authenticated user has favourited this media item.")
+    @JsonProperty("isFavourited")
     private boolean isFavourited;
 
     @Schema(description = "Watch status of the authenticated user for this media item.")

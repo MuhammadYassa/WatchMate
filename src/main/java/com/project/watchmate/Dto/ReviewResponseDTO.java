@@ -27,8 +27,8 @@ public class ReviewResponseDTO {
     @Schema(description = "Internal identifier of the review.", example = "101")
     private Long reviewId;
 
-    @Schema(description = "Internal identifier of the reviewed media item.", example = "42")
-    private Long mediaId;
+    @Schema(description = "TMDB identifier of the reviewed media item.", example = "1399")
+    private Long tmdbId;
 
     @Schema(description = "Timestamp when the review was created.")
     private LocalDateTime postedAt;

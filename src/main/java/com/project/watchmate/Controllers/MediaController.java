@@ -121,8 +121,8 @@ public class MediaController {
 		return ResponseEntity.ok(dto);
 	}
 
-    @GetMapping("/{mediaId}/reviews")
-    @Operation(summary = "List media reviews", description = "Returns reviews for a media item for the authenticated user.")
+    @GetMapping("/{tmdbId}/reviews")
+    @Operation(summary = "List media reviews", description = "Returns reviews for a media item identified by TMDB ID. Provide type when the item may need to be imported first.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Media reviews returned", content = @Content(array = @ArraySchema(schema = @Schema(implementation = ReviewResponseDTO.class)))),
@@ -131,9 +131,13 @@ public class MediaController {
         @ApiResponse(responseCode = "404", description = "Media not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<List<ReviewResponseDTO>> getReviews(@Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable @Min(1) Long mediaId) {
+    public ResponseEntity<List<ReviewResponseDTO>> getReviews(
+        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @PathVariable @Min(1) Long tmdbId,
+        @RequestParam(value = "type", required = false) String type
+    ) {
         Users user = userPrincipal.getUser();
-        List<ReviewResponseDTO> reviewResponses = reviewService.getReviews(user, mediaId);
+        List<ReviewResponseDTO> reviewResponses = reviewService.getReviews(user, tmdbId, type);
         return ResponseEntity.ok(reviewResponses);
     }
 }

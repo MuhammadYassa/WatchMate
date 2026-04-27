@@ -107,7 +107,8 @@ class WatchListIntegrationTest extends AbstractIntegrationTest {
 		Media media = saveMedia(9001L, "Item Movie", com.project.watchmate.Models.MediaType.MOVIE);
 
 		mockMvc.perform(post("/api/v1/watchlists/{watchListId}/items/{tmdbId}", watchList.getId(), media.getTmdbId())
-			.header("Authorization", bearerToken(owner)))
+			.header("Authorization", bearerToken(owner))
+			.param("type", "MOVIE"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.id").value(watchList.getId().intValue()))
 			.andExpect(jsonPath("$.media[0].tmdbId").value(media.getTmdbId().intValue()))
@@ -129,11 +130,13 @@ class WatchListIntegrationTest extends AbstractIntegrationTest {
 		Media media = saveMedia(9002L, "Removable Movie", com.project.watchmate.Models.MediaType.MOVIE);
 
 		mockMvc.perform(post("/api/v1/watchlists/{watchListId}/items/{tmdbId}", watchList.getId(), media.getTmdbId())
-			.header("Authorization", bearerToken(owner)))
+			.header("Authorization", bearerToken(owner))
+			.param("type", "MOVIE"))
 			.andExpect(status().isOk());
 
 		mockMvc.perform(delete("/api/v1/watchlists/{watchListId}/items/{tmdbId}", watchList.getId(), media.getTmdbId())
-			.header("Authorization", bearerToken(owner)))
+			.header("Authorization", bearerToken(owner))
+			.param("type", "MOVIE"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.id").value(watchList.getId().intValue()))
 			.andExpect(jsonPath("$.media").isEmpty());
@@ -156,7 +159,8 @@ class WatchListIntegrationTest extends AbstractIntegrationTest {
 		saveWatchListItem(watchList, media);
 
 		mockMvc.perform(delete("/api/v1/watchlists/{watchListId}/items/{tmdbId}", watchList.getId(), media.getTmdbId())
-			.header("Authorization", bearerToken(nonOwner)))
+			.header("Authorization", bearerToken(nonOwner))
+			.param("type", "MOVIE"))
 			.andExpect(status().isForbidden())
 			.andExpect(jsonPath("$.code").value("UNAUTHORIZED_WATCHLIST_ACCESS"));
 
@@ -172,7 +176,8 @@ class WatchListIntegrationTest extends AbstractIntegrationTest {
 		saveWatchListItem(watchList, media);
 
 		mockMvc.perform(delete("/api/v1/watchlists/{watchListId}/items/{tmdbId}", watchList.getId(), media.getTmdbId())
-			.header("Authorization", bearerToken(moderator)))
+			.header("Authorization", bearerToken(moderator))
+			.param("type", "MOVIE"))
 			.andExpect(status().isForbidden())
 			.andExpect(jsonPath("$.code").value("UNAUTHORIZED_WATCHLIST_ACCESS"));
 
@@ -188,7 +193,8 @@ class WatchListIntegrationTest extends AbstractIntegrationTest {
 		saveWatchListItem(watchList, media);
 
 		mockMvc.perform(delete("/api/v1/watchlists/{watchListId}/items/{tmdbId}", watchList.getId(), media.getTmdbId())
-			.header("Authorization", bearerToken(admin)))
+			.header("Authorization", bearerToken(admin))
+			.param("type", "MOVIE"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.id").value(watchList.getId().intValue()))
 			.andExpect(jsonPath("$.media").isEmpty());

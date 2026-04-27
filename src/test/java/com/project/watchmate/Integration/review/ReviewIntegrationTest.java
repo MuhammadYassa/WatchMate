@@ -13,6 +13,7 @@ import com.project.watchmate.Models.Users;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -28,10 +29,10 @@ class ReviewIntegrationTest extends AbstractIntegrationTest {
 		mockMvc.perform(post("/api/v1/reviews/create")
 			.header("Authorization", bearerToken(user))
 			.contentType(MediaType.APPLICATION_JSON)
-			.content(createReviewBody(media.getId(), 5, "Loved it")))
+			.content(createReviewBody(media.getTmdbId(), "MOVIE", 5, "Loved it")))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.reviewId").isNumber())
-			.andExpect(jsonPath("$.mediaId").value(media.getId().intValue()))
+			.andExpect(jsonPath("$.tmdbId").value(media.getTmdbId().intValue()))
 			.andExpect(jsonPath("$.starRating").value(5))
 			.andExpect(jsonPath("$.comment").value("Loved it"));
 
@@ -51,7 +52,7 @@ class ReviewIntegrationTest extends AbstractIntegrationTest {
 		mockMvc.perform(post("/api/v1/reviews/create")
 			.header("Authorization", bearerToken(user))
 			.contentType(MediaType.APPLICATION_JSON)
-			.content(createReviewBody(media.getId(), 3, "Second")))
+			.content(createReviewBody(media.getTmdbId(), "MOVIE", 3, "Second")))
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.code").value("DUPLICATE_REVIEW"));
 
@@ -96,6 +97,22 @@ class ReviewIntegrationTest extends AbstractIntegrationTest {
 
 		assertThat(unchanged.getRating()).isEqualTo(4);
 		assertThat(unchanged.getComment()).isEqualTo("Owner review");
+	}
+
+	@Test
+	void getReviewsByTmdbId_returns200_andListsReviews() throws Exception {
+		Users user = saveUser("review-list-user", true);
+		Media media = saveMedia(7009L, "Review Listing Movie", com.project.watchmate.Models.MediaType.MOVIE);
+		saveReview(user, media, 5, "Excellent");
+
+		mockMvc.perform(get("/api/v1/media/{tmdbId}/reviews", media.getTmdbId())
+			.header("Authorization", bearerToken(user))
+			.param("type", "MOVIE"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$[0].reviewId").isNumber())
+			.andExpect(jsonPath("$[0].tmdbId").value(media.getTmdbId().intValue()))
+			.andExpect(jsonPath("$[0].starRating").value(5))
+			.andExpect(jsonPath("$[0].comment").value("Excellent"));
 	}
 
 	@Test
@@ -165,10 +182,10 @@ class ReviewIntegrationTest extends AbstractIntegrationTest {
 			.build());
 	}
 
-	private String createReviewBody(Long mediaId, int starRating, String comment) {
+	private String createReviewBody(Long tmdbId, String type, int starRating, String comment) {
 		return """
-			{"mediaId":%d,"starRating":%d,"comment":"%s"}
-			""".formatted(mediaId, starRating, comment);
+			{"tmdbId":%d,"type":"%s","starRating":%d,"comment":"%s"}
+			""".formatted(tmdbId, type, starRating, comment);
 	}
 
 	private String updateReviewBody(int starRating, String comment) {

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.project.watchmate.Clients.TmdbClient;
 import com.project.watchmate.Dto.TmdbGenreDTO;
 import com.project.watchmate.Dto.TmdbMovieDTO;
+import com.project.watchmate.Exception.MediaNotFoundException;
 import com.project.watchmate.Models.Genre;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
@@ -58,7 +60,7 @@ public class TmdbService {
         log.info("TMDB genre sync completed totalFetched={} newGenresCreated={}", genreMap.size(), createdCount[0]);
     }
 
-    @Scheduled(cron = "0 47 23 * * *")
+    @Scheduled(cron = "0 59 23 * * *")
     public void popularMedia(){
         log.info("TMDB popular media sync started");
         try {
@@ -128,6 +130,9 @@ public class TmdbService {
 
     public Media fetchMediaByTmdbId(Long tmdbId, MediaType type){
         TmdbMovieDTO tmdbMedia = tmdbClient.fetchMediaById(tmdbId, type);
+        if (tmdbMedia == null) {
+            throw new MediaNotFoundException("TMDB media not found for ID: " + tmdbId);
+        }
 
         List<Long> genreIds = tmdbMedia.getGenres() == null
             ? List.of()
@@ -136,7 +141,7 @@ public class TmdbService {
         List<Genre> genres = genreRepository.findAllById(genreIds);
 
         Media media = Media.builder()
-            .tmdbId(tmdbMedia.getId())
+            .tmdbId(Objects.requireNonNull(tmdbMedia.getId(), "tmdbMedia.id"))
             .title(tmdbMedia.getTitle())
             .overview(tmdbMedia.getOverview())
             .posterPath(tmdbMedia.getPosterPath())
