@@ -70,7 +70,7 @@ class ExternalMediaIntegrationTest extends AbstractIntegrationTest {
 			.andExpect(jsonPath("$.type").value("MOVIE"))
 			.andExpect(jsonPath("$.watchStatus").value("NONE"));
 
-		Media persisted = mediaRepository.findByTmdbId(8101L).orElseThrow();
+		Media persisted = mediaRepository.findByTmdbIdAndType(8101L, MediaType.MOVIE).orElseThrow();
 
 		assertThat(persisted.getTitle()).isEqualTo("Fetched Movie");
 		assertThat(persisted.getType()).isEqualTo(MediaType.MOVIE);

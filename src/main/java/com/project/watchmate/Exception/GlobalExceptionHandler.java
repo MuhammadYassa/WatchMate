@@ -28,6 +28,11 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), "MEDIA_NOT_FOUND", null, ex, request);
     }
 
+    @ExceptionHandler(GenreNotFoundException.class)
+    public ResponseEntity<ApiError> handleGenreNotFound(GenreNotFoundException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), "GENRE_NOT_FOUND", null, ex, request);
+    }
+
     @ExceptionHandler(EmailException.class)
     public ResponseEntity<ApiError> handleDuplicate(EmailException ex, HttpServletRequest request){
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), "DUPLICATE_EMAIL", null, ex, request);

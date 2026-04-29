@@ -26,7 +26,6 @@ import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Repositories.GenreRepository;
 import com.project.watchmate.Repositories.MediaRepository;
-import com.project.watchmate.Repositories.PopularMediaRepository;
 
 @ExtendWith(MockitoExtension.class)
 class TmdbServiceTest {
@@ -39,9 +38,6 @@ class TmdbServiceTest {
 
     @Mock
     private GenreRepository genreRepository;
-
-    @Mock
-    private PopularMediaRepository popularMediaRepository;
 
     @InjectMocks
     private TmdbService tmdbService;
@@ -97,7 +93,7 @@ class TmdbServiceTest {
         @Test
         void saveAndUpdateMedia_WhenNewMedia_SavesEachAndReturnsList() {
             Media newMedia = Media.builder().tmdbId(200L).title("New").type(MediaType.MOVIE).build();
-            when(mediaRepository.findByTmdbId(200L)).thenReturn(Optional.empty());
+            when(mediaRepository.findByTmdbIdAndType(200L, MediaType.MOVIE)).thenReturn(Optional.empty());
             when(mediaRepository.save(any(Media.class)))
             .thenAnswer(inv -> inv.getArgument(0));
 
@@ -112,7 +108,7 @@ class TmdbServiceTest {
         void saveAndUpdateMedia_WhenMediaExists_UpdatesAndSavesExisting() {
             Media inputMedia = Media.builder().tmdbId(TMDB_ID).title("Updated").overview("New overview").type(MediaType.MOVIE).build();
             Media existingMedia = Media.builder().id(1L).tmdbId(TMDB_ID).title("Old").build();
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.of(existingMedia));
+            when(mediaRepository.findByTmdbIdAndType(TMDB_ID, MediaType.MOVIE)).thenReturn(Optional.of(existingMedia));
             when(mediaRepository.save(any(Media.class)))
             .thenAnswer(inv -> inv.getArgument(0));
 

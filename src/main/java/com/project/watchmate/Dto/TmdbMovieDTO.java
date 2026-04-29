@@ -32,6 +32,9 @@ public class TmdbMovieDTO {
     @JsonProperty("poster_path")
     private String posterPath;
 
+    @JsonProperty("backdrop_path")
+    private String backdropPath;
+
     @JsonProperty("release_date")
     private String releaseDate;
 

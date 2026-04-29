@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -56,7 +57,7 @@ class MediaResolutionServiceTest {
 
         @Test
         void resolveMediaByTmdbId_WhenMediaExists_ReturnsStoredMedia() {
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.of(media));
+            when(mediaRepository.findByTmdbIdAndType(TMDB_ID, MediaType.SHOW)).thenReturn(Optional.of(media));
 
             Media result = mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, "SHOW");
 
@@ -67,7 +68,7 @@ class MediaResolutionServiceTest {
 
         @Test
         void resolveMediaByTmdbId_WhenMediaMissing_ImportsAndSavesMedia() {
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.empty());
+            when(mediaRepository.findByTmdbIdAndType(TMDB_ID, MediaType.SHOW)).thenReturn(Optional.empty());
             when(tmdbService.fetchMediaByTmdbId(TMDB_ID, MediaType.SHOW)).thenReturn(media);
             when(mediaRepository.save(media)).thenReturn(media);
 
@@ -81,7 +82,7 @@ class MediaResolutionServiceTest {
 
         @Test
         void resolveMediaByTmdbId_WhenTypeMissingAndMediaMissing_ThrowsBadRequest() {
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.empty());
+            when(mediaRepository.findAllByTmdbId(TMDB_ID)).thenReturn(List.of());
 
             IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -104,7 +105,7 @@ class MediaResolutionServiceTest {
 
         @Test
         void resolveMediaByTmdbId_WhenTmdbServiceReturnsNull_ThrowsMediaNotFound() {
-            when(mediaRepository.findByTmdbId(TMDB_ID)).thenReturn(Optional.empty());
+            when(mediaRepository.findByTmdbIdAndType(TMDB_ID, MediaType.SHOW)).thenReturn(Optional.empty());
             when(tmdbService.fetchMediaByTmdbId(TMDB_ID, MediaType.SHOW)).thenReturn(null);
 
             MediaNotFoundException exception = assertThrows(
@@ -113,6 +114,19 @@ class MediaResolutionServiceTest {
             );
 
             assertEquals("TMDB media not found for ID: " + TMDB_ID, exception.getMessage());
+        }
+
+        @Test
+        void resolveMediaByTmdbId_WhenTypeMissingAndMultipleMatches_ThrowsBadRequest() {
+            Media movie = Media.builder().id(11L).tmdbId(TMDB_ID).type(MediaType.MOVIE).build();
+            when(mediaRepository.findAllByTmdbId(TMDB_ID)).thenReturn(List.of(media, movie));
+
+            IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, (String) null)
+            );
+
+            assertEquals("Multiple media items share this TMDB ID. Please supply the media type.", exception.getMessage());
         }
     }
 }
