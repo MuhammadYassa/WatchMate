@@ -1,5 +1,7 @@
 package com.project.watchmate.Controllers;
 
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,6 +19,7 @@ import com.project.watchmate.Dto.FollowListUserDetailsDTO;
 import com.project.watchmate.Dto.FollowRequestDTO;
 import com.project.watchmate.Dto.FollowRequestResponseDTO;
 import com.project.watchmate.Dto.FollowStatusDTO;
+import com.project.watchmate.Dto.SearchListUserDetailsDTO;
 import com.project.watchmate.Dto.UserProfileDTO;
 import com.project.watchmate.Models.FollowRequestStatuses;
 import com.project.watchmate.Models.UserPrincipal;
@@ -34,6 +37,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 
 
 
@@ -214,19 +218,35 @@ public class SocialController {
         Page<FollowListUserDetailsDTO> response = socialService.getFollowingList(user, page, size);
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/search")
+    @Operation(summary = "Search users by username", description = "Returns username matches using case-insensitive partial search.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Matching users returned"),
+        @ApiResponse(responseCode = "400", description = "Invalid query parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<List<SearchListUserDetailsDTO>> searchUsers(
+        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @RequestParam @NotBlank String query
+    ) {
+        Users user = userPrincipal.getUser();
+        List<SearchListUserDetailsDTO> response = socialService.searchUsersByUsername(query, user);
+        return ResponseEntity.ok(response);
+    }
     
-    @GetMapping("/user-profile/{userId}")
+    @GetMapping("/profile/{username}")
     @Operation(summary = "Get user profile", description = "Returns the profile view available to the authenticated user for the requested user.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "User profile returned", content = @Content(schema = @Schema(implementation = UserProfileDTO.class))),
-        @ApiResponse(responseCode = "400", description = "Invalid path parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "404", description = "Target user not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<UserProfileDTO> getUserProfile(@Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable @Min(1) Long userId) {
+    public ResponseEntity<UserProfileDTO> getUserProfile(@Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable String username) {
         Users user = userPrincipal.getUser();
-        UserProfileDTO response = socialService.getUserProfile(userId, user);
+        UserProfileDTO response = socialService.getUserProfile(username, user);
         return ResponseEntity.ok(response);
     }
 

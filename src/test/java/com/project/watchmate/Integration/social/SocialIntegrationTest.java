@@ -14,6 +14,7 @@ import com.project.watchmate.Models.WatchList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -122,7 +123,7 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 			.header("Authorization", bearerToken(target)))
 			.andExpect(status().isOk());
 
-		mockMvc.perform(get("/api/v1/social/user-profile/{userId}", target.getId())
+		mockMvc.perform(get("/api/v1/social/profile/{username}", target.getUsername())
 			.header("Authorization", bearerToken(viewer)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.username").value(target.getUsername()))
@@ -139,7 +140,7 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 		Users target = savePrivateUser("social-private-profile-target");
 		saveWatchList(target, "Private Watchlist");
 
-		mockMvc.perform(get("/api/v1/social/user-profile/{userId}", target.getId())
+		mockMvc.perform(get("/api/v1/social/profile/{username}", target.getUsername())
 			.header("Authorization", bearerToken(viewer)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.username").value(target.getUsername()))
@@ -153,7 +154,7 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 		Users target = savePrivateUser("social-private-profile-mod-target");
 		saveWatchList(target, "Moderator Visible Watchlist");
 
-		mockMvc.perform(get("/api/v1/social/user-profile/{userId}", target.getId())
+		mockMvc.perform(get("/api/v1/social/profile/{username}", target.getUsername())
 			.header("Authorization", bearerToken(moderator)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.username").value(target.getUsername()))
@@ -168,7 +169,7 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 		Users target = savePrivateUser("social-private-profile-admin-target");
 		saveWatchList(target, "Admin Visible Watchlist");
 
-		mockMvc.perform(get("/api/v1/social/user-profile/{userId}", target.getId())
+		mockMvc.perform(get("/api/v1/social/profile/{username}", target.getUsername())
 			.header("Authorization", bearerToken(admin)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.username").value(target.getUsername()))
@@ -201,6 +202,82 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 			.header("Authorization", bearerToken(user)))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("SELF_FOLLOW_ERROR"));
+	}
+
+	@Test
+	void searchUsers_returnsCaseInsensitiveMatchesOrderedByBestMatch() throws Exception {
+		Users viewer = saveUser("viewer-user", true);
+		Users exact = saveUser("muh", true);
+		Users followedPrefix = saveUser("muha", true);
+		saveUser("muhb", true);
+		Users followedContains = saveUser("amuh", true);
+		saveUser("other-user", true);
+		follow(viewer, followedPrefix);
+		follow(viewer, followedContains);
+
+		mockMvc.perform(get("/api/v1/social/search")
+			.param("query", "MUH")
+			.header("Authorization", bearerToken(viewer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$", hasSize(4)))
+			.andExpect(jsonPath("$[*].username", contains("muh", "muha", "muhb", "amuh")))
+			.andExpect(jsonPath("$[0].isFollowing").value(false))
+			.andExpect(jsonPath("$[1].isFollowing").value(true))
+			.andExpect(jsonPath("$[2].isFollowing").value(false))
+			.andExpect(jsonPath("$[3].isFollowing").value(true))
+			.andExpect(jsonPath("$[0].isSelf").value(false))
+			.andExpect(jsonPath("$[0].privacyStatus").value(exact.getPrivacyStatus().name()));
+	}
+
+	@Test
+	void searchUsers_withBlankQuery_returns400() throws Exception {
+		Users viewer = saveUser("blank-query-viewer", true);
+
+		mockMvc.perform(get("/api/v1/social/search")
+			.param("query", "   ")
+			.header("Authorization", bearerToken(viewer)))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+	}
+
+	@Test
+	void getUserProfileByUsername_returnsProfileUsingCaseInsensitiveLookup() throws Exception {
+		Users viewer = saveUser("profile-viewer", true);
+		Users target = saveUser("CaseTarget", true);
+		saveWatchList(target, "Visible Watchlist");
+
+		mockMvc.perform(get("/api/v1/social/profile/{username}", "casetarget")
+			.header("Authorization", bearerToken(viewer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.username").value("CaseTarget"))
+			.andExpect(jsonPath("$.watchlists.content.length()").value(1))
+			.andExpect(jsonPath("$.watchlists.content[0].name").value("Visible Watchlist"));
+	}
+
+	@Test
+	void getUserProfileByUsername_forPrivateUser_hidesSensitiveSectionsFromNonFollower() throws Exception {
+		Users viewer = saveUser("private-profile-viewer", true);
+		Users target = saveUser("private-profile-target", true);
+		target.setPrivacyStatus(PrivacyStatuses.PRIVATE);
+		usersRepository.save(target);
+		saveWatchList(target, "Private Watchlist");
+
+		mockMvc.perform(get("/api/v1/social/profile/{username}", target.getUsername())
+			.header("Authorization", bearerToken(viewer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.username").value(target.getUsername()))
+			.andExpect(jsonPath("$.privacyStatus").value("PRIVATE"))
+			.andExpect(jsonPath("$.watchlists").doesNotExist());
+	}
+
+	@Test
+	void getUserProfileByUsername_whenMissing_returns404() throws Exception {
+		Users viewer = saveUser("missing-profile-viewer", true);
+
+		mockMvc.perform(get("/api/v1/social/profile/{username}", "does-not-exist")
+			.header("Authorization", bearerToken(viewer)))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
 	}
 
 	private Users savePrivateUser(String username) {

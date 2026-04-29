@@ -3,11 +3,13 @@ package com.project.watchmate.Services;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -15,12 +17,16 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.project.watchmate.Dto.FollowRequestResponseDTO;
 import com.project.watchmate.Dto.FollowStatusDTO;
+import com.project.watchmate.Dto.SearchListUserDetailsDTO;
+import com.project.watchmate.Dto.UserProfileDTO;
 import com.project.watchmate.Exception.AlreadyFollowingException;
 import com.project.watchmate.Exception.FollowRequestNotFoundException;
 import com.project.watchmate.Exception.NotFollowingException;
@@ -68,6 +74,7 @@ class SocialServiceTest {
     private Users targetUser;
     private static final Long USER_ID = 1L;
     private static final Long TARGET_ID = 2L;
+
 
     @BeforeEach
     void setUp() {
@@ -251,6 +258,59 @@ class SocialServiceTest {
             when(usersRepository.findById(999L)).thenReturn(Optional.empty());
 
             assertThrows(UserNotFoundException.class, () -> socialService.getFollowStatus(999L, user));
+        }
+    }
+
+    @Nested
+    @DisplayName("Username Lookup Tests")
+    class UsernameLookupTests {
+
+        @Test
+        void searchUsersByUsername_TrimsQueryAndReturnsSearchDtos() {
+            SearchListUserDetailsDTO exactDto = SearchListUserDetailsDTO.builder()
+                .username("muh")
+                .isFollowing(false)
+                .isSelf(false)
+                .privacyStatus(PrivacyStatuses.PUBLIC)
+                .build();
+            SearchListUserDetailsDTO prefixDto = SearchListUserDetailsDTO.builder()
+                .username("muha")
+                .isFollowing(true)
+                .isSelf(false)
+                .privacyStatus(PrivacyStatuses.PUBLIC)
+                .build();
+
+            when(usersRepository.searchByUsername(eq("muh"), eq(USER_ID), any(Pageable.class))).thenReturn(List.of(exactDto, prefixDto));
+
+            List<SearchListUserDetailsDTO> result = socialService.searchUsersByUsername("  muh  ", user);
+
+            assertEquals(List.of(exactDto, prefixDto), result);
+            verify(usersRepository).searchByUsername(eq("muh"), eq(USER_ID), any(Pageable.class));
+        }
+
+        @Test
+        void getUserProfileByUsername_WhenUserNotFound_ThrowsUserNotFoundException() {
+            when(usersRepository.findByUsernameIgnoreCaseAndEmailVerifiedTrue("missing-user")).thenReturn(Optional.empty());
+
+            assertThrows(UserNotFoundException.class, () -> socialService.getUserProfile("missing-user", user));
+        }
+
+        @Test
+        void getUserProfileByUsername_WhenUserExists_ReturnsProfile() {
+            when(usersRepository.findByUsernameIgnoreCaseAndEmailVerifiedTrue("target")).thenReturn(Optional.of(targetUser));
+            when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
+            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
+            when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
+            when(usersRepository.countFollowersByUserId(TARGET_ID)).thenReturn(0L);
+            when(usersRepository.countFollowingByUserId(TARGET_ID)).thenReturn(0L);
+            when(userMediaStatusRepository.countWatchedMoviesByUser(targetUser)).thenReturn(0L);
+            when(userMediaStatusRepository.countWatchedShowsByUser(targetUser)).thenReturn(0L);
+            when(watchListService.getWatchListPage(targetUser)).thenReturn(Page.empty());
+
+            UserProfileDTO result = socialService.getUserProfile("target", user);
+
+            assertEquals("target", result.getUsername());
+            assertEquals(PrivacyStatuses.PUBLIC, result.getPrivacyStatus());
         }
     }
 }

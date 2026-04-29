@@ -1,6 +1,7 @@
 package com.project.watchmate.Services;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
 
 import org.springframework.data.domain.Page;
@@ -14,6 +15,7 @@ import com.project.watchmate.Dto.FollowListUserDetailsDTO;
 import com.project.watchmate.Dto.FollowRequestDTO;
 import com.project.watchmate.Dto.FollowRequestResponseDTO;
 import com.project.watchmate.Dto.FollowStatusDTO;
+import com.project.watchmate.Dto.SearchListUserDetailsDTO;
 import com.project.watchmate.Dto.UserProfileDTO;
 import com.project.watchmate.Exception.AlreadyFollowingException;
 import com.project.watchmate.Exception.BlockedUserException;
@@ -58,6 +60,11 @@ public class SocialService {
     private Users findAndValidateTargetUser(Long userId){
         return usersRepository.findById(Objects.requireNonNull(userId, "userId"))
         .orElseThrow(() -> new UserNotFoundException("User not found"));
+    }
+
+    private Users findAndValidateTargetUser(String username) {
+        return usersRepository.findByUsernameIgnoreCaseAndEmailVerifiedTrue(Objects.requireNonNull(username, "username"))
+            .orElseThrow(() -> new UserNotFoundException("User not found"));
     }
 
     private void validateFollowEligibility(Users user, Users targetUser){
@@ -256,20 +263,39 @@ public class SocialService {
     public Page<FollowListUserDetailsDTO> getFollowersList(Users user, int pageNumber, int size) {
         Pageable pageable = PageRequest.of(pageNumber, size, Sort.by("username").ascending().and(Sort.by("id").descending()));
         Page<Users> page = usersRepository.findFollowersByUser(user, pageable);
-        return page.map(u -> new FollowListUserDetailsDTO(u.getUsername()));
+        return page.map(watchMateMapper::mapToFollowListUserDetailsDTO);
     }
 
     @Transactional(readOnly = true)
     public Page<FollowListUserDetailsDTO> getFollowingList(Users user, int pageNumber, int size) {
         Pageable pageable = PageRequest.of(pageNumber, size, Sort.by("username").ascending().and(Sort.by("id").descending()));
         Page<Users> page = usersRepository.findFollowingByUser(user, pageable);
-        return page.map(u -> new FollowListUserDetailsDTO(u.getUsername()));
+        return page.map(watchMateMapper::mapToFollowListUserDetailsDTO);
     }
 
+    @Transactional(readOnly = true)
+    public List<SearchListUserDetailsDTO> searchUsersByUsername(String query, Users user) {
+        String normalizedQuery = Objects.requireNonNull(query, "query").trim();
+        if (normalizedQuery.isBlank()) {
+            throw new IllegalArgumentException("Query must not be blank");
+        }
+        Pageable limit = PageRequest.of(0, 15);
+        return usersRepository.searchByUsername(normalizedQuery, user.getId(), limit);
+    }
 
     @Transactional(readOnly = true)
     public UserProfileDTO getUserProfile(Long userId, Users user) {
         Users targetUser = findAndValidateTargetUser(userId);
+        return buildUserProfile(targetUser, user);
+    }
+
+    @Transactional(readOnly = true)
+    public UserProfileDTO getUserProfile(String username, Users user) {
+        Users targetUser = findAndValidateTargetUser(username);
+        return buildUserProfile(targetUser, user);
+    }
+
+    private UserProfileDTO buildUserProfile(Users targetUser, Users user) {
         if(user.getId().equals(targetUser.getId())){
             return retrieveSelfUserProfile(targetUser);
         }

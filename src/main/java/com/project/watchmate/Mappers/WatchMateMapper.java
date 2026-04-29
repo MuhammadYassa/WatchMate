@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.project.watchmate.Dto.FollowRequestDTO;
+import com.project.watchmate.Dto.FollowListUserDetailsDTO;
 import com.project.watchmate.Dto.MediaDetailsDTO;
 import com.project.watchmate.Dto.UserMediaStatusDTO;
 import com.project.watchmate.Dto.ReviewResponseDTO;
@@ -65,6 +66,12 @@ public class WatchMateMapper {
 
     public ReviewResponseDTO mapToReviewDTO(Review review){
         return mapToReviewResponseDTO(review);
+    }
+
+    public FollowListUserDetailsDTO mapToFollowListUserDetailsDTO(Users user) {
+        return FollowListUserDetailsDTO.builder()
+            .username(user.getUsername())
+            .build();
     }
 
     public UserMediaStatusDTO mapToUserMediaStatusDTO(UserMediaStatus userMediaStatus) {
