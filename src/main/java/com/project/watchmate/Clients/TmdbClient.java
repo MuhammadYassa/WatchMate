@@ -13,7 +13,17 @@ public interface TmdbClient {
 
     List<TmdbMovieDTO> fetchPopular(String type);
 
+    List<TmdbMovieDTO> fetchTrending(String type);
+
+    List<TmdbMovieDTO> fetchUpcomingMovies();
+
+    List<TmdbMovieDTO> fetchAiringToday();
+
+    List<TmdbMovieDTO> fetchOnTheAir();
+
     TmdbMovieDTO fetchMediaById(Long tmdbId, MediaType type);
 
     TmdbResponseDTO searchMulti(String query, int page);
+
+    TmdbResponseDTO discoverByGenre(String type, Long genreId, int page);
 }

@@ -40,7 +40,7 @@ class FavouriteIntegrationTest extends AbstractIntegrationTest {
 			.andExpect(jsonPath("$.tmdbId").value(9101))
 			.andExpect(jsonPath("$.isFavourited").value(true));
 
-		assertThat(mediaRepository.findByTmdbId(9101L)).isPresent();
+		assertThat(mediaRepository.findByTmdbIdAndType(9101L, MediaType.MOVIE)).isPresent();
 		Integer favouriteCount = jdbcTemplate.queryForObject(
 			"select count(*) from user_favorites where users_id = ?",
 			Integer.class,

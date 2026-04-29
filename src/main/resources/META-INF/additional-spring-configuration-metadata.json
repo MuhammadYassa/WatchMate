@@ -33,5 +33,15 @@
     "name": "spring.flyway.baseline-version",
     "type": "java.lang.String",
     "description": "A description for 'spring.flyway.baseline-version'"
+  },
+  {
+    "name": "watchmate.discovery.sync.cron",
+    "type": "java.lang.String",
+    "description": "Cron expression for the daily discovery sync scheduler."
+  },
+  {
+    "name": "watchmate.discovery.sync.startup-enabled",
+    "type": "java.lang.Boolean",
+    "description": "Whether startup discovery sync should run when the application becomes ready."
   }
 ]}

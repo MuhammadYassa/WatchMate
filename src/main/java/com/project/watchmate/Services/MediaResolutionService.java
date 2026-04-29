@@ -1,5 +1,6 @@
 package com.project.watchmate.Services;
 
+import java.util.List;
 import java.util.Objects;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -30,10 +31,16 @@ public class MediaResolutionService {
     public Media resolveMediaByTmdbId(Long tmdbId, MediaType type) {
         Long resolvedTmdbId = Objects.requireNonNull(tmdbId, "tmdbId");
 
-        Media media = mediaRepository.findByTmdbId(resolvedTmdbId).orElse(null);
-        if (media != null) {
-            validateResolvedMediaType(media, type);
-            return media;
+        if (type != null) {
+            Media media = mediaRepository.findByTmdbIdAndType(resolvedTmdbId, type).orElse(null);
+            if (media != null) {
+                return media;
+            }
+        } else {
+            Media media = resolveWithoutType(resolvedTmdbId);
+            if (media != null) {
+                return media;
+            }
         }
 
         if (type == null) {
@@ -48,8 +55,7 @@ public class MediaResolutionService {
         try {
             return mediaRepository.save(importedMedia);
         } catch (DataIntegrityViolationException ex) {
-            Media existingMedia = mediaRepository.findByTmdbId(resolvedTmdbId).orElseThrow(() -> ex);
-            validateResolvedMediaType(existingMedia, type);
+            Media existingMedia = mediaRepository.findByTmdbIdAndType(resolvedTmdbId, type).orElseThrow(() -> ex);
             return existingMedia;
         }
     }
@@ -66,9 +72,14 @@ public class MediaResolutionService {
         }
     }
 
-    private void validateResolvedMediaType(Media media, MediaType requestedType) {
-        if (requestedType != null && media.getType() != null && media.getType() != requestedType) {
-            throw new IllegalArgumentException("Media type does not match the requested media item.");
+    private Media resolveWithoutType(Long tmdbId) {
+        List<Media> matchingMedia = mediaRepository.findAllByTmdbId(tmdbId);
+        if (matchingMedia.isEmpty()) {
+            return null;
         }
+        if (matchingMedia.size() > 1) {
+            throw new IllegalArgumentException("Multiple media items share this TMDB ID. Please supply the media type.");
+        }
+        return matchingMedia.get(0);
     }
 }

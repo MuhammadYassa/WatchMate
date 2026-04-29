@@ -27,7 +27,10 @@ import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.Role;
 import com.project.watchmate.Repositories.EmailVerificationTokenRepository;
 import com.project.watchmate.Repositories.FollowRequestRepository;
+import com.project.watchmate.Repositories.ContentSyncStatusRepository;
+import com.project.watchmate.Repositories.CuratedContentRepository;
 import com.project.watchmate.Repositories.GenreRepository;
+import com.project.watchmate.Repositories.GenreLookupRepository;
 import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.PopularMediaRepository;
 import com.project.watchmate.Repositories.RefreshTokenRepository;
@@ -44,6 +47,7 @@ import software.amazon.awssdk.services.ses.model.SendEmailResponse;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
@@ -57,7 +61,8 @@ import static org.mockito.Mockito.mock;
 	"jwt.secret=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
 	"tmdb.api.token=test-token",
 	"app.domain=http://localhost",
-	"verified.sender=test@example.com"
+	"verified.sender=test@example.com",
+	"watchmate.discovery.sync.startup-enabled=false"
 })
 public abstract class AbstractIntegrationTest {
 
@@ -97,6 +102,15 @@ public abstract class AbstractIntegrationTest {
 	protected GenreRepository genreRepository;
 
 	@Autowired
+	protected GenreLookupRepository genreLookupRepository;
+
+	@Autowired
+	protected CuratedContentRepository curatedContentRepository;
+
+	@Autowired
+	protected ContentSyncStatusRepository contentSyncStatusRepository;
+
+	@Autowired
 	protected BCryptPasswordEncoder passwordEncoder;
 
 	@Autowired
@@ -129,7 +143,12 @@ public abstract class AbstractIntegrationTest {
 			.thenReturn(SendEmailResponse.builder().messageId("test-message-id").build());
 		when(tmdbClient.fetchGenres(anyString())).thenReturn(List.of());
 		when(tmdbClient.fetchPopular(anyString())).thenReturn(List.of());
+		when(tmdbClient.fetchTrending(anyString())).thenReturn(List.of());
+		when(tmdbClient.fetchUpcomingMovies()).thenReturn(List.of());
+		when(tmdbClient.fetchAiringToday()).thenReturn(List.of());
+		when(tmdbClient.fetchOnTheAir()).thenReturn(List.of());
 		when(tmdbClient.searchMulti(anyString(), anyInt())).thenReturn(new TmdbResponseDTO(List.of(), 1, 0, 0));
+		when(tmdbClient.discoverByGenre(anyString(), anyLong(), anyInt())).thenReturn(new TmdbResponseDTO(List.of(), 1, 0, 0));
 		jdbcTemplate.update("delete from user_following");
 		jdbcTemplate.update("delete from blocked_users");
 		jdbcTemplate.update("delete from user_favorites");
@@ -140,7 +159,10 @@ public abstract class AbstractIntegrationTest {
 		refreshTokenRepository.deleteAll();
 		reviewRepository.deleteAll();
 		userMediaStatusRepository.deleteAll();
+		curatedContentRepository.deleteAll();
 		popularMediaRepository.deleteAll();
+		contentSyncStatusRepository.deleteAll();
+		genreLookupRepository.deleteAll();
 		watchListRepository.deleteAll();
 		mediaRepository.deleteAll();
 		usersRepository.deleteAll();
@@ -191,8 +213,8 @@ public abstract class AbstractIntegrationTest {
 		@Primary
 		TmdbClient tmdbClient() {
 			return mock(TmdbClient.class, invocation -> switch (invocation.getMethod().getName()) {
-				case "fetchGenres", "fetchPopular" -> List.of();
-				case "searchMulti" -> new TmdbResponseDTO(List.of(), 1, 0, 0);
+				case "fetchGenres", "fetchPopular", "fetchTrending", "fetchUpcomingMovies", "fetchAiringToday", "fetchOnTheAir" -> List.of();
+				case "searchMulti", "discoverByGenre" -> new TmdbResponseDTO(List.of(), 1, 0, 0);
 				default -> null;
 			});
 		}

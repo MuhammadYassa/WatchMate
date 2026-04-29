@@ -7,14 +7,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.project.watchmate.Dto.FollowRequestDTO;
 import com.project.watchmate.Dto.FollowListUserDetailsDTO;
+import com.project.watchmate.Dto.DiscoveryMediaItemDTO;
 import com.project.watchmate.Dto.MediaDetailsDTO;
 import com.project.watchmate.Dto.UserMediaStatusDTO;
 import com.project.watchmate.Dto.ReviewResponseDTO;
 import com.project.watchmate.Dto.SearchItemDTO;
+import com.project.watchmate.Dto.TmdbMovieDTO;
 import com.project.watchmate.Dto.WatchListDTO;
 import com.project.watchmate.Models.FollowRequest;
 import com.project.watchmate.Models.Genre;
 import com.project.watchmate.Models.Media;
+import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.Review;
 import com.project.watchmate.Models.WatchList;
 import com.project.watchmate.Models.UserMediaStatus;
@@ -49,10 +52,36 @@ public class WatchMateMapper {
             .title(m.getTitle())
             .posterPath(m.getPosterPath())
             .mediaType(m.getType().toString())
-            .releaseDate(m.getReleaseDate().toString())
+            .releaseDate(m.getReleaseDate() == null ? null : m.getReleaseDate().toString())
             .voteAverage(m.getRating())
             .overview(m.getOverview())
             .genres(m.getGenres().stream().map(Genre::getName).toList())
+            .build();
+    }
+
+    public DiscoveryMediaItemDTO mapToDiscoveryMediaItemDTO(Media media) {
+        return DiscoveryMediaItemDTO.builder()
+            .tmdbId(media.getTmdbId())
+            .title(media.getTitle())
+            .overview(media.getOverview())
+            .posterPath(media.getPosterPath())
+            .backdropPath(media.getBackdropPath())
+            .releaseDate(media.getReleaseDate())
+            .rating(media.getRating())
+            .type(media.getType())
+            .build();
+    }
+
+    public DiscoveryMediaItemDTO mapToDiscoveryMediaItemDTO(TmdbMovieDTO media, MediaType mediaType) {
+        return DiscoveryMediaItemDTO.builder()
+            .tmdbId(media.getId())
+            .title(media.getTitle())
+            .overview(media.getOverview())
+            .posterPath(media.getPosterPath())
+            .backdropPath(media.getBackdropPath())
+            .releaseDate(TmdbMovieDTO.parseDate(media.getReleaseDate()).orElse(null))
+            .rating(media.getVoteAverage())
+            .type(mediaType)
             .build();
     }
 

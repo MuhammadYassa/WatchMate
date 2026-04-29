@@ -28,7 +28,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
-@Table(uniqueConstraints = @UniqueConstraint(name = "uq_media_tmdb_id", columnNames = "tmdb_id"))
+@Table(uniqueConstraints = @UniqueConstraint(name = "uq_media_tmdb_id_type", columnNames = {"tmdb_id", "type"}))
 @Builder
 public class Media {
     
@@ -46,8 +46,11 @@ public class Media {
 
     private String posterPath;
 
+    private String backdropPath;
+
     private LocalDate releaseDate;
 
+    @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private MediaType type;
     

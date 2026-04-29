@@ -71,7 +71,7 @@ public class MediaService {
     }
 
     public List<PopularMediaResponseDTO> getPopularMedia() {
-        return popularMediaRepository.findAll().stream()
+        return popularMediaRepository.findAllByOrderByPopularityRankAsc().stream()
             .map(pm -> PopularMediaResponseDTO.builder()
                 .rank(pm.getPopularityRank())
                 .tmdbId(pm.getMedia().getTmdbId())
