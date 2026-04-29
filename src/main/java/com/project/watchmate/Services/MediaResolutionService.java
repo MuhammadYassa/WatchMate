@@ -2,6 +2,7 @@ package com.project.watchmate.Services;
 
 import java.util.Objects;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,9 +32,7 @@ public class MediaResolutionService {
 
         Media media = mediaRepository.findByTmdbId(resolvedTmdbId).orElse(null);
         if (media != null) {
-            if (type != null && media.getType() != null && media.getType() != type) {
-                throw new IllegalArgumentException("Media type does not match the requested media item.");
-            }
+            validateResolvedMediaType(media, type);
             return media;
         }
 
@@ -46,7 +45,13 @@ public class MediaResolutionService {
             throw new MediaNotFoundException("TMDB media not found for ID: " + resolvedTmdbId);
         }
 
-        return mediaRepository.save(importedMedia);
+        try {
+            return mediaRepository.save(importedMedia);
+        } catch (DataIntegrityViolationException ex) {
+            Media existingMedia = mediaRepository.findByTmdbId(resolvedTmdbId).orElseThrow(() -> ex);
+            validateResolvedMediaType(existingMedia, type);
+            return existingMedia;
+        }
     }
 
     public MediaType parseMediaType(String typeStr) {
@@ -58,6 +63,12 @@ public class MediaResolutionService {
             return MediaType.valueOf(typeStr.trim().toUpperCase());
         } catch (IllegalArgumentException ex) {
             throw new IllegalArgumentException("Invalid media type. Allowed values: MOVIE, SHOW");
+        }
+    }
+
+    private void validateResolvedMediaType(Media media, MediaType requestedType) {
+        if (requestedType != null && media.getType() != null && media.getType() != requestedType) {
+            throw new IllegalArgumentException("Media type does not match the requested media item.");
         }
     }
 }

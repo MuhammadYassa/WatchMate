@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +40,12 @@ public class TmdbService {
     private final PopularMediaRepository  popularMediaRepository;
     
     private final GenreRepository genreRepository;
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void popularMediaOnStartup() {
+        popularMedia();
+    }
+
 
     @PostConstruct
     public void syncGenres(){

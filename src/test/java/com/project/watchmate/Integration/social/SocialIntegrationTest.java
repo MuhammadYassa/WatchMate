@@ -1,5 +1,6 @@
 package com.project.watchmate.Integration.social;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.Test;
@@ -7,9 +8,13 @@ import org.junit.jupiter.api.Test;
 import com.project.watchmate.Integration.support.AbstractIntegrationTest;
 import com.project.watchmate.Models.FollowRequest;
 import com.project.watchmate.Models.FollowRequestStatuses;
+import com.project.watchmate.Models.Media;
+import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.PrivacyStatuses;
 import com.project.watchmate.Models.Role;
+import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.Users;
+import com.project.watchmate.Models.WatchStatus;
 import com.project.watchmate.Models.WatchList;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -252,6 +257,27 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 			.andExpect(jsonPath("$.username").value("CaseTarget"))
 			.andExpect(jsonPath("$.watchlists.content.length()").value(1))
 			.andExpect(jsonPath("$.watchlists.content[0].name").value("Visible Watchlist"));
+	}
+
+	@Test
+	void getUserProfileByUsername_forSelfReturnsWatchedMediaWithoutQueryError() throws Exception {
+		Users user = saveUser("self-profile-watched", true);
+		Media watchedMovie = saveMedia(9301L, "Watched Movie", MediaType.MOVIE);
+		watchedMovie.setReleaseDate(LocalDate.of(2024, 1, 2));
+		mediaRepository.save(watchedMovie);
+		userMediaStatusRepository.save(UserMediaStatus.builder()
+			.user(user)
+			.media(watchedMovie)
+			.status(WatchStatus.WATCHED)
+			.build());
+
+		mockMvc.perform(get("/api/v1/social/profile/{username}", user.getUsername())
+			.header("Authorization", bearerToken(user)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.username").value(user.getUsername()))
+			.andExpect(jsonPath("$.moviesWatchedCount").value(1))
+			.andExpect(jsonPath("$.moviesWatched.content.length()").value(1))
+			.andExpect(jsonPath("$.moviesWatched.content[0].title").value("Watched Movie"));
 	}
 
 	@Test

@@ -30,18 +30,34 @@ public interface UserMediaStatusRepository extends JpaRepository<UserMediaStatus
         "and m.type = com.project.watchmate.Models.MediaType.SHOW")
     long countWatchedShowsByUser(@Param("user") Users user);
 
-    @Query("select m " +
-        "from UserMediaStatus ums join ums.media m " +
-        "where ums.user = :user " +
-        "and ums.status = com.project.watchmate.Models.WatchStatus.WATCHED " +
-        "and m.type = com.project.watchmate.Models.MediaType.MOVIE")
+    @Query(
+        value = "select m " +
+            "from UserMediaStatus ums join ums.media m " +
+            "where ums.user = :user " +
+            "and ums.status = com.project.watchmate.Models.WatchStatus.WATCHED " +
+            "and m.type = com.project.watchmate.Models.MediaType.MOVIE " +
+            "order by m.releaseDate desc, m.title desc, m.id desc",
+        countQuery = "select count(m) " +
+            "from UserMediaStatus ums join ums.media m " +
+            "where ums.user = :user " +
+            "and ums.status = com.project.watchmate.Models.WatchStatus.WATCHED " +
+            "and m.type = com.project.watchmate.Models.MediaType.MOVIE"
+    )
     Page<Media> findWatchedMoviesByUser(@Param("user") Users user, Pageable pageable);
 
-    @Query("select m " +
-        "from UserMediaStatus ums join ums.media m " +
-        "where ums.user = :user " +
-        "and ums.status = com.project.watchmate.Models.WatchStatus.WATCHED " +
-        "and m.type = com.project.watchmate.Models.MediaType.SHOW")
+    @Query(
+        value = "select m " +
+            "from UserMediaStatus ums join ums.media m " +
+            "where ums.user = :user " +
+            "and ums.status = com.project.watchmate.Models.WatchStatus.WATCHED " +
+            "and m.type = com.project.watchmate.Models.MediaType.SHOW " +
+            "order by m.releaseDate desc, m.title desc, m.id desc",
+        countQuery = "select count(m) " +
+            "from UserMediaStatus ums join ums.media m " +
+            "where ums.user = :user " +
+            "and ums.status = com.project.watchmate.Models.WatchStatus.WATCHED " +
+            "and m.type = com.project.watchmate.Models.MediaType.SHOW"
+    )
     Page<Media> findWatchedShowsByUser(@Param("user") Users user, Pageable pageable);
 
 }

@@ -7,7 +7,6 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,12 +61,12 @@ public class MediaService {
     }
 
     public Page<Media> getMoviesWatchedPage(Users user){
-        Pageable pageable = PageRequest.of(0, 5, Sort.by("releaseDate").descending().and(Sort.by("title")).descending());
+        Pageable pageable = PageRequest.of(0, 5);
         return userMediaStatusRepository.findWatchedMoviesByUser(user, pageable);
     }
 
     public Page<Media> getShowsWatchedPage(Users user){
-        Pageable pageable = PageRequest.of(0, 5, Sort.by("releaseDate").descending().and(Sort.by("title")).descending());
+        Pageable pageable = PageRequest.of(0, 5);
         return userMediaStatusRepository.findWatchedShowsByUser(user, pageable);
     }
 
