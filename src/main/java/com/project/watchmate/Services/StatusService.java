@@ -6,6 +6,7 @@ import com.project.watchmate.Dto.UpdateWatchStatusRequestDTO;
 import com.project.watchmate.Dto.UserMediaStatusDTO;
 import com.project.watchmate.Exception.InvalidWatchStatusException;
 import com.project.watchmate.Models.Media;
+import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
@@ -21,9 +22,9 @@ public class StatusService {
 
 	private final UserMediaStatusRepository userMediaStatusRepository;
 
-	public UserMediaStatusDTO updateWatchStatus(Users user, UpdateWatchStatusRequestDTO request) {
+	public UserMediaStatusDTO updateWatchStatus(Users user, Long tmdbId, MediaType mediaType, UpdateWatchStatusRequestDTO request) {
 		WatchStatus desiredStatus = parseWatchStatus(request.getStatus());
-		Media media = mediaResolutionService.resolveMediaByTmdbId(request.getTmdbId(), request.getType());
+		Media media = mediaResolutionService.resolveMediaByTmdbId(tmdbId, mediaType);
 
 		UserMediaStatus userMediaStatus = userMediaStatusRepository.findByUserAndMedia(user, media)
 				.orElse(UserMediaStatus.builder()

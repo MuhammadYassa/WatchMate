@@ -9,6 +9,7 @@ import com.project.watchmate.Dto.FollowRequestDTO;
 import com.project.watchmate.Dto.FollowListUserDetailsDTO;
 import com.project.watchmate.Dto.DiscoveryMediaItemDTO;
 import com.project.watchmate.Dto.MediaDetailsDTO;
+import com.project.watchmate.Dto.MovieDetailsDTO;
 import com.project.watchmate.Dto.UserMediaStatusDTO;
 import com.project.watchmate.Dto.ReviewResponseDTO;
 import com.project.watchmate.Dto.SearchItemDTO;
@@ -30,17 +31,35 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class WatchMateMapper {
 
-    public MediaDetailsDTO mapToMediaDetailsDTO(Media media, List<Review> reviews, boolean isFavourited, WatchStatus watchStatus) {
+    public MediaDetailsDTO mapToMediaDetailsDTO(Media media, List<Review> reviews, Boolean isFavourited, WatchStatus watchStatus) {
         return MediaDetailsDTO.builder()
             .tmdbId(media.getTmdbId())
             .title(media.getTitle())
             .posterPath(media.getPosterPath())
+            .backdropPath(media.getBackdropPath())
             .overview(media.getOverview())
             .releaseDate(media.getReleaseDate())
             .rating(media.getRating())
             .type(media.getType())
             .genres(media.getGenres().stream().map(Genre::getName).toList())
             .reviews(reviews.stream().map(r -> mapToReviewDTO(r)).toList())
+            .isFavourited(isFavourited)
+            .watchStatus(watchStatus)
+            .build();
+    }
+
+    public MovieDetailsDTO mapToMovieDetailsDTO(Media media, List<Review> reviews, Boolean isFavourited, WatchStatus watchStatus) {
+        return MovieDetailsDTO.builder()
+            .tmdbId(media.getTmdbId())
+            .title(media.getTitle())
+            .posterPath(media.getPosterPath())
+            .backdropPath(media.getBackdropPath())
+            .overview(media.getOverview())
+            .releaseDate(media.getReleaseDate())
+            .rating(media.getRating())
+            .type(media.getType())
+            .genres(media.getGenres().stream().map(Genre::getName).toList())
+            .reviews(reviews.stream().map(this::mapToReviewDTO).toList())
             .isFavourited(isFavourited)
             .watchStatus(watchStatus)
             .build();

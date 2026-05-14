@@ -28,6 +28,7 @@ import com.project.watchmate.Exception.ReviewNotFoundException;
 import com.project.watchmate.Exception.UnauthorizedReviewAccessException;
 import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Models.Media;
+import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.Review;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Repositories.ReviewRepository;
@@ -177,12 +178,12 @@ class ReviewServiceTest {
 
         @Test
         void getReviews_WhenMediaExists_ReturnsMappedList() {
-            when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, "MOVIE")).thenReturn(media);
+            when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, MediaType.MOVIE)).thenReturn(media);
             when(reviewRepository.findByMedia(media)).thenReturn(List.of(review));
             ReviewResponseDTO dto = ReviewResponseDTO.builder().reviewId(REVIEW_ID).build();
             when(watchMateMapper.mapToReviewResponseDTO(any(Review.class))).thenReturn(dto);
 
-            List<ReviewResponseDTO> result = reviewService.getReviews(user, TMDB_ID, "MOVIE");
+            List<ReviewResponseDTO> result = reviewService.getReviews(user, TMDB_ID, MediaType.MOVIE);
 
             assertEquals(1, result.size());
             assertEquals(REVIEW_ID, result.get(0).getReviewId());

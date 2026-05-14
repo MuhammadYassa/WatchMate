@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,6 +22,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.project.watchmate.Clients.TmdbClient;
 import com.project.watchmate.Dto.TmdbMovieDTO;
+import com.project.watchmate.Dto.TmdbEpisodeSummaryDTO;
+import com.project.watchmate.Dto.TmdbTvDetailsDTO;
 import com.project.watchmate.Exception.MediaNotFoundException;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
@@ -119,5 +122,43 @@ class TmdbServiceTest {
             assertEquals("New overview", existingMedia.getOverview());
             verify(mediaRepository).save(existingMedia);
         }
+    }
+
+    @Test
+    void refreshShowSnapshot_WhenShowDetailsProvided_UpdatesCachedNextAiringFields() {
+        Media show = Media.builder().id(1L).tmdbId(200L).type(MediaType.SHOW).title("Show").build();
+        TmdbTvDetailsDTO tvDetails = TmdbTvDetailsDTO.builder()
+            .numberOfSeasons(3)
+            .numberOfEpisodes(24)
+            .lastAirDate("2026-05-01")
+            .status("Returning Series")
+            .nextEpisodeToAir(TmdbEpisodeSummaryDTO.builder()
+                .airDate("2026-06-14")
+                .seasonNumber(3)
+                .episodeNumber(5)
+                .name("Future Episode")
+                .build())
+            .lastEpisodeToAir(TmdbEpisodeSummaryDTO.builder()
+                .seasonNumber(3)
+                .episodeNumber(4)
+                .name("Latest Episode")
+                .build())
+            .build();
+
+        when(mediaRepository.save(any(Media.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Media result = tmdbService.refreshShowSnapshot(show, tvDetails);
+
+        assertEquals(LocalDate.of(2026, 6, 14), result.getNextEpisodeAirDate());
+        assertEquals(Integer.valueOf(3), result.getNextEpisodeSeasonNumber());
+        assertEquals(Integer.valueOf(5), result.getNextEpisodeEpisodeNumber());
+        assertEquals("Future Episode", result.getNextEpisodeName());
+        assertEquals(Integer.valueOf(3), result.getLastEpisodeToAirSeasonNumber());
+        assertEquals(Integer.valueOf(4), result.getLastEpisodeToAirEpisodeNumber());
+        assertEquals("Latest Episode", result.getLastEpisodeToAirName());
+        assertEquals(LocalDate.of(2026, 5, 1), result.getLastAirDate());
+        assertEquals(Integer.valueOf(3), result.getNumberOfSeasons());
+        assertEquals(Integer.valueOf(24), result.getNumberOfEpisodes());
+        assertEquals("Returning Series", result.getTmdbShowStatus());
     }
 }

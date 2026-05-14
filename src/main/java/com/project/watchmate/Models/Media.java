@@ -2,6 +2,7 @@ package com.project.watchmate.Models;
 
 import java.util.ArrayList;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import jakarta.persistence.CascadeType;
@@ -50,6 +51,30 @@ public class Media {
 
     private LocalDate releaseDate;
 
+    private LocalDate nextEpisodeAirDate;
+
+    private Integer nextEpisodeSeasonNumber;
+
+    private Integer nextEpisodeEpisodeNumber;
+
+    private String nextEpisodeName;
+
+    private Integer lastEpisodeToAirSeasonNumber;
+
+    private Integer lastEpisodeToAirEpisodeNumber;
+
+    private String lastEpisodeToAirName;
+    
+    private LocalDate lastAirDate;
+
+    private Integer numberOfSeasons;
+
+    private Integer numberOfEpisodes;
+
+    private String tmdbShowStatus;
+
+    private LocalDateTime nextAiringSyncedAt;
+
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private MediaType type;
@@ -63,6 +88,14 @@ public class Media {
     @Builder.Default
     @OneToMany(mappedBy = "media", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<WatchListItem> watchListItems = new ArrayList<>();
+
+    @Builder.Default
+    @OneToMany(mappedBy = "media", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ShowSeason> showSeasons = new ArrayList<>();
+
+    @Builder.Default
+    @OneToMany(mappedBy = "media", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ShowEpisode> showEpisodes = new ArrayList<>();
 
     @Builder.Default
     @ManyToMany

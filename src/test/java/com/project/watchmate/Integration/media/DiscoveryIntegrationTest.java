@@ -22,6 +22,8 @@ import com.project.watchmate.Models.CuratedContentCategory;
 import com.project.watchmate.Models.GenreLookup;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
+import com.project.watchmate.Models.Role;
+import com.project.watchmate.Models.Users;
 import com.project.watchmate.Services.CuratedContentSyncService;
 
 class DiscoveryIntegrationTest extends AbstractIntegrationTest {
@@ -60,7 +62,26 @@ class DiscoveryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void homeStatus_returnsPersistedStatus() throws Exception {
+    void homeStatus_returns401_withoutAuthentication() throws Exception {
+        mockMvc.perform(get("/api/v1/home/status"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.message").value("Authentication failed"))
+            .andExpect(jsonPath("$.code").value("AUTH_FAILED"));
+    }
+
+    @Test
+    void homeStatus_returns403_forNonAdmin() throws Exception {
+        Users user = saveUser("home-status-user", true);
+
+        mockMvc.perform(get("/api/v1/home/status")
+            .header("Authorization", bearerToken(user)))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void homeStatus_returnsPersistedStatus_forAdmin() throws Exception {
+        Users admin = saveUser("home-status-admin", true, Role.ADMIN);
+
         contentSyncStatusRepository.save(ContentSyncStatus.builder()
             .statusKey(CuratedContentSyncService.STATUS_KEY)
             .lastResult(ContentSyncResult.SUCCESS)
@@ -72,7 +93,8 @@ class DiscoveryIntegrationTest extends AbstractIntegrationTest {
             .recommendedLaterCount(7)
             .build());
 
-        mockMvc.perform(get("/api/v1/home/status"))
+        mockMvc.perform(get("/api/v1/home/status")
+            .header("Authorization", bearerToken(admin)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.lastResult").value("SUCCESS"))
             .andExpect(jsonPath("$.popularNowCount").value(15))

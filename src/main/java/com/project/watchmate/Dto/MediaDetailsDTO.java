@@ -32,6 +32,9 @@ public class MediaDetailsDTO {
     @Schema(description = "Relative TMDB poster path.", example = "/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg")
     private String posterPath;
 
+    @Schema(description = "Relative TMDB backdrop path when available.")
+    private String backdropPath;
+
     @Schema(description = "Primary release date.")
     private LocalDate releaseDate;
     
@@ -47,10 +50,10 @@ public class MediaDetailsDTO {
     @Schema(description = "Reviews currently associated with the media item.")
     private List<ReviewResponseDTO> reviews;
 
-    @Schema(description = "Whether the authenticated user has favourited this media item.")
+    @Schema(description = "Whether the authenticated user has favourited this media item. Null when unauthenticated.")
     @JsonProperty("isFavourited")
-    private boolean isFavourited;
+    private Boolean isFavourited;
 
-    @Schema(description = "Watch status of the authenticated user for this media item.")
+    @Schema(description = "Watch status of the authenticated user for this media item. Null when unauthenticated.")
     private WatchStatus watchStatus;
 }

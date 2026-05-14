@@ -32,10 +32,13 @@ import com.project.watchmate.Repositories.CuratedContentRepository;
 import com.project.watchmate.Repositories.GenreRepository;
 import com.project.watchmate.Repositories.GenreLookupRepository;
 import com.project.watchmate.Repositories.MediaRepository;
-import com.project.watchmate.Repositories.PopularMediaRepository;
 import com.project.watchmate.Repositories.RefreshTokenRepository;
 import com.project.watchmate.Repositories.ReviewRepository;
+import com.project.watchmate.Repositories.ShowEpisodeRepository;
+import com.project.watchmate.Repositories.ShowSeasonRepository;
+import com.project.watchmate.Repositories.UserEpisodeProgressRepository;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
+import com.project.watchmate.Repositories.UserShowProgressRepository;
 import com.project.watchmate.Repositories.UsersRepository;
 import com.project.watchmate.Repositories.WatchListRepository;
 import com.project.watchmate.Services.JwtService;
@@ -93,10 +96,19 @@ public abstract class AbstractIntegrationTest {
 	protected ReviewRepository reviewRepository;
 
 	@Autowired
+	protected ShowSeasonRepository showSeasonRepository;
+
+	@Autowired
+	protected ShowEpisodeRepository showEpisodeRepository;
+
+	@Autowired
 	protected UserMediaStatusRepository userMediaStatusRepository;
 
 	@Autowired
-	protected PopularMediaRepository popularMediaRepository;
+	protected UserEpisodeProgressRepository userEpisodeProgressRepository;
+
+	@Autowired
+	protected UserShowProgressRepository userShowProgressRepository;
 
 	@Autowired
 	protected GenreRepository genreRepository;
@@ -134,7 +146,7 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.datasource.username", SharedMySQLContainer.INSTANCE::getUsername);
         registry.add("spring.datasource.password", SharedMySQLContainer.INSTANCE::getPassword);
     }
-
+	
 	@BeforeEach
 	void cleanDatabase() {
 		reset(sesClient);
@@ -158,9 +170,12 @@ public abstract class AbstractIntegrationTest {
 		followRequestRepository.deleteAll();
 		refreshTokenRepository.deleteAll();
 		reviewRepository.deleteAll();
+		userEpisodeProgressRepository.deleteAll();
+		userShowProgressRepository.deleteAll();
 		userMediaStatusRepository.deleteAll();
+		showEpisodeRepository.deleteAll();
+		showSeasonRepository.deleteAll();
 		curatedContentRepository.deleteAll();
-		popularMediaRepository.deleteAll();
 		contentSyncStatusRepository.deleteAll();
 		genreLookupRepository.deleteAll();
 		watchListRepository.deleteAll();

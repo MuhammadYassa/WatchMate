@@ -19,6 +19,7 @@ import com.project.watchmate.Exception.ReviewNotFoundException;
 import com.project.watchmate.Exception.UnauthorizedReviewAccessException;
 import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Models.Media;
+import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.Review;
 import com.project.watchmate.Models.Role;
 import com.project.watchmate.Models.Users;
@@ -73,8 +74,8 @@ public class ReviewService {
         return;
     }
 
-    public List<ReviewResponseDTO> getReviews(Users user, Long tmdbId, String type) {
-        Media media = mediaResolutionService.resolveMediaByTmdbId(tmdbId, type);
+    public List<ReviewResponseDTO> getReviews(Users user, Long tmdbId, MediaType mediaType) {
+        Media media = mediaResolutionService.resolveMediaByTmdbId(tmdbId, mediaType);
         List<Review> reviews = reviewRepository.findByMedia(media);
         return reviews.stream().map(review -> watchMateMapper.mapToReviewResponseDTO(review)).collect(Collectors.toList());
     }

@@ -9,11 +9,9 @@ import com.project.watchmate.Dto.TmdbResponseDTO;
 import com.project.watchmate.Integration.support.AbstractIntegrationTest;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
-import com.project.watchmate.Models.PopularMedia;
 import com.project.watchmate.Models.Users;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -61,12 +59,11 @@ class ExternalMediaIntegrationTest extends AbstractIntegrationTest {
 				.genres(List.of())
 				.build());
 
-		mockMvc.perform(get("/api/v1/media/{tmdbId}", 8101L)
-			.header("Authorization", bearerToken(user))
-			.param("type", "movie"))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.tmdbId").value(8101))
-			.andExpect(jsonPath("$.title").value("Fetched Movie"))
+        mockMvc.perform(get("/api/v1/movies/{tmdbId}", 8101L)
+            .header("Authorization", bearerToken(user)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tmdbId").value(8101))
+            .andExpect(jsonPath("$.title").value("Fetched Movie"))
 			.andExpect(jsonPath("$.type").value("MOVIE"))
 			.andExpect(jsonPath("$.watchStatus").value("NONE"));
 
@@ -74,19 +71,5 @@ class ExternalMediaIntegrationTest extends AbstractIntegrationTest {
 
 		assertThat(persisted.getTitle()).isEqualTo("Fetched Movie");
 		assertThat(persisted.getType()).isEqualTo(MediaType.MOVIE);
-	}
-
-	@Test
-	void popularMedia_returnsPersistedRankedItems() throws Exception {
-		Media first = saveMedia(8201L, "Popular One", MediaType.MOVIE);
-		Media second = saveMedia(8202L, "Popular Two", MediaType.SHOW);
-		popularMediaRepository.save(PopularMedia.builder().media(first).popularityRank(1).build());
-		popularMediaRepository.save(PopularMedia.builder().media(second).popularityRank(2).build());
-
-		mockMvc.perform(get("/api/v1/media/popular"))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.length()").value(2))
-			.andExpect(jsonPath("$[?(@.rank == 1)].title", contains("Popular One")))
-			.andExpect(jsonPath("$[?(@.rank == 2)].title", contains("Popular Two")));
 	}
 }
