@@ -27,12 +27,10 @@ import com.project.watchmate.Models.Genre;
 import com.project.watchmate.Models.GenreLookup;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
-import com.project.watchmate.Models.PopularMedia;
 import com.project.watchmate.Repositories.ContentSyncStatusRepository;
 import com.project.watchmate.Repositories.CuratedContentRepository;
 import com.project.watchmate.Repositories.GenreLookupRepository;
 import com.project.watchmate.Repositories.GenreRepository;
-import com.project.watchmate.Repositories.PopularMediaRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,8 +53,6 @@ public class CuratedContentSyncService {
     private final GenreLookupRepository genreLookupRepository;
 
     private final GenreRepository genreRepository;
-
-    private final PopularMediaRepository popularMediaRepository;
 
     private final ContentSyncStatusRepository contentSyncStatusRepository;
 
@@ -238,7 +234,6 @@ public class CuratedContentSyncService {
             replaceBucket(bucket.getKey(), bucket.getValue(), syncedAt);
         }
 
-        mirrorPopularNow(storedDiscoveryData.bucketMedia().getOrDefault(CuratedContentCategory.POPULAR_NOW, List.of()));
         markSyncSuccess(syncStatus, storedDiscoveryData.bucketCounts(), syncedAt);
     }
 
@@ -255,32 +250,6 @@ public class CuratedContentSyncService {
                     .build())
                 .toList()
         );
-    }
-
-    private void mirrorPopularNow(List<Media> popularNow) {
-        List<Media> uniquePopularNow = distinctById(popularNow);
-
-        popularMediaRepository.deleteAllInBatch();
-        popularMediaRepository.flush();
-        popularMediaRepository.saveAll(
-            IntStream.range(0, uniquePopularNow.size())
-                .mapToObj(index -> PopularMedia.builder()
-                    .media(uniquePopularNow.get(index))
-                    .popularityRank(index + 1)
-                    .build())
-                .toList()
-        );
-    }
-
-    private List<Media> distinctById(List<Media> mediaItems) {
-        Map<Long, Media> distinctMedia = new LinkedHashMap<>();
-        for (Media media : mediaItems) {
-            if (media.getId() == null) {
-                throw new IllegalStateException("Cannot mirror popular media without a persisted media id");
-            }
-            distinctMedia.putIfAbsent(media.getId(), media);
-        }
-        return List.copyOf(distinctMedia.values());
     }
 
     private void markSyncSuccess(ContentSyncStatus status, BucketCounts bucketCounts, LocalDateTime syncedAt) {

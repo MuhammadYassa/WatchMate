@@ -1,8 +1,6 @@
 package com.project.watchmate.Services;
 
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -10,15 +8,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.project.watchmate.Dto.MediaDetailsDTO;
-import com.project.watchmate.Dto.PopularMediaResponseDTO;
+import com.project.watchmate.Dto.MovieDetailsDTO;
 import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Models.Media;
+import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.Review;
 import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
-import com.project.watchmate.Repositories.PopularMediaRepository;
+import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.ReviewRepository;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
 import com.project.watchmate.Repositories.UsersRepository;
@@ -31,9 +29,9 @@ public class MediaService {
 
     private final MediaResolutionService mediaResolutionService;
 
-    private final UsersRepository usersRepository;
+    private final MediaRepository mediaRepository;
 
-    private final PopularMediaRepository popularMediaRepository;
+    private final UsersRepository usersRepository;
 
     private final WatchMateMapper watchMateMapper;
 
@@ -41,23 +39,19 @@ public class MediaService {
 
     private final UserMediaStatusRepository userMediaStatusRepository;
 
+    private final TmdbService tmdbService;
+
     @Transactional
-    public MediaDetailsDTO getMediaDetails(Long tmdbId, String typeStr, Users userParam){
-        Long userId = Objects.requireNonNull(Objects.requireNonNull(userParam, "userParam").getId(), "userParam.id");
-        Users user = usersRepository.findByIdWithFavorites(userId)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+    public MovieDetailsDTO getMovieDetails(Long tmdbId, Users userParam){
+        Media media = userParam == null
+            ? mediaRepository.findByTmdbIdAndType(tmdbId, MediaType.MOVIE)
+                .orElseGet(() -> tmdbService.fetchMediaByTmdbId(tmdbId, MediaType.MOVIE))
+            : mediaResolutionService.resolveMediaByTmdbId(tmdbId, MediaType.MOVIE);
 
-        Media media = mediaResolutionService.resolveMediaByTmdbId(tmdbId, typeStr);
+        List<Review> reviews = media.getId() == null ? List.of() : reviewRepository.findByMedia(media);
+        UserContext userContext = resolveUserContext(userParam, media);
 
-        List<Review> reviews = reviewRepository.findByMedia(media);
-
-        boolean isFavourited = user.getFavorites().contains(media);
-
-        UserMediaStatus userStatus= userMediaStatusRepository.findByUserAndMedia(user, media).orElse(null);
-        WatchStatus watchStatus = userStatus != null ? userStatus.getStatus() : WatchStatus.NONE;
-
-
-        return watchMateMapper.mapToMediaDetailsDTO(media, reviews, isFavourited, watchStatus);
+        return watchMateMapper.mapToMovieDetailsDTO(media, reviews, userContext.isFavourited(), userContext.watchStatus());
     }
 
     public Page<Media> getMoviesWatchedPage(Users user){
@@ -70,17 +64,22 @@ public class MediaService {
         return userMediaStatusRepository.findWatchedShowsByUser(user, pageable);
     }
 
-    public List<PopularMediaResponseDTO> getPopularMedia() {
-        return popularMediaRepository.findAllByOrderByPopularityRankAsc().stream()
-            .map(pm -> PopularMediaResponseDTO.builder()
-                .rank(pm.getPopularityRank())
-                .tmdbId(pm.getMedia().getTmdbId())
-                .title(pm.getMedia().getTitle())
-                .overview(pm.getMedia().getOverview())
-                .posterPath(pm.getMedia().getPosterPath())
-                .rating(pm.getMedia().getRating())
-                .type(pm.getMedia().getType().toString())
-                .build()
-            ).collect(Collectors.toList());
+    private UserContext resolveUserContext(Users userParam, Media media) {
+        if (userParam == null) {
+            return new UserContext(false, WatchStatus.NONE);
+        }
+
+        Long userId = userParam.getId();
+        Users user = usersRepository.findByIdWithFavorites(userId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+
+        boolean isFavourited = user.getFavorites().contains(media);
+        UserMediaStatus userStatus = userMediaStatusRepository.findByUserAndMedia(user, media).orElse(null);
+        WatchStatus watchStatus = userStatus != null ? userStatus.getStatus() : WatchStatus.NONE;
+
+        return new UserContext(isFavourited, watchStatus);
+    }
+
+    private record UserContext(boolean isFavourited, WatchStatus watchStatus) {
     }
 }

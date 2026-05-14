@@ -1,5 +1,6 @@
 package com.project.watchmate.Services;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 
@@ -9,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.project.watchmate.Clients.TmdbClient;
 import com.project.watchmate.Dto.TmdbGenreDTO;
 import com.project.watchmate.Dto.TmdbMovieDTO;
+import com.project.watchmate.Dto.TmdbTvDetailsDTO;
+import com.project.watchmate.Dto.TmdbTvSeasonDTO;
 import com.project.watchmate.Exception.MediaNotFoundException;
 import com.project.watchmate.Models.Genre;
 import com.project.watchmate.Models.Media;
@@ -65,6 +68,49 @@ public class TmdbService {
         Media media = mapToMedia(tmdbMedia, type);
         log.info("Fetched media details from TMDB tmdbId={} type={} genreCount={}", tmdbId, type, media.getGenres().size());
         return media;
+    }
+
+    public TmdbTvDetailsDTO fetchTvDetails(Long tmdbId) {
+        TmdbTvDetailsDTO tvDetails = tmdbClient.fetchTvDetailsById(tmdbId);
+        if (tvDetails == null) {
+            throw new MediaNotFoundException("TMDB show not found for ID: " + tmdbId);
+        }
+        return tvDetails;
+    }
+
+    public TmdbTvSeasonDTO fetchTvSeasonDetails(Long tmdbId, Integer seasonNumber) {
+        TmdbTvSeasonDTO seasonDetails = tmdbClient.fetchTvSeasonDetails(tmdbId, seasonNumber);
+        if (seasonDetails == null) {
+            throw new MediaNotFoundException("TMDB season not found for show ID: " + tmdbId + " season: " + seasonNumber);
+        }
+        return seasonDetails;
+    }
+
+    @Transactional
+    public Media refreshShowSnapshot(Media media, TmdbTvDetailsDTO tvDetails) {
+        if (media.getType() != MediaType.SHOW) {
+            throw new IllegalArgumentException("Only shows can store next-airing snapshot data.");
+        }
+
+        media.setNextEpisodeAirDate(TmdbMovieDTO.parseDate(tvDetails.getNextEpisodeToAir() == null ? null : tvDetails.getNextEpisodeToAir().getAirDate()).orElse(null));
+        media.setNextEpisodeSeasonNumber(tvDetails.getNextEpisodeToAir() == null ? null : tvDetails.getNextEpisodeToAir().getSeasonNumber());
+        media.setNextEpisodeEpisodeNumber(tvDetails.getNextEpisodeToAir() == null ? null : tvDetails.getNextEpisodeToAir().getEpisodeNumber());
+        media.setNextEpisodeName(tvDetails.getNextEpisodeToAir() == null ? null : tvDetails.getNextEpisodeToAir().getName());
+        media.setLastEpisodeToAirSeasonNumber(tvDetails.getLastEpisodeToAir() == null ? null : tvDetails.getLastEpisodeToAir().getSeasonNumber());
+        media.setLastEpisodeToAirEpisodeNumber(tvDetails.getLastEpisodeToAir() == null ? null : tvDetails.getLastEpisodeToAir().getEpisodeNumber());
+        media.setLastEpisodeToAirName(tvDetails.getLastEpisodeToAir() == null ? null : tvDetails.getLastEpisodeToAir().getName());
+        media.setLastAirDate(TmdbMovieDTO.parseDate(tvDetails.getLastAirDate()).orElse(null));
+        media.setNumberOfSeasons(tvDetails.getNumberOfSeasons());
+        media.setNumberOfEpisodes(tvDetails.getNumberOfEpisodes());
+        media.setTmdbShowStatus(tvDetails.getStatus());
+        media.setNextAiringSyncedAt(LocalDateTime.now());
+        return mediaRepository.save(media);
+    }
+
+    @Transactional
+    public void refreshShowSnapshotIfImported(Long tmdbId, TmdbTvDetailsDTO tvDetails) {
+        mediaRepository.findByTmdbIdAndType(tmdbId, MediaType.SHOW)
+            .ifPresent(media -> refreshShowSnapshot(media, tvDetails));
     }
 
     private Media mapToMedia(TmdbMovieDTO tmdbMedia, MediaType type) {

@@ -1,5 +1,7 @@
 package com.project.watchmate.Models;
 
+import java.time.LocalDateTime;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -8,7 +10,11 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinColumns;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
@@ -39,5 +45,27 @@ public class UserMediaStatus {
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private WatchStatus status;
+
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
+
+    @OneToOne
+    @JoinColumns({
+        @JoinColumn(name = "user_id", referencedColumnName = "user_id", insertable = false, updatable = false),
+        @JoinColumn(name = "media_id", referencedColumnName = "media_id", insertable = false, updatable = false)
+    })
+    private UserShowProgress showProgress;
+
+    @PrePersist
+    void onCreate() {
+        if (updatedAt == null) {
+            updatedAt = LocalDateTime.now();
+        }
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 
 }

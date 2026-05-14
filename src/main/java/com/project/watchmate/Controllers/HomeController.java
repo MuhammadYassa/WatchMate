@@ -1,6 +1,7 @@
 package com.project.watchmate.Controllers;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,6 +40,7 @@ public class HomeController {
     }
 
     @GetMapping("/status")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get homepage cache status", description = "Returns the last discovery sync status and bucket counts.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Homepage status returned", content = @Content(schema = @Schema(implementation = HomeStatusDTO.class))),

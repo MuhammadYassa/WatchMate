@@ -10,10 +10,11 @@ import com.project.watchmate.Dto.TmdbGenreDTO;
 import com.project.watchmate.Dto.TmdbGenreResponseDTO;
 import com.project.watchmate.Dto.TmdbMovieDTO;
 import com.project.watchmate.Dto.TmdbResponseDTO;
+import com.project.watchmate.Dto.TmdbTvDetailsDTO;
+import com.project.watchmate.Dto.TmdbTvSeasonDTO;
 import com.project.watchmate.Exception.MediaNotFoundException;
 import com.project.watchmate.Models.MediaType;
 
-import io.jsonwebtoken.lang.Collections;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -33,7 +34,7 @@ public class TmdbClientImpl implements TmdbClient {
                 .bodyToMono(TmdbGenreResponseDTO.class)
                 .block();
 
-            return response != null ? response.getGenres() : Collections.emptyList();
+            return response != null ? response.getGenres() : List.of();
         } catch (WebClientResponseException ex) {
             log.warn("TMDB genre fetch failed type={} status={}", type, ex.getStatusCode().value());
             throw ex;
@@ -104,6 +105,52 @@ public class TmdbClientImpl implements TmdbClient {
             throw new MediaNotFoundException("TMDB media not found for ID: " + tmdbId);
         } catch (WebClientResponseException ex) {
             log.error("TMDB media lookup failed tmdbId={} type={} status={}", tmdbId, type, ex.getStatusCode().value(), ex);
+            throw ex;
+        }
+    }
+
+    @Override
+    public TmdbTvDetailsDTO fetchTvDetailsById(Long tmdbId) {
+        String uri = "/tv/" + tmdbId + "?language=en-US";
+
+        try {
+            return tmdbWebClient.get()
+                .uri(uri)
+                .retrieve()
+                .bodyToMono(TmdbTvDetailsDTO.class)
+                .blockOptional()
+                .orElseThrow(() ->
+                    new MediaNotFoundException("TMDB show not found for ID: " + tmdbId));
+        } catch (WebClientResponseException.NotFound ex) {
+            log.warn("TMDB show details not found tmdbId={}", tmdbId);
+            throw new MediaNotFoundException("TMDB show not found for ID: " + tmdbId);
+        } catch (WebClientResponseException ex) {
+            log.error("TMDB show details lookup failed tmdbId={} status={}", tmdbId, ex.getStatusCode().value(), ex);
+            throw ex;
+        }
+    }
+
+    @Override
+    public TmdbTvSeasonDTO fetchTvSeasonDetails(Long tmdbId, Integer seasonNumber) {
+        String uri = "/tv/" + tmdbId + "/season/" + seasonNumber + "?language=en-US";
+
+        try {
+            return tmdbWebClient.get()
+                .uri(uri)
+                .retrieve()
+                .bodyToMono(TmdbTvSeasonDTO.class)
+                .blockOptional()
+                .orElseThrow(() ->
+                    new MediaNotFoundException("TMDB season not found for show ID: " + tmdbId + " season: " + seasonNumber));
+        } catch (WebClientResponseException.NotFound ex) {
+            log.warn("TMDB season not found tmdbId={} season={}", tmdbId, seasonNumber);
+            throw new MediaNotFoundException("TMDB season not found for show ID: " + tmdbId + " season: " + seasonNumber);
+        } catch (WebClientResponseException ex) {
+            log.error("TMDB season lookup failed tmdbId={} season={} status={}",
+                tmdbId,
+                seasonNumber,
+                ex.getStatusCode().value(),
+                ex);
             throw ex;
         }
     }

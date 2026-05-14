@@ -50,7 +50,6 @@ import com.project.watchmate.Repositories.ContentSyncStatusRepository;
 import com.project.watchmate.Repositories.CuratedContentRepository;
 import com.project.watchmate.Repositories.GenreLookupRepository;
 import com.project.watchmate.Repositories.GenreRepository;
-import com.project.watchmate.Repositories.PopularMediaRepository;
 
 @ExtendWith(MockitoExtension.class)
 class CuratedContentSyncServiceTest {
@@ -69,9 +68,6 @@ class CuratedContentSyncServiceTest {
 
     @Mock
     private GenreRepository genreRepository;
-
-    @Mock
-    private PopularMediaRepository popularMediaRepository;
 
     @Mock
     private ContentSyncStatusRepository contentSyncStatusRepository;
@@ -100,7 +96,6 @@ class CuratedContentSyncServiceTest {
         curatedContentSyncService.syncDiscoveryContent("test");
 
         verify(curatedContentRepository, times(0)).deleteByCategoryKey(any());
-        verify(popularMediaRepository, times(0)).deleteAll();
     }
 
     @Test
@@ -109,7 +104,7 @@ class CuratedContentSyncServiceTest {
 
         curatedContentSyncService.syncDiscoveryContent("test");
 
-        verifyNoInteractions(contentSyncStatusRepository, curatedContentRepository, genreLookupRepository, genreRepository, popularMediaRepository);
+        verifyNoInteractions(contentSyncStatusRepository, curatedContentRepository, genreLookupRepository, genreRepository);
     }
 
     @Test
@@ -132,23 +127,6 @@ class CuratedContentSyncServiceTest {
         verify(curatedContentRepository, times(1)).deleteByCategoryKey(CuratedContentCategory.AIRING_TODAY);
         verify(curatedContentRepository, times(1)).deleteByCategoryKey(CuratedContentCategory.UPCOMING);
         verify(curatedContentRepository, times(1)).deleteByCategoryKey(CuratedContentCategory.RECOMMENDED_LATER);
-    }
-
-    @Test
-    void syncDiscoveryContent_whenSuccessful_callsPopularMediaDeleteAllExactlyOnce() {
-        stubSuccessfulSync(
-            List.of(media(1L, 101L, MediaType.MOVIE, 8.5, LocalDate.of(2024, 1, 1))),
-            List.of(media(2L, 201L, MediaType.SHOW, 8.1, LocalDate.of(2024, 2, 1))),
-            List.of(media(3L, 301L, MediaType.MOVIE, 7.8, LocalDate.of(2023, 3, 1))),
-            List.of(media(4L, 401L, MediaType.SHOW, 7.7, LocalDate.of(2023, 4, 1))),
-            List.of(media(5L, 501L, MediaType.SHOW, 7.5, LocalDate.of(2025, 1, 1))),
-            List.of(media(6L, 601L, MediaType.MOVIE, 7.9, LocalDate.of(2026, 1, 1))),
-            List.of(media(7L, 701L, MediaType.SHOW, 8.0, LocalDate.of(2026, 2, 1)))
-        );
-
-        curatedContentSyncService.syncDiscoveryContent("test");
-
-        verify(popularMediaRepository, times(1)).deleteAllInBatch();
     }
 
     @Test

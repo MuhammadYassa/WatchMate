@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import lombok.AllArgsConstructor;
@@ -18,10 +20,12 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TmdbMovieDTO {
 
     private Long id;
 
+    @JsonAlias("name")
     private String title;
 
     private String overview;
@@ -36,6 +40,7 @@ public class TmdbMovieDTO {
     private String backdropPath;
 
     @JsonProperty("release_date")
+    @JsonAlias("first_air_date")
     private String releaseDate;
 
     @JsonProperty("vote_average")
@@ -48,20 +53,6 @@ public class TmdbMovieDTO {
     @Builder.Default
     @JsonProperty("genre_ids")
     private List<Long> genreIds = new ArrayList<>();
-
-    @JsonProperty("name")
-    private void mapName(String name) {
-        if (title == null || title.isBlank()) {
-            title = name;
-        }
-    }
-
-    @JsonProperty("first_air_date")
-    private void mapFirstAirDate(String airDate) {
-        if (releaseDate == null || releaseDate.isBlank()) {
-            releaseDate = airDate;
-        }
-    }
 
     public static Optional<LocalDate> parseDate(String dateString){
         if (dateString == null || dateString.isBlank()){

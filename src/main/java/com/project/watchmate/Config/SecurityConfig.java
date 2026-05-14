@@ -7,6 +7,7 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -22,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -40,13 +42,15 @@ public class SecurityConfig {
                 .authorizeHttpRequests(request -> request
                     .requestMatchers("/api/v1/auth/register","/api/v1/auth/login", "/api/v1/auth/verify/**", "/api/v1/auth/verify", "/api/v1/auth/refresh")
                     .permitAll()
-                    .requestMatchers("/api/v1/media/search/**", "/api/v1/media/popular")
+                    .requestMatchers("/api/v1/media/search/**")
                     .permitAll()
-                    .requestMatchers("/api/v1/home/**", "/api/v1/discover/**", "/api/v1/genre/**")
+                    .requestMatchers("/api/v1/shows/*", "/api/v1/shows/*/next-episode", "/api/v1/shows/*/seasons/*/episodes", "/api/v1/movies/*")
+                    .permitAll()
+                    .requestMatchers("/api/v1/home", "/api/v1/discover/**", "/api/v1/genre/**")
                     .permitAll()
                     .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/v3/api-docs.yaml")
                     .permitAll()
-                    .requestMatchers("/actuator", "/actuator/**")
+                    .requestMatchers("/actuator", "/actuator/**", "/api/v1/home/status")
                     .hasRole("ADMIN")
                     .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())

@@ -105,9 +105,8 @@ class ReviewIntegrationTest extends AbstractIntegrationTest {
 		Media media = saveMedia(7009L, "Review Listing Movie", com.project.watchmate.Models.MediaType.MOVIE);
 		saveReview(user, media, 5, "Excellent");
 
-		mockMvc.perform(get("/api/v1/media/{tmdbId}/reviews", media.getTmdbId())
-			.header("Authorization", bearerToken(user))
-			.param("type", "MOVIE"))
+		mockMvc.perform(get("/api/v1/movies/{tmdbId}/reviews", media.getTmdbId())
+			.header("Authorization", bearerToken(user)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$[0].reviewId").isNumber())
 			.andExpect(jsonPath("$[0].tmdbId").value(media.getTmdbId().intValue()))

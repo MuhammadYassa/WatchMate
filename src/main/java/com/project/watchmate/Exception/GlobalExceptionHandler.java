@@ -10,6 +10,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import com.project.watchmate.Dto.ApiError;
@@ -164,6 +165,19 @@ public class GlobalExceptionHandler {
             "Invalid value for parameter: " + field,
             "TYPE_MISMATCH",
             List.of(new FieldValidationError(field, "Invalid value")),
+            ex,
+            request
+        );
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiError> handleMissingRequestParameter(MissingServletRequestParameterException ex, HttpServletRequest request) {
+        String field = ex.getParameterName();
+        return buildResponse(
+            HttpStatus.BAD_REQUEST,
+            "Missing required parameter: " + field,
+            "BAD_REQUEST",
+            List.of(new FieldValidationError(field, "Parameter is required")),
             ex,
             request
         );
