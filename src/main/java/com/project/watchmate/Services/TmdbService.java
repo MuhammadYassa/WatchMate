@@ -1,6 +1,7 @@
 package com.project.watchmate.Services;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,7 +55,7 @@ public class TmdbService {
                     existing.setBackdropPath(media.getBackdropPath());
                     existing.setReleaseDate(media.getReleaseDate());
                     existing.setRating(media.getRating());
-                    existing.setGenres(media.getGenres());
+                    syncGenres(existing, media.getGenres());
                     return mediaRepository.save(existing);
                 })
                 .orElseGet(() -> mediaRepository.save(media)))
@@ -127,14 +128,14 @@ public class TmdbService {
             .backdropPath(tmdbMedia.getBackdropPath())
             .releaseDate(TmdbMovieDTO.parseDate(tmdbMedia.getReleaseDate()).orElse(null))
             .rating(tmdbMedia.getVoteAverage())
-            .genres(genres)
+            .genres(new ArrayList<>(genres))
             .type(type)
             .build();
     }
 
     private List<Genre> resolveGenres(List<Long> genreIds, MediaType mediaType) {
         if (genreIds.isEmpty()) {
-            return List.of();
+            return new ArrayList<>();
         }
 
         Map<Long, Genre> genresByTmdbId = new LinkedHashMap<>();
@@ -144,7 +145,7 @@ public class TmdbService {
         return genreIds.stream()
             .map(genresByTmdbId::get)
             .filter(Objects::nonNull)
-            .toList();
+            .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
     }
 
     private List<Long> resolveGenreIds(TmdbMovieDTO tmdbMedia) {
@@ -157,5 +158,10 @@ public class TmdbService {
         return tmdbMedia.getGenres().stream()
             .map(TmdbGenreDTO::getId)
             .toList();
+    }
+
+    private void syncGenres(Media existing, List<Genre> genres) {
+        existing.getGenres().clear();
+        existing.getGenres().addAll(genres);
     }
 }

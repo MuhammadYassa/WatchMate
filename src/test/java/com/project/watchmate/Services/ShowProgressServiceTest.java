@@ -241,16 +241,6 @@ class ShowProgressServiceTest {
         when(userShowProgressRepository.findWithEpisodeProgressByUserAndMedia(user, show)).thenReturn(Optional.empty());
         when(userMediaStatusRepository.save(any(UserMediaStatus.class))).thenAnswer(inv -> inv.getArgument(0));
         when(userShowProgressRepository.save(any(UserShowProgress.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(userEpisodeProgressRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(userEpisodeProgressRepository.findByUserShowProgressOrderBySeasonNumberAscEpisodeNumberAsc(any(UserShowProgress.class)))
-            .thenAnswer(inv -> {
-                UserShowProgress progress = inv.getArgument(0);
-                return List.of(
-                    UserEpisodeProgress.builder().userShowProgress(progress).seasonNumber(1).episodeNumber(1).watched(true).build(),
-                    UserEpisodeProgress.builder().userShowProgress(progress).seasonNumber(1).episodeNumber(2).watched(true).build(),
-                    UserEpisodeProgress.builder().userShowProgress(progress).seasonNumber(2).episodeNumber(1).watched(true).build()
-                );
-            });
         when(showStatusCalculator.calculate(any(UserShowProgress.class), eq(tvDetails), isNull())).thenReturn(WatchStatus.WATCHING);
 
         ShowProgressDTO result = showProgressService.updateShowProgress(user, 999L, MediaType.SHOW, request);
@@ -263,7 +253,6 @@ class ShowProgressServiceTest {
         assertEquals(Integer.valueOf(3), result.getEpisodesWatchedCount());
         assertEquals(Integer.valueOf(1), result.getSeasonsCompletedCount());
         assertEquals(3, result.getWatchedEpisodes().size());
-        verify(userEpisodeProgressRepository).saveAll(any());
     }
 
     @Test
@@ -285,7 +274,6 @@ class ShowProgressServiceTest {
         when(tmdbService.fetchTvSeasonDetails(999L, 1)).thenReturn(seasonOneDetails);
         when(userMediaStatusRepository.findByUserAndMedia(user, show)).thenReturn(Optional.of(existingStatus));
         when(userShowProgressRepository.findWithEpisodeProgressByUserAndMedia(user, show)).thenReturn(Optional.of(existingProgress));
-        when(userEpisodeProgressRepository.findByUserShowProgressAndSeasonNumberAndEpisodeNumber(existingProgress, 1, 1)).thenReturn(Optional.empty());
         when(userMediaStatusRepository.save(any(UserMediaStatus.class))).thenAnswer(inv -> inv.getArgument(0));
         when(userShowProgressRepository.save(any(UserShowProgress.class))).thenAnswer(inv -> inv.getArgument(0));
         when(showStatusCalculator.calculate(any(UserShowProgress.class), eq(tvDetails), isNull())).thenReturn(WatchStatus.WATCHING);
@@ -331,7 +319,6 @@ class ShowProgressServiceTest {
         when(tmdbService.fetchTvSeasonDetails(999L, 1)).thenReturn(seasonOneDetails);
         when(userMediaStatusRepository.findByUserAndMedia(user, show)).thenReturn(Optional.of(existingStatus));
         when(userShowProgressRepository.findWithEpisodeProgressByUserAndMedia(user, show)).thenReturn(Optional.of(existingProgress));
-        when(userEpisodeProgressRepository.findByUserShowProgressAndSeasonNumberAndEpisodeNumber(existingProgress, 1, 1)).thenReturn(Optional.of(progress));
         when(userMediaStatusRepository.save(any(UserMediaStatus.class))).thenAnswer(inv -> inv.getArgument(0));
         when(userShowProgressRepository.save(any(UserShowProgress.class))).thenAnswer(inv -> inv.getArgument(0));
         when(showStatusCalculator.calculate(any(UserShowProgress.class), eq(tvDetails), isNull())).thenReturn(WatchStatus.NONE);
@@ -394,15 +381,6 @@ class ShowProgressServiceTest {
         when(userShowProgressRepository.findWithEpisodeProgressByUserAndMedia(user, show)).thenReturn(Optional.empty());
         when(userMediaStatusRepository.save(any(UserMediaStatus.class))).thenAnswer(inv -> inv.getArgument(0));
         when(userShowProgressRepository.save(any(UserShowProgress.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(userEpisodeProgressRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(userEpisodeProgressRepository.findByUserShowProgressOrderBySeasonNumberAscEpisodeNumberAsc(any(UserShowProgress.class)))
-            .thenAnswer(inv -> {
-                UserShowProgress progress = inv.getArgument(0);
-                return List.of(
-                    UserEpisodeProgress.builder().userShowProgress(progress).seasonNumber(1).episodeNumber(1).watched(true).build(),
-                    UserEpisodeProgress.builder().userShowProgress(progress).seasonNumber(1).episodeNumber(2).watched(true).build()
-                );
-            });
         when(showStatusCalculator.calculate(any(UserShowProgress.class), eq(tvDetails), isNull())).thenReturn(WatchStatus.WATCHING);
 
         ShowProgressDTO result = showProgressService.markSeasonWatched(user, 999L, 1, true);
