@@ -2,7 +2,6 @@ package com.project.watchmate.Services;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -28,7 +27,6 @@ import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.UserShowProgress;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
-import com.project.watchmate.Repositories.UserEpisodeProgressRepository;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
 import com.project.watchmate.Repositories.UserShowProgressRepository;
 
@@ -49,8 +47,6 @@ public class ShowProgressService {
     private final UserMediaStatusRepository userMediaStatusRepository;
 
     private final UserShowProgressRepository userShowProgressRepository;
-
-    private final UserEpisodeProgressRepository userEpisodeProgressRepository;
 
     private final TransactionTemplate transactionTemplate;
 
@@ -164,9 +160,7 @@ public class ShowProgressService {
             progress = loadOrCreateProgress(user, media);
         }
 
-        UserEpisodeProgress row = userEpisodeProgressRepository
-            .findByUserShowProgressAndSeasonNumberAndEpisodeNumber(progress, seasonNumber, episodeNumber)
-            .orElse(null);
+        UserEpisodeProgress row = findEpisodeProgressRow(progress, seasonNumber, episodeNumber);
 
         if (Boolean.TRUE.equals(watched)) {
             if (row == null) {
@@ -221,7 +215,6 @@ public class ShowProgressService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        List<UserEpisodeProgress> newRows = new ArrayList<>();
         for (TmdbTvEpisodeDTO episode : seasonDetails.getEpisodes()) {
             Integer currentEpisodeNumber = episode.getEpisodeNumber();
             if (currentEpisodeNumber == null) {
@@ -240,7 +233,7 @@ public class ShowProgressService {
                         .watched(true)
                         .watchedAt(now)
                         .build();
-                    newRows.add(row);
+                    progress.getEpisodeProgress().add(row);
                     existing.put(key, row);
                     continue;
                 }
@@ -250,12 +243,6 @@ public class ShowProgressService {
                 row.setWatched(false);
                 row.setWatchedAt(null);
             }
-        }
-
-        if (!newRows.isEmpty()) {
-            userShowProgressRepository.save(progress);
-            userEpisodeProgressRepository.saveAll(newRows);
-            progress.setEpisodeProgress(userEpisodeProgressRepository.findByUserShowProgressOrderBySeasonNumberAscEpisodeNumberAsc(progress));
         }
 
         recalculateFromEpisodeRows(progress, tvDetails);
@@ -305,7 +292,6 @@ public class ShowProgressService {
             existing.put(progressKey(row.getSeasonNumber(), row.getEpisodeNumber()), row);
         }
 
-        List<UserEpisodeProgress> rowsToInsert = new ArrayList<>();
         for (TmdbTvSeasonSummaryDTO seasonSummary : tvDetails.getSeasons()) {
             Integer currentSeason = seasonSummary.getSeasonNumber();
             if (currentSeason == null || currentSeason == 0 || currentSeason > seasonNumber) {
@@ -320,24 +306,20 @@ public class ShowProgressService {
                 String key = progressKey(currentSeason, episode);
                 UserEpisodeProgress row = existing.get(key);
                 if (row == null) {
-                    rowsToInsert.add(UserEpisodeProgress.builder()
+                    row = UserEpisodeProgress.builder()
                         .userShowProgress(progress)
                         .seasonNumber(currentSeason)
                         .episodeNumber(episode)
                         .watched(true)
                         .watchedAt(now)
-                        .build());
+                        .build();
+                    progress.getEpisodeProgress().add(row);
+                    existing.put(key, row);
                     continue;
                 }
                 row.setWatched(true);
                 row.setWatchedAt(now);
             }
-        }
-
-        if (!rowsToInsert.isEmpty()) {
-            userShowProgressRepository.save(progress);
-            userEpisodeProgressRepository.saveAll(rowsToInsert);
-            progress.setEpisodeProgress(userEpisodeProgressRepository.findByUserShowProgressOrderBySeasonNumberAscEpisodeNumberAsc(progress));
         }
     }
 
@@ -371,6 +353,18 @@ public class ShowProgressService {
             .filter(Objects::nonNull)
             .max(LocalDateTime::compareTo)
             .orElse(null));
+    }
+
+    private UserEpisodeProgress findEpisodeProgressRow(
+        UserShowProgress progress,
+        Integer seasonNumber,
+        Integer episodeNumber
+    ) {
+        return progress.getEpisodeProgress().stream()
+            .filter(row -> Objects.equals(row.getSeasonNumber(), seasonNumber)
+                && Objects.equals(row.getEpisodeNumber(), episodeNumber))
+            .findFirst()
+            .orElse(null);
     }
 
     private int countCompletedSeasonsFromRows(TmdbTvDetailsDTO tvDetails, List<UserEpisodeProgress> watchedStandardRows) {
