@@ -18,9 +18,10 @@ import com.project.watchmate.Dto.HomeResponseDTO;
 import com.project.watchmate.Dto.HomeStatusDTO;
 import com.project.watchmate.Models.ContentSyncResult;
 import com.project.watchmate.Models.ContentSyncStatus;
+import com.project.watchmate.Models.Genre;
 import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Repositories.ContentSyncStatusRepository;
-import com.project.watchmate.Repositories.GenreLookupRepository;
+import com.project.watchmate.Repositories.GenreRepository;
 
 @ExtendWith(MockitoExtension.class)
 class HomeServiceTest {
@@ -29,7 +30,7 @@ class HomeServiceTest {
     private DiscoverService discoverService;
 
     @Mock
-    private GenreLookupRepository genreLookupRepository;
+    private GenreRepository genreRepository;
 
     @Mock
     private ContentSyncStatusRepository contentSyncStatusRepository;
@@ -46,12 +47,18 @@ class HomeServiceTest {
         when(discoverService.getAiringToday()).thenReturn(List.of());
         when(discoverService.getUpcoming()).thenReturn(List.of());
         when(discoverService.getRecommendedLater()).thenReturn(List.of());
-        when(genreLookupRepository.findDistinctNamesOrderByNameAsc()).thenReturn(List.of("Action", "Drama"));
+        when(genreRepository.findCurrentByMediaTypeOrderByNameAsc(MediaType.MOVIE)).thenReturn(List.of(
+            Genre.builder().tmdbGenreId(28L).name("Action").mediaType(MediaType.MOVIE).build()
+        ));
+        when(genreRepository.findCurrentByMediaTypeOrderByNameAsc(MediaType.SHOW)).thenReturn(List.of(
+            Genre.builder().tmdbGenreId(18L).name("Drama").mediaType(MediaType.SHOW).build()
+        ));
 
         HomeResponseDTO result = homeService.getHome();
 
         assertEquals(1, result.getTrendingMovies().size());
-        assertEquals(List.of("Action", "Drama"), result.getGenres());
+        assertEquals(List.of("Action"), result.getMovieGenres());
+        assertEquals(List.of("Drama"), result.getShowGenres());
     }
 
     @Test

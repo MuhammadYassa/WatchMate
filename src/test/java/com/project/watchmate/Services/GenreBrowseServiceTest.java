@@ -21,15 +21,15 @@ import com.project.watchmate.Dto.TmdbMovieDTO;
 import com.project.watchmate.Dto.TmdbResponseDTO;
 import com.project.watchmate.Exception.GenreNotFoundException;
 import com.project.watchmate.Mappers.WatchMateMapper;
-import com.project.watchmate.Models.GenreLookup;
+import com.project.watchmate.Models.Genre;
 import com.project.watchmate.Models.MediaType;
-import com.project.watchmate.Repositories.GenreLookupRepository;
+import com.project.watchmate.Repositories.GenreRepository;
 
 @ExtendWith(MockitoExtension.class)
 class GenreBrowseServiceTest {
 
     @Mock
-    private GenreLookupRepository genreLookupRepository;
+    private GenreRepository genreRepository;
 
     @Mock
     private TmdbClient tmdbClient;
@@ -42,11 +42,11 @@ class GenreBrowseServiceTest {
 
     @Test
     void browseMovies_ResolvesGenreAndMapsPagedResults() {
-        GenreLookup genreLookup = GenreLookup.builder().tmdbGenreId(28L).name("Action").mediaType(MediaType.MOVIE).build();
+        Genre genre = Genre.builder().tmdbGenreId(28L).name("Action").mediaType(MediaType.MOVIE).build();
         TmdbMovieDTO tmdbMovie = TmdbMovieDTO.builder().id(10L).title("Action Hit").build();
         DiscoveryMediaItemDTO dto = DiscoveryMediaItemDTO.builder().tmdbId(10L).title("Action Hit").type(MediaType.MOVIE).build();
 
-        when(genreLookupRepository.findByNameIgnoreCaseAndMediaType("Action", MediaType.MOVIE)).thenReturn(Optional.of(genreLookup));
+        when(genreRepository.findCurrentByNameIgnoreCaseAndMediaType("Action", MediaType.MOVIE)).thenReturn(Optional.of(genre));
         when(tmdbClient.discoverByGenre("movie", 28L, 1)).thenReturn(new TmdbResponseDTO(List.of(tmdbMovie), 1, 4, 80));
         when(watchMateMapper.mapToDiscoveryMediaItemDTO(eq(tmdbMovie), eq(MediaType.MOVIE))).thenReturn(dto);
 
@@ -59,7 +59,7 @@ class GenreBrowseServiceTest {
 
     @Test
     void browseShows_WhenGenreMissing_ThrowsNotFound() {
-        when(genreLookupRepository.findByNameIgnoreCaseAndMediaType("Horror", MediaType.SHOW)).thenReturn(Optional.empty());
+        when(genreRepository.findCurrentByNameIgnoreCaseAndMediaType("Horror", MediaType.SHOW)).thenReturn(Optional.empty());
 
         GenreNotFoundException exception = assertThrows(
             GenreNotFoundException.class,

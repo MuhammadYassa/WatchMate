@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
@@ -43,12 +42,10 @@ import com.project.watchmate.Models.ContentSyncStatus;
 import com.project.watchmate.Models.CuratedContent;
 import com.project.watchmate.Models.CuratedContentCategory;
 import com.project.watchmate.Models.Genre;
-import com.project.watchmate.Models.GenreLookup;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Repositories.ContentSyncStatusRepository;
 import com.project.watchmate.Repositories.CuratedContentRepository;
-import com.project.watchmate.Repositories.GenreLookupRepository;
 import com.project.watchmate.Repositories.GenreRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -64,9 +61,6 @@ class CuratedContentSyncServiceTest {
     private CuratedContentRepository curatedContentRepository;
 
     @Mock
-    private GenreLookupRepository genreLookupRepository;
-
-    @Mock
     private GenreRepository genreRepository;
 
     @Mock
@@ -76,7 +70,7 @@ class CuratedContentSyncServiceTest {
     private PlatformTransactionManager transactionManager;
 
     @Captor
-    private ArgumentCaptor<List<GenreLookup>> lookupCaptor;
+    private ArgumentCaptor<List<Genre>> genreBatchCaptor;
 
     @InjectMocks
     private CuratedContentSyncService curatedContentSyncService;
@@ -85,7 +79,6 @@ class CuratedContentSyncServiceTest {
     void setUp() {
         TransactionStatus transactionStatus = new SimpleTransactionStatus();
         lenient().when(transactionManager.getTransaction(any(TransactionDefinition.class))).thenReturn(transactionStatus);
-        lenient().when(genreRepository.findById(anyLong())).thenReturn(Optional.empty());
     }
 
     @Test
@@ -104,7 +97,7 @@ class CuratedContentSyncServiceTest {
 
         curatedContentSyncService.syncDiscoveryContent("test");
 
-        verifyNoInteractions(contentSyncStatusRepository, curatedContentRepository, genreLookupRepository, genreRepository);
+        verifyNoInteractions(contentSyncStatusRepository, curatedContentRepository, genreRepository);
     }
 
     @Test
@@ -275,37 +268,17 @@ class CuratedContentSyncServiceTest {
     }
 
     @Test
-    void syncGenres_whenMovieAndShowGenresProvided_upsertsGenresForBothTypes() {
-        ArgumentCaptor<Genre> genreCaptor = ArgumentCaptor.forClass(Genre.class);
+    void syncGenres_whenMovieAndShowGenresProvided_replacesTypedGenresForEachType() {
         LocalDateTime syncedAt = LocalDateTime.of(2026, 4, 29, 12, 0);
         List<TmdbGenreDTO> movieGenres = List.of(new TmdbGenreDTO(28L, "Action"));
         List<TmdbGenreDTO> showGenres = List.of(new TmdbGenreDTO(18L, "Drama"));
 
         curatedContentSyncService.syncGenres(movieGenres, showGenres, syncedAt);
 
-        verify(genreRepository, times(2)).save(genreCaptor.capture());
-        assertIterableEquals(
-            List.of("28:Action", "18:Drama"),
-            genreCaptor.getAllValues().stream()
-                .map(genre -> genre.getId() + ":" + genre.getName())
-                .toList()
-        );
-    }
-
-    @Test
-    void syncGenres_whenMovieAndShowGenresProvided_replacesGenreLookupForEachType() {
-        LocalDateTime syncedAt = LocalDateTime.of(2026, 4, 29, 12, 0);
-        List<TmdbGenreDTO> movieGenres = List.of(new TmdbGenreDTO(28L, "Action"));
-        List<TmdbGenreDTO> showGenres = List.of(new TmdbGenreDTO(18L, "Drama"));
-
-        curatedContentSyncService.syncGenres(movieGenres, showGenres, syncedAt);
-
-        verify(genreLookupRepository, times(1)).deleteByMediaType(MediaType.MOVIE);
-        verify(genreLookupRepository, times(1)).deleteByMediaType(MediaType.SHOW);
-        verify(genreLookupRepository, times(2)).saveAll(lookupCaptor.capture());
+        verify(genreRepository, times(2)).saveAll(genreBatchCaptor.capture());
         assertAll(
-            () -> assertLookupBatch(lookupCaptor.getAllValues().get(0), MediaType.MOVIE, syncedAt, List.of("28:Action")),
-            () -> assertLookupBatch(lookupCaptor.getAllValues().get(1), MediaType.SHOW, syncedAt, List.of("18:Drama"))
+            () -> assertGenreBatch(genreBatchCaptor.getAllValues().get(0), MediaType.MOVIE, syncedAt, List.of("28:Action")),
+            () -> assertGenreBatch(genreBatchCaptor.getAllValues().get(1), MediaType.SHOW, syncedAt, List.of("18:Drama"))
         );
     }
 
@@ -400,16 +373,16 @@ class CuratedContentSyncServiceTest {
         return savedStatuses;
     }
 
-    private void assertLookupBatch(
-        List<GenreLookup> lookups,
+    private void assertGenreBatch(
+        List<Genre> genres,
         MediaType mediaType,
         LocalDateTime syncedAt,
         List<String> expectedIdAndName
     ) {
         assertAll(
-            () -> assertEquals(expectedIdAndName, lookups.stream().map(lookup -> lookup.getTmdbGenreId() + ":" + lookup.getName()).toList()),
-            () -> assertEquals(List.of(mediaType), lookups.stream().map(GenreLookup::getMediaType).distinct().toList()),
-            () -> assertEquals(List.of(syncedAt), lookups.stream().map(GenreLookup::getSyncedAt).distinct().toList())
+            () -> assertEquals(expectedIdAndName, genres.stream().map(genre -> genre.getTmdbGenreId() + ":" + genre.getName()).toList()),
+            () -> assertEquals(List.of(mediaType), genres.stream().map(Genre::getMediaType).distinct().toList()),
+            () -> assertEquals(List.of(syncedAt), genres.stream().map(Genre::getSyncedAt).distinct().toList())
         );
     }
 

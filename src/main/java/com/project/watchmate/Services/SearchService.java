@@ -1,7 +1,10 @@
 package com.project.watchmate.Services;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 
@@ -11,6 +14,7 @@ import com.project.watchmate.Dto.SearchItemDTO;
 import com.project.watchmate.Dto.TmdbMovieDTO;
 import com.project.watchmate.Dto.TmdbResponseDTO;
 import com.project.watchmate.Models.Genre;
+import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Repositories.GenreRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -62,13 +66,28 @@ public class SearchService {
 
     private List<String> resolveGenreNames(TmdbMovieDTO result) {
         List<Long> genreIds = result.getGenreIds();
-        if (genreIds == null || genreIds.isEmpty()) {
+        MediaType mediaType = resolveMediaType(result);
+        if (genreIds == null || genreIds.isEmpty() || mediaType == null) {
             return List.of();
         }
 
-        return genreRepository.findAllById(genreIds).stream()
+        Map<Long, Genre> genresByTmdbId = new LinkedHashMap<>();
+        genreRepository.findByTmdbGenreIdInAndMediaType(genreIds, mediaType)
+            .forEach(genre -> genresByTmdbId.putIfAbsent(genre.getTmdbGenreId(), genre));
+
+        return genreIds.stream()
+            .map(genresByTmdbId::get)
+            .filter(Objects::nonNull)
             .map(Genre::getName)
             .toList();
+    }
+
+    private MediaType resolveMediaType(TmdbMovieDTO result) {
+        return switch (normalizeMediaType(result.getMediaType())) {
+            case "movie" -> MediaType.MOVIE;
+            case "tv" -> MediaType.SHOW;
+            default -> null;
+        };
     }
 
     private String normalizeMediaType(String mediaType) {

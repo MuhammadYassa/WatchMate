@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,12 +25,10 @@ import com.project.watchmate.Models.ContentSyncStatus;
 import com.project.watchmate.Models.CuratedContent;
 import com.project.watchmate.Models.CuratedContentCategory;
 import com.project.watchmate.Models.Genre;
-import com.project.watchmate.Models.GenreLookup;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Repositories.ContentSyncStatusRepository;
 import com.project.watchmate.Repositories.CuratedContentRepository;
-import com.project.watchmate.Repositories.GenreLookupRepository;
 import com.project.watchmate.Repositories.GenreRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -49,8 +48,6 @@ public class CuratedContentSyncService {
     private final TmdbService tmdbService;
 
     private final CuratedContentRepository curatedContentRepository;
-
-    private final GenreLookupRepository genreLookupRepository;
 
     private final GenreRepository genreRepository;
 
@@ -110,31 +107,30 @@ public class CuratedContentSyncService {
     }
 
     protected void syncGenres(List<TmdbGenreDTO> movieGenres, List<TmdbGenreDTO> showGenres, LocalDateTime syncedAt) {
-        upsertGlobalGenres(movieGenres);
-        upsertGlobalGenres(showGenres);
-        replaceGenreLookup(movieGenres, MediaType.MOVIE, syncedAt);
-        replaceGenreLookup(showGenres, MediaType.SHOW, syncedAt);
+        replaceGenres(movieGenres, MediaType.MOVIE, syncedAt);
+        replaceGenres(showGenres, MediaType.SHOW, syncedAt);
     }
 
-    private void upsertGlobalGenres(List<TmdbGenreDTO> tmdbGenres) {
-        for (TmdbGenreDTO tmdbGenre : tmdbGenres) {
-            Genre genre = genreRepository.findById(tmdbGenre.getId())
-                .orElse(Genre.builder().id(tmdbGenre.getId()).build());
-            genre.setName(tmdbGenre.getName());
-            genreRepository.save(genre);
-        }
-    }
+    private void replaceGenres(List<TmdbGenreDTO> tmdbGenres, MediaType mediaType, LocalDateTime syncedAt) {
+        Map<Long, Genre> existingGenresByTmdbId = new HashMap<>();
+        genreRepository.findByMediaTypeOrderByNameAsc(mediaType)
+            .forEach(genre -> existingGenresByTmdbId.putIfAbsent(genre.getTmdbGenreId(), genre));
 
-    private void replaceGenreLookup(List<TmdbGenreDTO> tmdbGenres, MediaType mediaType, LocalDateTime syncedAt) {
-        genreLookupRepository.deleteByMediaType(mediaType);
-        genreLookupRepository.saveAll(
+        genreRepository.saveAll(
             tmdbGenres.stream()
-                .map(genre -> GenreLookup.builder()
-                    .tmdbGenreId(genre.getId())
-                    .name(genre.getName())
-                    .mediaType(mediaType)
-                    .syncedAt(syncedAt)
-                    .build())
+                .map(tmdbGenre -> {
+                    Genre genre = existingGenresByTmdbId.getOrDefault(
+                        tmdbGenre.getId(),
+                        Genre.builder()
+                            .tmdbGenreId(tmdbGenre.getId())
+                            .mediaType(mediaType)
+                            .build()
+                    );
+                    genre.setName(tmdbGenre.getName());
+                    genre.setMediaType(mediaType);
+                    genre.setSyncedAt(syncedAt);
+                    return genre;
+                })
                 .toList()
         );
     }

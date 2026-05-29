@@ -1,5 +1,7 @@
 package com.project.watchmate.Services;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -7,8 +9,10 @@ import com.project.watchmate.Dto.HomeResponseDTO;
 import com.project.watchmate.Dto.HomeStatusDTO;
 import com.project.watchmate.Models.ContentSyncResult;
 import com.project.watchmate.Models.ContentSyncStatus;
+import com.project.watchmate.Models.Genre;
+import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Repositories.ContentSyncStatusRepository;
-import com.project.watchmate.Repositories.GenreLookupRepository;
+import com.project.watchmate.Repositories.GenreRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -18,7 +22,7 @@ public class HomeService {
 
     private final DiscoverService discoverService;
 
-    private final GenreLookupRepository genreLookupRepository;
+    private final GenreRepository genreRepository;
 
     private final ContentSyncStatusRepository contentSyncStatusRepository;
 
@@ -31,7 +35,8 @@ public class HomeService {
             .airingToday(discoverService.getAiringToday())
             .upcoming(discoverService.getUpcoming())
             .recommendedLater(discoverService.getRecommendedLater())
-            .genres(genreLookupRepository.findDistinctNamesOrderByNameAsc())
+            .movieGenres(genreNamesFor(MediaType.MOVIE))
+            .showGenres(genreNamesFor(MediaType.SHOW))
             .build();
     }
 
@@ -62,5 +67,11 @@ public class HomeService {
             .upcomingCount(status.getUpcomingCount())
             .recommendedLaterCount(status.getRecommendedLaterCount())
             .build();
+    }
+
+    private List<String> genreNamesFor(MediaType mediaType) {
+        return genreRepository.findCurrentByMediaTypeOrderByNameAsc(mediaType).stream()
+            .map(Genre::getName)
+            .toList();
     }
 }

@@ -30,7 +30,6 @@ import com.project.watchmate.Repositories.FollowRequestRepository;
 import com.project.watchmate.Repositories.ContentSyncStatusRepository;
 import com.project.watchmate.Repositories.CuratedContentRepository;
 import com.project.watchmate.Repositories.GenreRepository;
-import com.project.watchmate.Repositories.GenreLookupRepository;
 import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.RefreshTokenRepository;
 import com.project.watchmate.Repositories.ReviewRepository;
@@ -114,9 +113,6 @@ public abstract class AbstractIntegrationTest {
 	protected GenreRepository genreRepository;
 
 	@Autowired
-	protected GenreLookupRepository genreLookupRepository;
-
-	@Autowired
 	protected CuratedContentRepository curatedContentRepository;
 
 	@Autowired
@@ -177,9 +173,9 @@ public abstract class AbstractIntegrationTest {
 		showSeasonRepository.deleteAll();
 		curatedContentRepository.deleteAll();
 		contentSyncStatusRepository.deleteAll();
-		genreLookupRepository.deleteAll();
 		watchListRepository.deleteAll();
 		mediaRepository.deleteAll();
+		genreRepository.deleteAll();
 		usersRepository.deleteAll();
 	}
 

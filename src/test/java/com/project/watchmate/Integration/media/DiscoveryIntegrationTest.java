@@ -19,7 +19,7 @@ import com.project.watchmate.Models.ContentSyncResult;
 import com.project.watchmate.Models.ContentSyncStatus;
 import com.project.watchmate.Models.CuratedContent;
 import com.project.watchmate.Models.CuratedContentCategory;
-import com.project.watchmate.Models.GenreLookup;
+import com.project.watchmate.Models.Genre;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.Role;
@@ -47,10 +47,16 @@ class DiscoveryIntegrationTest extends AbstractIntegrationTest {
             .rankPosition(1)
             .syncedAt(LocalDateTime.now())
             .build());
-        genreLookupRepository.save(GenreLookup.builder()
+        genreRepository.save(Genre.builder()
             .tmdbGenreId(28L)
             .name("Action")
             .mediaType(MediaType.MOVIE)
+            .syncedAt(LocalDateTime.now())
+            .build());
+        genreRepository.save(Genre.builder()
+            .tmdbGenreId(18L)
+            .name("Drama")
+            .mediaType(MediaType.SHOW)
             .syncedAt(LocalDateTime.now())
             .build());
 
@@ -58,7 +64,8 @@ class DiscoveryIntegrationTest extends AbstractIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.trendingMovies[0].title").value("Home Trending"))
             .andExpect(jsonPath("$.recommendedLater[0].title").value("Home Recommended"))
-            .andExpect(jsonPath("$.genres", contains("Action")));
+            .andExpect(jsonPath("$.movieGenres", contains("Action")))
+            .andExpect(jsonPath("$.showGenres", contains("Drama")));
     }
 
     @Test
@@ -128,7 +135,7 @@ class DiscoveryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void genreMovies_returnsPagedResultsWhenGenreExists() throws Exception {
-        genreLookupRepository.save(GenreLookup.builder()
+        genreRepository.save(Genre.builder()
             .tmdbGenreId(28L)
             .name("Action")
             .mediaType(MediaType.MOVIE)

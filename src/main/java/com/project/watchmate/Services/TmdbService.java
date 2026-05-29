@@ -1,7 +1,9 @@
 package com.project.watchmate.Services;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import org.springframework.stereotype.Service;
@@ -115,7 +117,7 @@ public class TmdbService {
 
     private Media mapToMedia(TmdbMovieDTO tmdbMedia, MediaType type) {
         List<Long> genreIds = resolveGenreIds(tmdbMedia);
-        List<Genre> genres = genreRepository.findAllById(genreIds);
+        List<Genre> genres = resolveGenres(genreIds, type);
 
         return Media.builder()
             .tmdbId(Objects.requireNonNull(tmdbMedia.getId(), "tmdbMedia.id"))
@@ -128,6 +130,21 @@ public class TmdbService {
             .genres(genres)
             .type(type)
             .build();
+    }
+
+    private List<Genre> resolveGenres(List<Long> genreIds, MediaType mediaType) {
+        if (genreIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, Genre> genresByTmdbId = new LinkedHashMap<>();
+        genreRepository.findByTmdbGenreIdInAndMediaType(genreIds, mediaType)
+            .forEach(genre -> genresByTmdbId.putIfAbsent(genre.getTmdbGenreId(), genre));
+
+        return genreIds.stream()
+            .map(genresByTmdbId::get)
+            .filter(Objects::nonNull)
+            .toList();
     }
 
     private List<Long> resolveGenreIds(TmdbMovieDTO tmdbMedia) {

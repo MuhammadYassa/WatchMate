@@ -28,6 +28,7 @@ It lets users discover media, maintain watchlists and favourites, write reviews,
   - Search movies/TV by query via TMDB (`/api/v1/media/search`).
   - Fetch media details by TMDB ID and type (`/api/v1/media/{tmdbId}?type=...`).
   - Retrieve **popular media** list from a pre-populated table (`/api/v1/media/popular`).
+  - Fetch the cached homepage discovery payload (`/api/v1/home`), including `movieGenres` and `showGenres` for type-aware genre browsing.
 
 - **Watchlists**
   - Create / rename / delete user-specific watchlists.
@@ -177,6 +178,14 @@ This is a high-level summary; see controllers and DTOs for full details.
   - `GET /popular` – list popular media from `PopularMedia`.
   - `POST /update` – update current user’s watch status for a media item.
   - `GET /{mediaId}/reviews` – get reviews for a given media.
+
+- **Home (`/api/v1/home`)**
+  - `GET /` – cached homepage discovery buckets plus `movieGenres` and `showGenres`.
+  - `GET /status` – admin-only discovery sync status and cached bucket counts.
+
+- **Genre (`/api/v1/genre`)**
+  - `GET /{genre}/movies?page=...&size=...` – browse cached movie genres through TMDB discover.
+  - `GET /{genre}/shows?page=...&size=...` – browse cached show genres through TMDB discover.
 
 - **Watchlists (`/api/v1/watchlists`)**
   - `GET /` – all watchlists for current user.

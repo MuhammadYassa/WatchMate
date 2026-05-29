@@ -24,6 +24,7 @@ import com.project.watchmate.Dto.SearchItemDTO;
 import com.project.watchmate.Dto.TmdbMovieDTO;
 import com.project.watchmate.Dto.TmdbResponseDTO;
 import com.project.watchmate.Models.Genre;
+import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Repositories.GenreRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -61,10 +62,10 @@ class SearchServiceTest {
 
             when(tmdbClient.searchMulti("batman", 1))
                 .thenReturn(new TmdbResponseDTO(List.of(movieResult), 1, 3, 40));
-            when(genreRepository.findAllById(List.of(28L, 80L)))
+            when(genreRepository.findByTmdbGenreIdInAndMediaType(List.of(28L, 80L), MediaType.MOVIE))
                 .thenReturn(List.of(
-                    Genre.builder().id(28L).name("Action").build(),
-                    Genre.builder().id(80L).name("Crime").build()
+                    Genre.builder().tmdbGenreId(28L).name("Action").mediaType(MediaType.MOVIE).build(),
+                    Genre.builder().tmdbGenreId(80L).name("Crime").mediaType(MediaType.MOVIE).build()
                 ));
 
             PaginatedSearchResponseDTO result = searchService.search("batman", 1);
@@ -101,8 +102,8 @@ class SearchServiceTest {
 
             when(tmdbClient.searchMulti("batman", 1))
                 .thenReturn(new TmdbResponseDTO(List.of(tvResult), 1, 2, 12));
-            when(genreRepository.findAllById(List.of(16L)))
-                .thenReturn(List.of(Genre.builder().id(16L).name("Animation").build()));
+            when(genreRepository.findByTmdbGenreIdInAndMediaType(List.of(16L), MediaType.SHOW))
+                .thenReturn(List.of(Genre.builder().tmdbGenreId(16L).name("Animation").mediaType(MediaType.SHOW).build()));
 
             PaginatedSearchResponseDTO result = searchService.search("batman", 1);
 
@@ -199,6 +200,40 @@ class SearchServiceTest {
             assertNotNull(result);
             assertEquals(List.of(), result.getSearchResults());
             assertEquals(0, result.getTotalResults());
+        }
+
+        @Test
+        void search_WhenMovieAndShowShareGenreIds_UsesTypedLookupForEachResult() {
+            TmdbMovieDTO movieResult = tmdbMovie("""
+                {
+                  "id": 6,
+                  "media_type": "movie",
+                  "title": "Shared Genre Movie",
+                  "overview": "Movie overview.",
+                  "genre_ids": [18]
+                }
+                """);
+            TmdbMovieDTO showResult = tmdbMovie("""
+                {
+                  "id": 7,
+                  "media_type": "tv",
+                  "name": "Shared Genre Show",
+                  "overview": "Show overview.",
+                  "genre_ids": [18]
+                }
+                """);
+
+            when(tmdbClient.searchMulti("shared", 1))
+                .thenReturn(new TmdbResponseDTO(List.of(movieResult, showResult), 1, 1, 2));
+            when(genreRepository.findByTmdbGenreIdInAndMediaType(List.of(18L), MediaType.MOVIE))
+                .thenReturn(List.of(Genre.builder().tmdbGenreId(18L).name("Drama Movie").mediaType(MediaType.MOVIE).build()));
+            when(genreRepository.findByTmdbGenreIdInAndMediaType(List.of(18L), MediaType.SHOW))
+                .thenReturn(List.of(Genre.builder().tmdbGenreId(18L).name("Drama Show").mediaType(MediaType.SHOW).build()));
+
+            PaginatedSearchResponseDTO result = searchService.search("shared", 1);
+
+            assertEquals(List.of("Drama Movie"), result.getSearchResults().get(0).getGenres());
+            assertEquals(List.of("Drama Show"), result.getSearchResults().get(1).getGenres());
         }
 
         private TmdbMovieDTO tmdbMovie(String json) {

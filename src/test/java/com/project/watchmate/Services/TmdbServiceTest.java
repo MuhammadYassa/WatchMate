@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +26,7 @@ import com.project.watchmate.Dto.TmdbMovieDTO;
 import com.project.watchmate.Dto.TmdbEpisodeSummaryDTO;
 import com.project.watchmate.Dto.TmdbTvDetailsDTO;
 import com.project.watchmate.Exception.MediaNotFoundException;
+import com.project.watchmate.Models.Genre;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Repositories.GenreRepository;
@@ -56,6 +58,7 @@ class TmdbServiceTest {
             .overview("Overview")
             .posterPath("/path")
             .voteAverage(8.0)
+            .genreIds(List.of(28L))
             .genres(List.of())
             .build();
     }
@@ -68,7 +71,14 @@ class TmdbServiceTest {
         void fetchMediaByTmdbId_WhenSuccess_ReturnsMappedMedia() {
             when(tmdbClient.fetchMediaById(TMDB_ID, MediaType.MOVIE))
             .thenReturn(tmdbMovieDto);
-            when(genreRepository.findAllById(any())).thenReturn(List.of());
+            when(genreRepository.findByTmdbGenreIdInAndMediaType(any(), any())).thenReturn(List.of(
+                Genre.builder()
+                    .tmdbGenreId(28L)
+                    .name("Action")
+                    .mediaType(MediaType.MOVIE)
+                    .syncedAt(LocalDateTime.now())
+                    .build()
+            ));
 
             Media result = tmdbService.fetchMediaByTmdbId(TMDB_ID, MediaType.MOVIE);
 
@@ -76,6 +86,7 @@ class TmdbServiceTest {
             assertEquals(TMDB_ID, result.getTmdbId());
             assertEquals("Test Movie", result.getTitle());
             assertEquals(MediaType.MOVIE, result.getType());
+            assertEquals(List.of("Action"), result.getGenres().stream().map(Genre::getName).toList());
         }
 
         @Test

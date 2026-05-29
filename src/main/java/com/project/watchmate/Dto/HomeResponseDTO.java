@@ -27,6 +27,9 @@ public class HomeResponseDTO {
 
     private List<DiscoveryMediaItemDTO> recommendedLater;
 
-    @Schema(description = "Distinct locally cached genre names.")
-    private List<String> genres;
+    @Schema(description = "Locally cached movie genres ordered by name.")
+    private List<String> movieGenres;
+
+    @Schema(description = "Locally cached show genres ordered by name.")
+    private List<String> showGenres;
 }

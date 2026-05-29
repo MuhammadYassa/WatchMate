@@ -11,9 +11,9 @@ import com.project.watchmate.Dto.GenreBrowseResponseDTO;
 import com.project.watchmate.Dto.TmdbResponseDTO;
 import com.project.watchmate.Exception.GenreNotFoundException;
 import com.project.watchmate.Mappers.WatchMateMapper;
-import com.project.watchmate.Models.GenreLookup;
+import com.project.watchmate.Models.Genre;
 import com.project.watchmate.Models.MediaType;
-import com.project.watchmate.Repositories.GenreLookupRepository;
+import com.project.watchmate.Repositories.GenreRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -21,7 +21,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class GenreBrowseService {
 
-    private final GenreLookupRepository genreLookupRepository;
+    private final GenreRepository genreRepository;
 
     private final TmdbClient tmdbClient;
 
@@ -36,10 +36,10 @@ public class GenreBrowseService {
     }
 
     private GenreBrowseResponseDTO browse(String genreName, MediaType mediaType, String tmdbType, int page, int size) {
-        GenreLookup genreLookup = genreLookupRepository.findByNameIgnoreCaseAndMediaType(Objects.requireNonNull(genreName, "genreName"), mediaType)
+        Genre genre = genreRepository.findCurrentByNameIgnoreCaseAndMediaType(Objects.requireNonNull(genreName, "genreName"), mediaType)
             .orElseThrow(() -> new GenreNotFoundException("Genre not found: " + genreName));
 
-        TmdbResponseDTO response = tmdbClient.discoverByGenre(tmdbType, genreLookup.getTmdbGenreId(), page);
+        TmdbResponseDTO response = tmdbClient.discoverByGenre(tmdbType, genre.getTmdbGenreId(), page);
         List<DiscoveryMediaItemDTO> results = response == null || response.getResults() == null
             ? List.of()
             : response.getResults().stream()
@@ -48,7 +48,7 @@ public class GenreBrowseService {
                 .toList();
 
         return GenreBrowseResponseDTO.builder()
-            .genre(genreLookup.getName())
+            .genre(genre.getName())
             .mediaType(mediaType)
             .results(results)
             .currentPage(response == null ? page : response.getPage())
