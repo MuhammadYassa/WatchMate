@@ -9,6 +9,8 @@ import org.hibernate.annotations.BatchSize;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -54,6 +56,10 @@ public class UserShowProgress {
 
     @Column(name = "watch_position_episode")
     private Integer watchPositionEpisode;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tracking_state")
+    private ShowTrackingState trackingState;
 
     @Builder.Default
     @Column(nullable = false)

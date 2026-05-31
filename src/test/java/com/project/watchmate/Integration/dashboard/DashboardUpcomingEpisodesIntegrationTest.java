@@ -84,9 +84,20 @@ class DashboardUpcomingEpisodesIntegrationTest extends AbstractIntegrationTest {
             .type(MediaType.SHOW)
             .nextEpisodeAirDate(LocalDate.of(2099, 1, 3))
             .build());
+        Media caughtUpShow = mediaRepository.save(Media.builder()
+            .tmdbId(8008L)
+            .title("Caught Up Show")
+            .type(MediaType.SHOW)
+            .nextEpisodeSeasonNumber(4)
+            .nextEpisodeEpisodeNumber(2)
+            .nextEpisodeName("Return")
+            .nextEpisodeAirDate(LocalDate.of(2099, 1, 20))
+            .tmdbShowStatus("Returning Series")
+            .build());
 
         saveStatus(user, firstUpcomingShow, WatchStatus.WATCHING);
         saveStatus(user, secondUpcomingShow, WatchStatus.TO_WATCH);
+        saveStatus(user, caughtUpShow, WatchStatus.UP_TO_DATE);
         saveStatus(user, noAirDateShow, WatchStatus.WATCHING);
         saveStatus(user, alreadyAiredShow, WatchStatus.WATCHING);
         saveStatus(user, movie, WatchStatus.WATCHING);
@@ -96,7 +107,7 @@ class DashboardUpcomingEpisodesIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/dashboard/upcoming-episodes")
             .header("Authorization", bearerToken(user)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.items.length()").value(2))
+            .andExpect(jsonPath("$.items.length()").value(3))
             .andExpect(jsonPath("$.items[0].tmdbId").value(8001))
             .andExpect(jsonPath("$.items[0].type").value("SHOW"))
             .andExpect(jsonPath("$.items[0].title").value("First Upcoming Show"))
@@ -107,8 +118,10 @@ class DashboardUpcomingEpisodesIntegrationTest extends AbstractIntegrationTest {
             .andExpect(jsonPath("$.items[0].nextEpisodeName").value("First Episode"))
             .andExpect(jsonPath("$.items[0].nextEpisodeAirDate").value("2099-01-10"))
             .andExpect(jsonPath("$.items[0].tmdbShowStatus").value("Returning Series"))
-            .andExpect(jsonPath("$.items[1].tmdbId").value(8002))
-            .andExpect(jsonPath("$.items[1].nextEpisodeAirDate").value("2099-02-01"));
+            .andExpect(jsonPath("$.items[1].tmdbId").value(8008))
+            .andExpect(jsonPath("$.items[1].nextEpisodeAirDate").value("2099-01-20"))
+            .andExpect(jsonPath("$.items[2].tmdbId").value(8002))
+            .andExpect(jsonPath("$.items[2].nextEpisodeAirDate").value("2099-02-01"));
 
         verifyNoInteractions(tmdbClient);
     }

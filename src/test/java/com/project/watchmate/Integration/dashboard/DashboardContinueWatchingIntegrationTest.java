@@ -50,6 +50,7 @@ class DashboardContinueWatchingIntegrationTest extends AbstractIntegrationTest {
             .build());
         Media watchedMovie = saveMedia(7003L, "Completed Movie", MediaType.MOVIE);
         Media otherUsersShow = saveMedia(7004L, "Other User Show", MediaType.SHOW);
+        Media caughtUpShow = saveMedia(7005L, "Caught Up Show", MediaType.SHOW);
 
         saveStatus(user, show, WatchStatus.WATCHING, 2, 3,
             LocalDateTime.of(2026, 5, 11, 10, 30),
@@ -60,6 +61,9 @@ class DashboardContinueWatchingIntegrationTest extends AbstractIntegrationTest {
         saveStatus(user, watchedMovie, WatchStatus.WATCHED, null, null,
             null,
             LocalDateTime.of(2026, 5, 12, 8, 0));
+        saveStatus(user, caughtUpShow, WatchStatus.UP_TO_DATE, 3, 8,
+            LocalDateTime.of(2026, 5, 12, 9, 0),
+            LocalDateTime.of(2026, 5, 12, 9, 0));
         saveStatus(otherUser, otherUsersShow, WatchStatus.WATCHING, 1, 2,
             LocalDateTime.of(2026, 5, 12, 11, 0),
             LocalDateTime.of(2026, 5, 12, 11, 0));
@@ -103,6 +107,7 @@ class DashboardContinueWatchingIntegrationTest extends AbstractIntegrationTest {
         Media movieUpdatedMostRecently = saveMedia(7101L, "Newest Update", MediaType.MOVIE);
         Media showWatchedSecond = saveMedia(7102L, "Second Item", MediaType.SHOW);
         Media movieOldest = saveMedia(7103L, "Oldest Item", MediaType.MOVIE);
+        Media caughtUpExcluded = saveMedia(7104L, "Caught Up Excluded", MediaType.SHOW);
 
         saveStatus(user, movieOldest, WatchStatus.WATCHING, null, null,
             null,
@@ -113,6 +118,9 @@ class DashboardContinueWatchingIntegrationTest extends AbstractIntegrationTest {
         saveStatus(user, movieUpdatedMostRecently, WatchStatus.WATCHING, null, null,
             null,
             LocalDateTime.of(2026, 5, 11, 7, 0));
+        saveStatus(user, caughtUpExcluded, WatchStatus.UP_TO_DATE, 2, 8,
+            LocalDateTime.of(2026, 5, 11, 8, 0),
+            LocalDateTime.of(2026, 5, 11, 8, 0));
 
         mockMvc.perform(get("/api/v1/dashboard/continue-watching")
             .header("Authorization", bearerToken(user)))

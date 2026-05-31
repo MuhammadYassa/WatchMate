@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 @Schema(name = "UpdateShowProgressRequest", description = "Payload used to update summary progress for a show.")
 public class UpdateShowProgressRequestDTO {
 
-    @Schema(description = "Optional desired status. The server normalizes this to remain consistent with show progress.", allowableValues = {"TO_WATCH", "WATCHING", "WATCHED", "NONE"})
+    @Schema(description = "Optional desired status. The server normalizes this to remain consistent with show progress and may return UP_TO_DATE for caught-up ongoing shows.", allowableValues = {"TO_WATCH", "WATCHING", "WATCHED", "UP_TO_DATE", "NONE"})
     private String status;
 
     @NotNull

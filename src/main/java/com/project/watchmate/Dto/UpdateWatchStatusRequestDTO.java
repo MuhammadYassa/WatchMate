@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 public class UpdateWatchStatusRequestDTO {
 
 	@NotBlank
-    @Schema(description = "Desired watch status.", example = "WATCHED", allowableValues = {"TO_WATCH", "WATCHING", "WATCHED", "NONE"})
+    @Schema(description = "Desired watch status. Shows additionally accept UP_TO_DATE.", example = "WATCHED", allowableValues = {"TO_WATCH", "WATCHING", "WATCHED", "UP_TO_DATE", "NONE"})
 	private String status;
 
 }

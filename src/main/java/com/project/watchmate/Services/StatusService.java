@@ -22,8 +22,14 @@ public class StatusService {
 
 	private final UserMediaStatusRepository userMediaStatusRepository;
 
+	private final ShowProgressService showProgressService;
+
 	public UserMediaStatusDTO updateWatchStatus(Users user, Long tmdbId, MediaType mediaType, UpdateWatchStatusRequestDTO request) {
-		WatchStatus desiredStatus = parseWatchStatus(request.getStatus());
+		if (mediaType == MediaType.SHOW) {
+			return showProgressService.updateShowStatus(user, tmdbId, mediaType, request);
+		}
+
+		WatchStatus desiredStatus = parseMovieWatchStatus(request.getStatus());
 		Media media = mediaResolutionService.resolveMediaByTmdbId(tmdbId, mediaType);
 
 		UserMediaStatus userMediaStatus = userMediaStatusRepository.findByUserAndMedia(user, media)
@@ -42,7 +48,7 @@ public class StatusService {
 				.build();
 	}
 
-	private WatchStatus parseWatchStatus(String statusString) {
+	private WatchStatus parseMovieWatchStatus(String statusString) {
 		if (statusString == null) {
 			throw new InvalidWatchStatusException("Status must be provided.");
 		}

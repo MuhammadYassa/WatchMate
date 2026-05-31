@@ -9,6 +9,8 @@ import com.project.watchmate.Models.ShowEpisode;
 
 public interface ShowEpisodeRepository extends JpaRepository<ShowEpisode, Long> {
 
+    List<ShowEpisode> findAllByMediaIdOrderBySeasonNumberAscEpisodeNumberAsc(Long mediaId);
+
     List<ShowEpisode> findAllByMediaIdAndSeasonNumberOrderByEpisodeNumberAsc(Long mediaId, Integer seasonNumber);
 
     Optional<ShowEpisode> findByMediaIdAndSeasonNumberAndEpisodeNumber(Long mediaId, Integer seasonNumber, Integer episodeNumber);

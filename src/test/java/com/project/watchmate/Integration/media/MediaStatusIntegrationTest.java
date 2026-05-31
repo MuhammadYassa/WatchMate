@@ -47,6 +47,21 @@ class MediaStatusIntegrationTest extends AbstractIntegrationTest {
 		assertThat(userMediaStatusRepository.findByUserAndMedia(user, media)).isEmpty();
 	}
 
+	@Test
+	void movieStatus_upToDate_returns400() throws Exception {
+		Users user = saveUser("movie-up-to-date-user", true);
+		Media media = saveMedia(8003L, "Movie", com.project.watchmate.Models.MediaType.MOVIE);
+
+		mockMvc.perform(put("/api/v1/movies/{tmdbId}/status", media.getTmdbId())
+			.header("Authorization", bearerToken(user))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(watchStatusBody("UP_TO_DATE")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVALID_WATCH_STATUS"));
+
+		assertThat(userMediaStatusRepository.findByUserAndMedia(user, media)).isEmpty();
+	}
+
 	private String watchStatusBody(String status) {
 		return """
 			{"status":"%s"}

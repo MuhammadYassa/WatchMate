@@ -14,6 +14,7 @@ import com.project.watchmate.Dto.TmdbMovieDTO;
 import com.project.watchmate.Dto.TmdbTvDetailsDTO;
 import com.project.watchmate.Dto.TmdbTvEpisodeDTO;
 import com.project.watchmate.Dto.TmdbTvSeasonDTO;
+import com.project.watchmate.Dto.TmdbTvSeasonSummaryDTO;
 import com.project.watchmate.Mappers.ShowMetadataMapper;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
@@ -95,6 +96,27 @@ public class ShowMetadataService {
         TmdbTvSeasonDTO seasonDetails = tmdbService.fetchTvSeasonDetails(tmdbId, seasonNumber);
         CachedSeasonData cachedData = cacheSeasonDetails(media, seasonNumber, seasonDetails);
         return showMetadataMapper.mapToShowSeasonDetails(tmdbId, cachedData.season(), cachedData.episodes());
+    }
+
+    @Transactional
+    public List<ShowEpisode> ensureStandardEpisodesCached(Media media, Long tmdbId, TmdbTvDetailsDTO tvDetails) {
+        for (TmdbTvSeasonSummaryDTO seasonSummary : tvDetails.getSeasons()) {
+            Integer seasonNumber = seasonSummary.getSeasonNumber();
+            if (seasonNumber == null || seasonNumber <= 0) {
+                continue;
+            }
+
+            ShowSeason cachedSeason = showSeasonRepository.findByMediaIdAndSeasonNumber(media.getId(), seasonNumber).orElse(null);
+            List<ShowEpisode> cachedEpisodes = showEpisodeRepository.findAllByMediaIdAndSeasonNumberOrderByEpisodeNumberAsc(media.getId(), seasonNumber);
+            if (isFreshSeasonCache(cachedSeason, cachedEpisodes)) {
+                continue;
+            }
+
+            TmdbTvSeasonDTO seasonDetails = tmdbService.fetchTvSeasonDetails(tmdbId, seasonNumber);
+            cacheSeasonDetails(media, seasonNumber, seasonDetails);
+        }
+
+        return showEpisodeRepository.findAllByMediaIdOrderBySeasonNumberAscEpisodeNumberAsc(media.getId());
     }
 
     public MediaType validateShowType(MediaType mediaType) {

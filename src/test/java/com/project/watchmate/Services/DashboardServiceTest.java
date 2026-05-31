@@ -17,10 +17,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.project.watchmate.Dto.CalendarResponseDTO;
+import com.project.watchmate.Dto.ContinueWatchingResponseDTO;
 import com.project.watchmate.Dto.UpcomingEpisodesResponseDTO;
 import com.project.watchmate.Mappers.DashboardMapper;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
+import com.project.watchmate.Models.UserShowProgress;
 import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
@@ -39,6 +41,32 @@ class DashboardServiceTest {
     @BeforeEach
     void setUp() {
         dashboardService = new DashboardService(userMediaStatusRepository, dashboardMapper);
+    }
+
+    @Test
+    void getContinueWatching_onlyRequestsWatchingStatuses() {
+        Users user = Users.builder().id(99L).username("continue-user").build();
+        UserMediaStatus watchingStatus = UserMediaStatus.builder()
+            .user(user)
+            .status(WatchStatus.WATCHING)
+            .media(Media.builder().tmdbId(9100L).title("Active Show").type(MediaType.SHOW).build())
+            .showProgress(UserShowProgress.builder().currentSeasonNumber(1).currentEpisodeNumber(2).build())
+            .build();
+
+        when(userMediaStatusRepository.findContinueWatchingByUser(
+            eq(user),
+            eq(List.of(WatchStatus.WATCHING)),
+            any()))
+            .thenReturn(List.of(watchingStatus));
+
+        ContinueWatchingResponseDTO result = dashboardService.getContinueWatching(user, 10);
+
+        assertEquals(1, result.getItems().size());
+        assertEquals(WatchStatus.WATCHING, result.getItems().get(0).getWatchStatus());
+        verify(userMediaStatusRepository).findContinueWatchingByUser(
+            eq(user),
+            eq(List.of(WatchStatus.WATCHING)),
+            any());
     }
 
     @Test
@@ -76,7 +104,7 @@ class DashboardServiceTest {
 
         when(userMediaStatusRepository.findUpcomingEpisodesByUser(
             eq(user),
-            eq(List.of(WatchStatus.WATCHING, WatchStatus.TO_WATCH)),
+            eq(List.of(WatchStatus.WATCHING, WatchStatus.UP_TO_DATE, WatchStatus.TO_WATCH)),
             any(LocalDate.class)))
             .thenReturn(List.of(firstStatus, secondStatus));
 
@@ -92,7 +120,7 @@ class DashboardServiceTest {
 
         verify(userMediaStatusRepository).findUpcomingEpisodesByUser(
             eq(user),
-            eq(List.of(WatchStatus.WATCHING, WatchStatus.TO_WATCH)),
+            eq(List.of(WatchStatus.WATCHING, WatchStatus.UP_TO_DATE, WatchStatus.TO_WATCH)),
             any(LocalDate.class));
     }
 
@@ -101,7 +129,7 @@ class DashboardServiceTest {
         Users user = Users.builder().id(2L).username("dashboard-empty").build();
         when(userMediaStatusRepository.findUpcomingEpisodesByUser(
             eq(user),
-            eq(List.of(WatchStatus.WATCHING, WatchStatus.TO_WATCH)),
+            eq(List.of(WatchStatus.WATCHING, WatchStatus.UP_TO_DATE, WatchStatus.TO_WATCH)),
             any(LocalDate.class)))
             .thenReturn(List.of());
 
@@ -135,7 +163,7 @@ class DashboardServiceTest {
 
         when(userMediaStatusRepository.findCalendarItemsByUser(
             user,
-            List.of(WatchStatus.WATCHING, WatchStatus.TO_WATCH),
+            List.of(WatchStatus.WATCHING, WatchStatus.UP_TO_DATE, WatchStatus.TO_WATCH),
             from,
             to))
             .thenReturn(List.of(status));

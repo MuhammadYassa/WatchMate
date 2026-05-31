@@ -25,6 +25,10 @@ public interface CuratedContentRepository extends JpaRepository<CuratedContent, 
 
     long countByCategoryKey(CuratedContentCategory categoryKey);
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        delete from CuratedContent curatedContent
+        where curatedContent.categoryKey = :categoryKey
+        """)
     void deleteByCategoryKey(CuratedContentCategory categoryKey);
 }

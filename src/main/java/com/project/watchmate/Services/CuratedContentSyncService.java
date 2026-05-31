@@ -235,6 +235,7 @@ public class CuratedContentSyncService {
 
     private void replaceBucket(CuratedContentCategory category, List<Media> mediaItems, LocalDateTime syncedAt) {
         curatedContentRepository.deleteByCategoryKey(category);
+        curatedContentRepository.flush();
         curatedContentRepository.saveAll(
             IntStream.range(0, mediaItems.size())
                 .mapToObj(index -> CuratedContent.builder()

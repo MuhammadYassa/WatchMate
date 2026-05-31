@@ -28,7 +28,11 @@ public class DashboardService {
 
     private static final List<WatchStatus> CONTINUE_WATCHING_STATUSES = List.of(WatchStatus.WATCHING);
 
-    private static final List<WatchStatus> UPCOMING_EPISODE_TRACKING_STATUSES = List.of(WatchStatus.WATCHING, WatchStatus.TO_WATCH);
+    private static final List<WatchStatus> UPCOMING_EPISODE_TRACKING_STATUSES = List.of(
+        WatchStatus.WATCHING,
+        WatchStatus.UP_TO_DATE,
+        WatchStatus.TO_WATCH
+    );
 
     private final UserMediaStatusRepository userMediaStatusRepository;
 

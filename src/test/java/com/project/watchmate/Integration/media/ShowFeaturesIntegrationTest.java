@@ -5,8 +5,8 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -286,6 +286,7 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
                 .genres(List.of())
                 .build());
         when(tmdbClient.fetchTvDetailsById(eq(9200L))).thenReturn(tmdbTvDetailsWithId(9200L));
+        when(tmdbClient.fetchTvSeasonDetails(eq(9200L), eq(1))).thenReturn(seasonOne());
         when(tmdbClient.fetchTvSeasonDetails(eq(9200L), eq(2))).thenReturn(seasonTwo());
 
         mockMvc.perform(put("/api/v1/shows/{tmdbId}/progress", 9200L)
@@ -296,7 +297,7 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
                 """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.tmdbId").value(9200))
-            .andExpect(jsonPath("$.status").value("NONE"))
+            .andExpect(jsonPath("$.status").value("WATCHING"))
             .andExpect(jsonPath("$.currentSeasonNumber").doesNotExist())
             .andExpect(jsonPath("$.currentEpisodeNumber").doesNotExist())
             .andExpect(jsonPath("$.watchPositionSeason").value(2))
@@ -308,12 +309,15 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
         UserMediaStatus persistedStatus = userMediaStatusRepository.findByUserAndMedia(user, imported).orElseThrow();
         UserShowProgress persistedProgress = userShowProgressRepository.findByUserAndMedia(user, imported).orElseThrow();
         assertThat(imported.getNextEpisodeName()).isEqualTo("Next Episode");
-        assertThat(persistedStatus.getStatus()).isEqualTo(WatchStatus.NONE);
+        assertThat(persistedStatus.getStatus()).isEqualTo(WatchStatus.WATCHING);
         assertThat(persistedProgress.getWatchPositionSeason()).isEqualTo(2);
         assertThat(persistedProgress.getWatchPositionEpisode()).isEqualTo(1);
         assertThat(persistedProgress.getEpisodesWatchedCount()).isZero();
-        assertThat(showSeasonRepository.findAllByMediaIdOrderBySeasonNumberAsc(imported.getId())).isEmpty();
-        assertThat(showEpisodeRepository.findAllByMediaIdAndSeasonNumberOrderByEpisodeNumberAsc(imported.getId(), 2)).isEmpty();
+        assertThat(persistedProgress.getTrackingState()).isEqualTo(com.project.watchmate.Models.ShowTrackingState.WATCHING);
+        assertThat(showSeasonRepository.findAllByMediaIdOrderBySeasonNumberAsc(imported.getId()))
+            .extracting(ShowSeason::getSeasonNumber)
+            .containsExactly(1, 2);
+        assertThat(showEpisodeRepository.findAllByMediaIdAndSeasonNumberOrderByEpisodeNumberAsc(imported.getId(), 2)).hasSize(3);
     }
 
     @Test
@@ -322,6 +326,7 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
         saveMedia(9300L, "Existing Show", MediaType.SHOW);
         when(tmdbClient.fetchTvDetailsById(eq(9300L))).thenReturn(tmdbTvDetailsWithId(9300L));
         when(tmdbClient.fetchTvSeasonDetails(eq(9300L), eq(1))).thenReturn(seasonOne());
+        when(tmdbClient.fetchTvSeasonDetails(eq(9300L), eq(2))).thenReturn(seasonTwo());
 
         mockMvc.perform(put("/api/v1/shows/{tmdbId}/episodes/{seasonNumber}/{episodeNumber}", 9300L, 1, 1)
             .header("Authorization", bearerToken(user))
@@ -336,6 +341,86 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
 
         Media media = mediaRepository.findByTmdbIdAndType(9300L, MediaType.SHOW).orElseThrow();
         assertThat(userMediaStatusRepository.findByUserAndMedia(user, media)).isEmpty();
+    }
+
+    @Test
+    void updateShowStatus_watchedForOngoingShow_materializesEpisodeProgressAndReturnsUpToDate() throws Exception {
+        Users user = saveUser("show-status-ongoing-user", true);
+        when(tmdbClient.fetchMediaById(eq(9500L), eq(MediaType.SHOW)))
+            .thenReturn(TmdbMovieDTO.builder()
+                .id(9500L)
+                .title("Ongoing Show")
+                .overview("Show overview")
+                .posterPath("/ongoing.jpg")
+                .releaseDate("2020-01-01")
+                .genres(List.of())
+                .build());
+        when(tmdbClient.fetchTvDetailsById(eq(9500L))).thenReturn(tmdbTvDetailsWithId(9500L));
+        when(tmdbClient.fetchTvSeasonDetails(eq(9500L), eq(1))).thenReturn(seasonOne());
+        when(tmdbClient.fetchTvSeasonDetails(eq(9500L), eq(2))).thenReturn(seasonTwo());
+
+        mockMvc.perform(put("/api/v1/shows/{tmdbId}/status", 9500L)
+            .header("Authorization", bearerToken(user))
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .content("""
+                {"status":"WATCHED"}
+                """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tmdbId").value(9500))
+            .andExpect(jsonPath("$.status").value("UP_TO_DATE"));
+
+        Media imported = mediaRepository.findByTmdbIdAndType(9500L, MediaType.SHOW).orElseThrow();
+        UserMediaStatus persistedStatus = userMediaStatusRepository.findByUserAndMedia(user, imported).orElseThrow();
+        UserShowProgress persistedProgress = userShowProgressRepository.findByUserAndMedia(user, imported).orElseThrow();
+
+        assertThat(persistedStatus.getStatus()).isEqualTo(WatchStatus.UP_TO_DATE);
+        assertThat(persistedProgress.getEpisodesWatchedCount()).isEqualTo(4);
+        assertThat(userEpisodeProgressRepository.findByUserShowProgressAndWatchedTrueOrderBySeasonNumberAscEpisodeNumberAsc(persistedProgress))
+            .extracting(UserEpisodeProgress::getSeasonNumber, UserEpisodeProgress::getEpisodeNumber)
+            .containsExactly(
+                org.assertj.core.groups.Tuple.tuple(1, 1),
+                org.assertj.core.groups.Tuple.tuple(1, 2),
+                org.assertj.core.groups.Tuple.tuple(2, 1),
+                org.assertj.core.groups.Tuple.tuple(2, 2)
+            );
+    }
+
+    @Test
+    void updateShowStatus_none_clearsSummaryAndProgressRows() throws Exception {
+        Users user = saveUser("show-status-clear-user", true);
+        Media show = saveMedia(9501L, "Clearable Show", MediaType.SHOW);
+        UserShowProgress progress = UserShowProgress.builder()
+            .user(user)
+            .media(show)
+            .trackingState(com.project.watchmate.Models.ShowTrackingState.WATCHING)
+            .episodeProgress(new java.util.ArrayList<>())
+            .episodesWatchedCount(1)
+            .build();
+        progress.getEpisodeProgress().add(UserEpisodeProgress.builder()
+            .userShowProgress(progress)
+            .seasonNumber(1)
+            .episodeNumber(1)
+            .watched(true)
+            .build());
+        userShowProgressRepository.save(progress);
+        userMediaStatusRepository.save(UserMediaStatus.builder()
+            .user(user)
+            .media(show)
+            .status(WatchStatus.WATCHING)
+            .build());
+
+        mockMvc.perform(put("/api/v1/shows/{tmdbId}/status", 9501L)
+            .header("Authorization", bearerToken(user))
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .content("""
+                {"status":"NONE"}
+                """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("NONE"));
+
+        assertThat(userMediaStatusRepository.findByUserAndMedia(user, show)).isEmpty();
+        assertThat(userShowProgressRepository.findByUserAndMedia(user, show)).isEmpty();
+        assertThat(userEpisodeProgressRepository.findAll()).isEmpty();
     }
 
     private TmdbTvDetailsDTO tmdbTvDetails() {

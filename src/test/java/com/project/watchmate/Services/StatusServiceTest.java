@@ -11,8 +11,6 @@ import static org.mockito.Mockito.when;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -38,69 +36,74 @@ class StatusServiceTest {
     @Mock
     private UserMediaStatusRepository userMediaStatusRepository;
 
+    @Mock
+    private ShowProgressService showProgressService;
+
     @InjectMocks
     private StatusService statusService;
 
     private Users user;
-    private Media media;
+    private Media movie;
     private static final Long TMDB_ID = 100L;
 
     @BeforeEach
     void setUp() {
         user = Users.builder().id(1L).username("user").build();
-        media = Media.builder().id(1L).tmdbId(TMDB_ID).title("Movie").build();
+        movie = Media.builder().id(1L).tmdbId(TMDB_ID).title("Movie").type(MediaType.MOVIE).build();
     }
 
-    @Nested
-    @DisplayName("Update Watch Status Tests")
-    class UpdateWatchStatusTests {
+    @Test
+    void updateWatchStatus_whenMovieStatusValid_savesAndReturnsDto() {
+        UpdateWatchStatusRequestDTO request = UpdateWatchStatusRequestDTO.builder().status("WATCHED").build();
+        when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, MediaType.MOVIE)).thenReturn(movie);
+        UserMediaStatus status = UserMediaStatus.builder().user(user).media(movie).status(WatchStatus.NONE).build();
+        when(userMediaStatusRepository.findByUserAndMedia(user, movie)).thenReturn(Optional.of(status));
+        when(userMediaStatusRepository.save(any(UserMediaStatus.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        @Test
-        void updateWatchStatus_WhenValid_SavesAndReturnsDto() {
-            UpdateWatchStatusRequestDTO request = UpdateWatchStatusRequestDTO.builder().status("WATCHED").build();
-            when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, MediaType.MOVIE)).thenReturn(media);
-            UserMediaStatus status = UserMediaStatus.builder().user(user).media(media).status(WatchStatus.NONE).build();
-            when(userMediaStatusRepository.findByUserAndMedia(user, media)).thenReturn(Optional.of(status));
-            when(userMediaStatusRepository.save(any(UserMediaStatus.class))).thenReturn(status);
+        UserMediaStatusDTO result = statusService.updateWatchStatus(user, TMDB_ID, MediaType.MOVIE, request);
 
-            UserMediaStatusDTO result = statusService.updateWatchStatus(user, TMDB_ID, MediaType.MOVIE, request);
+        assertEquals(TMDB_ID, result.getTmdbId());
+        assertEquals(WatchStatus.WATCHED, result.getStatus());
+        verify(userMediaStatusRepository).save(status);
+        verify(showProgressService, never()).updateShowStatus(any(), anyLong(), any(), any());
+    }
 
-            assertEquals(TMDB_ID, result.getTmdbId());
-            assertEquals(WatchStatus.WATCHED, result.getStatus());
-            verify(userMediaStatusRepository).save(status);
-        }
+    @Test
+    void updateWatchStatus_whenMovieStatusIsUpToDate_rejectsRequest() {
+        UpdateWatchStatusRequestDTO request = UpdateWatchStatusRequestDTO.builder().status("UP_TO_DATE").build();
 
-        @Test
-        void updateWatchStatus_WhenNoExistingStatus_CreatesNewAndSaves() {
-            UpdateWatchStatusRequestDTO request = UpdateWatchStatusRequestDTO.builder().status("TO_WATCH").build();
-            when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, MediaType.MOVIE)).thenReturn(media);
-            when(userMediaStatusRepository.findByUserAndMedia(user, media)).thenReturn(Optional.empty());
+        InvalidWatchStatusException exception = assertThrows(InvalidWatchStatusException.class,
+            () -> statusService.updateWatchStatus(user, TMDB_ID, MediaType.MOVIE, request));
 
-            UserMediaStatusDTO result = statusService.updateWatchStatus(user, TMDB_ID, MediaType.MOVIE, request);
+        assertEquals("Invalid status. Allowed: TO_WATCH, WATCHING, WATCHED, NONE", exception.getMessage());
+        verify(mediaResolutionService, never()).resolveMediaByTmdbId(anyLong(), any(MediaType.class));
+        verify(showProgressService, never()).updateShowStatus(any(), anyLong(), any(), any());
+    }
 
-            assertEquals(TMDB_ID, result.getTmdbId());
-            assertEquals(WatchStatus.TO_WATCH, result.getStatus());
-            verify(userMediaStatusRepository).save(any(UserMediaStatus.class));
-        }
+    @Test
+    void updateWatchStatus_whenShowStatusRequested_delegatesToShowProgressService() {
+        UpdateWatchStatusRequestDTO request = UpdateWatchStatusRequestDTO.builder().status("UP_TO_DATE").build();
+        UserMediaStatusDTO delegated = UserMediaStatusDTO.builder()
+            .tmdbId(TMDB_ID)
+            .status(WatchStatus.UP_TO_DATE)
+            .build();
+        when(showProgressService.updateShowStatus(user, TMDB_ID, MediaType.SHOW, request)).thenReturn(delegated);
 
-        @Test
-        void updateWatchStatus_WhenStatusNull_ThrowsInvalidWatchStatusException() {
-            UpdateWatchStatusRequestDTO request = UpdateWatchStatusRequestDTO.builder().status(null).build();
+        UserMediaStatusDTO result = statusService.updateWatchStatus(user, TMDB_ID, MediaType.SHOW, request);
 
-            InvalidWatchStatusException e = assertThrows(InvalidWatchStatusException.class,
-                () -> statusService.updateWatchStatus(user, TMDB_ID, MediaType.MOVIE, request));
-            assertEquals("Status must be provided.", e.getMessage());
-            verify(mediaResolutionService, never()).resolveMediaByTmdbId(anyLong(), any(MediaType.class));
-        }
+        assertEquals(WatchStatus.UP_TO_DATE, result.getStatus());
+        verify(showProgressService).updateShowStatus(user, TMDB_ID, MediaType.SHOW, request);
+        verify(userMediaStatusRepository, never()).save(any());
+    }
 
-        @Test
-        void updateWatchStatus_WhenStatusInvalid_ThrowsInvalidWatchStatusException() {
-            UpdateWatchStatusRequestDTO request = UpdateWatchStatusRequestDTO.builder().status("INVALID").build();
+    @Test
+    void updateWatchStatus_whenStatusNull_throwsInvalidWatchStatusException() {
+        UpdateWatchStatusRequestDTO request = UpdateWatchStatusRequestDTO.builder().status(null).build();
 
-            InvalidWatchStatusException e = assertThrows(InvalidWatchStatusException.class,
-                () -> statusService.updateWatchStatus(user, TMDB_ID, MediaType.MOVIE, request));
-            assertEquals("Invalid status. Allowed: TO_WATCH, WATCHING, WATCHED, NONE", e.getMessage());
-            verify(mediaResolutionService, never()).resolveMediaByTmdbId(anyLong(), any(MediaType.class));
-        }
+        InvalidWatchStatusException exception = assertThrows(InvalidWatchStatusException.class,
+            () -> statusService.updateWatchStatus(user, TMDB_ID, MediaType.MOVIE, request));
+
+        assertEquals("Status must be provided.", exception.getMessage());
+        verify(mediaResolutionService, never()).resolveMediaByTmdbId(anyLong(), any(MediaType.class));
     }
 }

@@ -81,7 +81,7 @@ public class ShowController {
     }
 
     @PutMapping("/{tmdbId}/status")
-    @Operation(summary = "Update show watch status", description = "Updates the authenticated user's watch status for a show.")
+    @Operation(summary = "Update show watch status", description = "Updates the authenticated user's watch status for a show. WATCHED and UP_TO_DATE requests are normalized from real episode progress.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Watch status updated", content = @Content(schema = @Schema(implementation = UserMediaStatusDTO.class))),
@@ -119,7 +119,7 @@ public class ShowController {
     }
 
     @PutMapping("/{tmdbId}/progress")
-    @Operation(summary = "Update show progress", description = "Updates summary progress for a show.")
+    @Operation(summary = "Update show progress", description = "Updates summary progress for a show and normalizes status from synchronized episode progress.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Show progress updated", content = @Content(schema = @Schema(implementation = ShowProgressDTO.class))),
