@@ -1,7 +1,6 @@
 package com.project.watchmate.Services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -24,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.project.watchmate.Exception.InvalidEmailVerificationTokenException;
 import com.project.watchmate.Models.EmailVerificationToken;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Repositories.EmailVerificationTokenRepository;
@@ -103,9 +103,8 @@ public class EmailVerificationTokenServiceTest {
             String token = "missing-token";
             when(tokenRepository.getByToken(token)).thenReturn(Optional.empty());
 
-            boolean verified = emailVerificationTokenService.verifyToken(token);
+            assertThrows(InvalidEmailVerificationTokenException.class, () -> emailVerificationTokenService.verifyToken(token));
 
-            assertFalse(verified);
             verify(usersRepository, never()).save(any(Users.class));
             verify(tokenRepository, never()).delete(any(EmailVerificationToken.class));
         }
@@ -122,9 +121,8 @@ public class EmailVerificationTokenServiceTest {
                     .build();
             when(tokenRepository.getByToken(token)).thenReturn(Optional.of(expiredToken));
 
-            boolean verified = emailVerificationTokenService.verifyToken(token);
+            assertThrows(InvalidEmailVerificationTokenException.class, () -> emailVerificationTokenService.verifyToken(token));
 
-            assertFalse(verified);
             verify(tokenRepository).delete(expiredToken);
             verify(usersRepository, never()).save(any(Users.class));
         }
