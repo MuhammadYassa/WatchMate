@@ -24,6 +24,11 @@ import software.amazon.awssdk.services.ses.model.SesException;
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(InvalidEmailVerificationTokenException.class)
+    public ResponseEntity<ApiError> handleInvalidEmailVerificationToken(InvalidEmailVerificationTokenException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), "INVALID_EMAIL_VERIFICATION_TOKEN", null, ex, request);
+    }
+
     @ExceptionHandler(MediaNotFoundException.class)
     public ResponseEntity<ApiError> handleNotFound(MediaNotFoundException ex, HttpServletRequest request){
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), "MEDIA_NOT_FOUND", null, ex, request);

@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.project.watchmate.Exception.InvalidEmailVerificationTokenException;
 import com.project.watchmate.Models.EmailVerificationToken;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Repositories.EmailVerificationTokenRepository;
@@ -61,14 +62,14 @@ public class EmailVerificationTokenService {
         Optional<EmailVerificationToken> tokenOpt = tokenRepository.getByToken(token);
         if (tokenOpt.isEmpty()){
             log.warn("Email verification failed reason=token_not_found");
-            return false;
+            throw new InvalidEmailVerificationTokenException("Invalid verification token");
         }
         EmailVerificationToken verificationToken = tokenOpt.get();
 
         if (verificationToken.getExpiresAt().isBefore(LocalDateTime.now())){
             tokenRepository.delete(verificationToken);
             log.warn("Email verification failed reason=token_expired username={}", verificationToken.getUser().getUsername());
-            return false;
+            throw new InvalidEmailVerificationTokenException("Verification token expired");
         }
 
         Users user = verificationToken.getUser();
