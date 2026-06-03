@@ -86,7 +86,7 @@ public class EmailVerificationTokenServiceTest {
             .thenReturn(Optional.of(EmailVerificationToken.builder().token(token).expiresAt(expiryDate).user(user).build()));
             when(usersRepository.save(any(Users.class))).thenAnswer(invocation -> invocation.getArgument(0, Users.class));
 
-            Boolean verified = emailVerificationTokenService.verifyToken(token);
+            emailVerificationTokenService.verifyToken(token);
 
             ArgumentCaptor<Users> captor = ArgumentCaptor.forClass(Users.class);
             verify(usersRepository).save(captor.capture());
@@ -95,7 +95,6 @@ public class EmailVerificationTokenServiceTest {
             verify(tokenRepository).delete(any(EmailVerificationToken.class));
             assertNotNull(savedUser);
             assertTrue(savedUser.isEmailVerified());
-            assertTrue(verified);
         }
 
         @Test

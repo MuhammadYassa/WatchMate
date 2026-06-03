@@ -58,7 +58,7 @@ public class EmailVerificationTokenService {
     }
 
     @Transactional
-    public boolean verifyToken(String token){
+    public void verifyToken(String token){
         Optional<EmailVerificationToken> tokenOpt = tokenRepository.getByToken(token);
         if (tokenOpt.isEmpty()){
             log.warn("Email verification failed reason=token_not_found");
@@ -78,8 +78,6 @@ public class EmailVerificationTokenService {
 
         tokenRepository.delete(verificationToken);
         log.info("Email verified username={}", user.getUsername());
-
-        return true;
     }
 
     public void sendVerificationEmail(String toEmail, String token){

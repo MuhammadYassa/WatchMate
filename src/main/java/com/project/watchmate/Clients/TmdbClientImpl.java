@@ -1,9 +1,15 @@
 package com.project.watchmate.Clients;
 
+import java.net.ConnectException;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import com.project.watchmate.Dto.TmdbGenreDTO;
@@ -13,15 +19,20 @@ import com.project.watchmate.Dto.TmdbResponseDTO;
 import com.project.watchmate.Dto.TmdbTvDetailsDTO;
 import com.project.watchmate.Dto.TmdbTvSeasonDTO;
 import com.project.watchmate.Exception.MediaNotFoundException;
+import com.project.watchmate.Exception.TmdbUnavailableException;
 import com.project.watchmate.Models.MediaType;
 
+import io.netty.handler.timeout.ReadTimeoutException;
+import io.netty.handler.timeout.WriteTimeoutException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import reactor.netty.http.client.PrematureCloseException;
 
 @Component
 @Slf4j
 @RequiredArgsConstructor
 public class TmdbClientImpl implements TmdbClient {
+    private static final String TMDB_UNAVAILABLE_MESSAGE = "TMDB is temporarily unavailable. Please try again shortly.";
 
     private final WebClient tmdbWebClient;
 
@@ -36,11 +47,9 @@ public class TmdbClientImpl implements TmdbClient {
 
             return response != null ? response.getGenres() : List.of();
         } catch (WebClientResponseException ex) {
-            log.warn("TMDB genre fetch failed type={} status={}", type, ex.getStatusCode().value());
-            throw ex;
-        } catch (Exception e) {
-            log.warn("TMDB genre fetch failed type={} reason={}", type, e.getClass().getSimpleName());
-            throw e;
+            throw handleWebClientResponseException(ex, "genre fetch", "type=" + type);
+        } catch (Exception ex) {
+            throw handleGenericException(ex, "genre fetch", "type=" + type);
         }
     }
 
@@ -79,11 +88,9 @@ public class TmdbClientImpl implements TmdbClient {
                 .map(TmdbResponseDTO::getResults)
                 .orElse(List.of());
         } catch (WebClientResponseException ex) {
-            log.warn("TMDB list fetch failed label={} status={}", label, ex.getStatusCode().value());
-            throw ex;
+            throw handleWebClientResponseException(ex, "list fetch", "label=" + label);
         } catch (Exception ex) {
-            log.error("TMDB list fetch failed label={}", label, ex);
-            throw ex;
+            throw handleGenericException(ex, "list fetch", "label=" + label);
         }
     }
 
@@ -104,8 +111,9 @@ public class TmdbClientImpl implements TmdbClient {
             log.warn("TMDB media not found tmdbId={} type={}", tmdbId, type);
             throw new MediaNotFoundException("TMDB media not found for ID: " + tmdbId);
         } catch (WebClientResponseException ex) {
-            log.error("TMDB media lookup failed tmdbId={} type={} status={}", tmdbId, type, ex.getStatusCode().value(), ex);
-            throw ex;
+            throw handleWebClientResponseException(ex, "media lookup", "tmdbId=" + tmdbId + " type=" + type);
+        } catch (Exception ex) {
+            throw handleGenericException(ex, "media lookup", "tmdbId=" + tmdbId + " type=" + type);
         }
     }
 
@@ -125,8 +133,9 @@ public class TmdbClientImpl implements TmdbClient {
             log.warn("TMDB show details not found tmdbId={}", tmdbId);
             throw new MediaNotFoundException("TMDB show not found for ID: " + tmdbId);
         } catch (WebClientResponseException ex) {
-            log.error("TMDB show details lookup failed tmdbId={} status={}", tmdbId, ex.getStatusCode().value(), ex);
-            throw ex;
+            throw handleWebClientResponseException(ex, "show details lookup", "tmdbId=" + tmdbId);
+        } catch (Exception ex) {
+            throw handleGenericException(ex, "show details lookup", "tmdbId=" + tmdbId);
         }
     }
 
@@ -146,12 +155,9 @@ public class TmdbClientImpl implements TmdbClient {
             log.warn("TMDB season not found tmdbId={} season={}", tmdbId, seasonNumber);
             throw new MediaNotFoundException("TMDB season not found for show ID: " + tmdbId + " season: " + seasonNumber);
         } catch (WebClientResponseException ex) {
-            log.error("TMDB season lookup failed tmdbId={} season={} status={}",
-                tmdbId,
-                seasonNumber,
-                ex.getStatusCode().value(),
-                ex);
-            throw ex;
+            throw handleWebClientResponseException(ex, "season lookup", "tmdbId=" + tmdbId + " season=" + seasonNumber);
+        } catch (Exception ex) {
+            throw handleGenericException(ex, "season lookup", "tmdbId=" + tmdbId + " season=" + seasonNumber);
         }
     }
 
@@ -169,11 +175,9 @@ public class TmdbClientImpl implements TmdbClient {
                 .bodyToMono(TmdbResponseDTO.class)
                 .block();
         } catch (WebClientResponseException ex) {
-            log.warn("TMDB search failed page={} status={}", page, ex.getStatusCode().value());
-            throw ex;
+            throw handleWebClientResponseException(ex, "search", "page=" + page);
         } catch (Exception ex) {
-            log.error("TMDB search failed page={}", page, ex);
-            throw ex;
+            throw handleGenericException(ex, "search", "page=" + page);
         }
     }
 
@@ -191,15 +195,49 @@ public class TmdbClientImpl implements TmdbClient {
                 .bodyToMono(TmdbResponseDTO.class)
                 .block();
         } catch (WebClientResponseException ex) {
-            log.warn("TMDB discover failed type={} genreId={} page={} status={}",
-                type,
-                genreId,
-                page,
-                ex.getStatusCode().value());
-            throw ex;
+            throw handleWebClientResponseException(ex, "discover", "type=" + type + " genreId=" + genreId + " page=" + page);
         } catch (Exception ex) {
-            log.error("TMDB discover failed type={} genreId={} page={}", type, genreId, page, ex);
-            throw ex;
+            throw handleGenericException(ex, "discover", "type=" + type + " genreId=" + genreId + " page=" + page);
         }
+    }
+
+    private RuntimeException handleWebClientResponseException(WebClientResponseException ex, String operation, String context) {
+        if (ex.getStatusCode().is5xxServerError()) {
+            log.error("TMDB {} unavailable context={} status={}", operation, context, ex.getStatusCode().value(), ex);
+            return new TmdbUnavailableException(TMDB_UNAVAILABLE_MESSAGE, ex);
+        }
+
+        log.warn("TMDB {} failed context={} status={}", operation, context, ex.getStatusCode().value());
+        return ex;
+    }
+
+    private RuntimeException handleGenericException(Exception ex, String operation, String context) {
+        if (ex instanceof WebClientRequestException || isNetworkOrTimeoutFailure(ex)) {
+            log.error("TMDB {} unavailable context={} reason={}", operation, context, ex.getClass().getSimpleName(), ex);
+            return new TmdbUnavailableException(TMDB_UNAVAILABLE_MESSAGE, ex);
+        }
+
+        log.error("TMDB {} failed context={}", operation, context, ex);
+        return ex instanceof RuntimeException runtimeException
+            ? runtimeException
+            : new RuntimeException(ex);
+    }
+
+    private boolean isNetworkOrTimeoutFailure(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof TimeoutException
+                || current instanceof SocketTimeoutException
+                || current instanceof ConnectException
+                || current instanceof UnknownHostException
+                || current instanceof SocketException
+                || current instanceof ReadTimeoutException
+                || current instanceof WriteTimeoutException
+                || current instanceof PrematureCloseException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

@@ -59,6 +59,11 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.UNAUTHORIZED, ex.getMessage(), "INVALID_REFRESH_TOKEN", null, ex, request);
     }
 
+    @ExceptionHandler(TmdbUnavailableException.class)
+    public ResponseEntity<ApiError> handleTmdbUnavailable(TmdbUnavailableException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), "TMDB_UNAVAILABLE", null, ex, request);
+    }
+
     @ExceptionHandler(WatchListNotFoundException.class)
     public ResponseEntity<ApiError> handleWatchlistNotFound(WatchListNotFoundException ex, HttpServletRequest request) {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), "WATCHLIST_NOT_FOUND", null, ex, request);
