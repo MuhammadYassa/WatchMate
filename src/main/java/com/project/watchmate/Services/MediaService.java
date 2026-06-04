@@ -13,12 +13,12 @@ import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.Review;
-import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
 import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.ReviewRepository;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
+import com.project.watchmate.Repositories.UserShowTrackingRepository;
 import com.project.watchmate.Repositories.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -38,6 +38,10 @@ public class MediaService {
     private final ReviewRepository reviewRepository;
 
     private final UserMediaStatusRepository userMediaStatusRepository;
+
+    private final UserShowTrackingRepository userShowTrackingRepository;
+
+    private final UserWatchStatusResolver userWatchStatusResolver;
 
     private final TmdbService tmdbService;
 
@@ -61,7 +65,15 @@ public class MediaService {
 
     public Page<Media> getShowsWatchedPage(Users user){
         Pageable pageable = PageRequest.of(0, 5);
-        return userMediaStatusRepository.findWatchedShowsByUser(user, pageable);
+        return userShowTrackingRepository.findWatchedShowsByUser(user, pageable);
+    }
+
+    public long countMoviesWatched(Users user) {
+        return userMediaStatusRepository.countWatchedMoviesByUser(user);
+    }
+
+    public long countShowsWatched(Users user) {
+        return userShowTrackingRepository.countWatchedShowsByUser(user);
     }
 
     private UserContext resolveUserContext(Users userParam, Media media) {
@@ -74,8 +86,7 @@ public class MediaService {
             .orElseThrow(() -> new RuntimeException("User not found"));
 
         boolean isFavourited = user.getFavorites().contains(media);
-        UserMediaStatus userStatus = userMediaStatusRepository.findByUserAndMedia(user, media).orElse(null);
-        WatchStatus watchStatus = userStatus != null ? userStatus.getStatus() : WatchStatus.NONE;
+        WatchStatus watchStatus = userWatchStatusResolver.resolveWatchStatus(user, media);
 
         return new UserContext(isFavourited, watchStatus);
     }

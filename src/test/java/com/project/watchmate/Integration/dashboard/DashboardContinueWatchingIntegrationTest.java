@@ -12,7 +12,7 @@ import com.project.watchmate.Integration.support.AbstractIntegrationTest;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.UserMediaStatus;
-import com.project.watchmate.Models.UserShowProgress;
+import com.project.watchmate.Models.UserShowTracking;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
 
@@ -78,8 +78,8 @@ class DashboardContinueWatchingIntegrationTest extends AbstractIntegrationTest {
             .andExpect(jsonPath("$.items[0].posterPath").value("/show.jpg"))
             .andExpect(jsonPath("$.items[0].backdropPath").value("/show-bg.jpg"))
             .andExpect(jsonPath("$.items[0].watchStatus").value("WATCHING"))
-            .andExpect(jsonPath("$.items[0].currentSeasonNumber").value(2))
-            .andExpect(jsonPath("$.items[0].currentEpisodeNumber").value(3))
+            .andExpect(jsonPath("$.items[0].resumeSeasonNumber").value(2))
+            .andExpect(jsonPath("$.items[0].resumeEpisodeNumber").value(3))
             .andExpect(jsonPath("$.items[0].nextSeasonNumber").value(2))
             .andExpect(jsonPath("$.items[0].nextEpisodeNumber").value(4))
             .andExpect(jsonPath("$.items[0].lastWatchedAt").value("2026-05-11T10:30:00"))
@@ -135,28 +135,31 @@ class DashboardContinueWatchingIntegrationTest extends AbstractIntegrationTest {
         Users user,
         Media media,
         WatchStatus watchStatus,
-        Integer currentSeasonNumber,
-        Integer currentEpisodeNumber,
+        Integer watchPositionSeason,
+        Integer watchPositionEpisode,
         LocalDateTime lastWatchedAt,
         LocalDateTime updatedAt
     ) {
+        if (media.getType() == MediaType.SHOW) {
+            userShowTrackingRepository.save(UserShowTracking.builder()
+                .user(user)
+                .media(media)
+                .status(watchStatus)
+                .watchPositionSeason(watchPositionSeason)
+                .watchPositionEpisode(watchPositionEpisode)
+                .episodesWatchedCount(watchPositionEpisode == null ? 0 : watchPositionEpisode)
+                .seasonsCompletedCount(0)
+                .lastWatchedAt(lastWatchedAt)
+                .updatedAt(updatedAt)
+                .build());
+            return;
+        }
+
         userMediaStatusRepository.save(UserMediaStatus.builder()
             .user(user)
             .media(media)
             .status(watchStatus)
             .updatedAt(updatedAt)
             .build());
-
-        if (media.getType() == MediaType.SHOW) {
-            userShowProgressRepository.save(UserShowProgress.builder()
-                .user(user)
-                .media(media)
-                .currentSeasonNumber(currentSeasonNumber)
-                .currentEpisodeNumber(currentEpisodeNumber)
-                .episodesWatchedCount(currentEpisodeNumber == null ? 0 : currentEpisodeNumber)
-                .seasonsCompletedCount(0)
-                .lastWatchedAt(lastWatchedAt)
-                .build());
-        }
     }
 }

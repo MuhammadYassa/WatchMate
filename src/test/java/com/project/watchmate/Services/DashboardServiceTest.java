@@ -22,14 +22,17 @@ import com.project.watchmate.Dto.UpcomingEpisodesResponseDTO;
 import com.project.watchmate.Mappers.DashboardMapper;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
-import com.project.watchmate.Models.UserShowProgress;
-import com.project.watchmate.Models.UserMediaStatus;
+import com.project.watchmate.Models.UserShowTracking;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
+import com.project.watchmate.Repositories.UserShowTrackingRepository;
 
 @ExtendWith(MockitoExtension.class)
 class DashboardServiceTest {
+
+    @Mock
+    private UserShowTrackingRepository userShowTrackingRepository;
 
     @Mock
     private UserMediaStatusRepository userMediaStatusRepository;
@@ -40,30 +43,40 @@ class DashboardServiceTest {
 
     @BeforeEach
     void setUp() {
-        dashboardService = new DashboardService(userMediaStatusRepository, dashboardMapper);
+        dashboardService = new DashboardService(userMediaStatusRepository, userShowTrackingRepository, dashboardMapper);
     }
 
     @Test
     void getContinueWatching_onlyRequestsWatchingStatuses() {
         Users user = Users.builder().id(99L).username("continue-user").build();
-        UserMediaStatus watchingStatus = UserMediaStatus.builder()
+        UserShowTracking watchingStatus = UserShowTracking.builder()
             .user(user)
             .status(WatchStatus.WATCHING)
             .media(Media.builder().tmdbId(9100L).title("Active Show").type(MediaType.SHOW).build())
-            .showProgress(UserShowProgress.builder().currentSeasonNumber(1).currentEpisodeNumber(2).build())
             .build();
+        watchingStatus.setWatchPositionSeason(1);
+        watchingStatus.setWatchPositionEpisode(2);
 
-        when(userMediaStatusRepository.findContinueWatchingByUser(
+        when(userShowTrackingRepository.findContinueWatchingByUser(
             eq(user),
             eq(List.of(WatchStatus.WATCHING)),
             any()))
             .thenReturn(List.of(watchingStatus));
+        when(userMediaStatusRepository.findContinueWatchingMoviesByUser(
+            eq(user),
+            eq(List.of(WatchStatus.WATCHING)),
+            any()))
+            .thenReturn(List.of());
 
         ContinueWatchingResponseDTO result = dashboardService.getContinueWatching(user, 10);
 
         assertEquals(1, result.getItems().size());
         assertEquals(WatchStatus.WATCHING, result.getItems().get(0).getWatchStatus());
-        verify(userMediaStatusRepository).findContinueWatchingByUser(
+        verify(userShowTrackingRepository).findContinueWatchingByUser(
+            eq(user),
+            eq(List.of(WatchStatus.WATCHING)),
+            any());
+        verify(userMediaStatusRepository).findContinueWatchingMoviesByUser(
             eq(user),
             eq(List.of(WatchStatus.WATCHING)),
             any());
@@ -75,7 +88,7 @@ class DashboardServiceTest {
         LocalDate firstAirDate = LocalDate.now().plusDays(2);
         LocalDate secondAirDate = LocalDate.now().plusDays(7);
 
-        UserMediaStatus firstStatus = UserMediaStatus.builder()
+        UserShowTracking firstStatus = UserShowTracking.builder()
             .user(user)
             .status(WatchStatus.WATCHING)
             .media(Media.builder()
@@ -91,7 +104,7 @@ class DashboardServiceTest {
                 .tmdbShowStatus("Returning Series")
                 .build())
             .build();
-        UserMediaStatus secondStatus = UserMediaStatus.builder()
+        UserShowTracking secondStatus = UserShowTracking.builder()
             .user(user)
             .status(WatchStatus.TO_WATCH)
             .media(Media.builder()
@@ -102,7 +115,7 @@ class DashboardServiceTest {
                 .build())
             .build();
 
-        when(userMediaStatusRepository.findUpcomingEpisodesByUser(
+        when(userShowTrackingRepository.findUpcomingEpisodesByUser(
             eq(user),
             eq(List.of(WatchStatus.WATCHING, WatchStatus.UP_TO_DATE, WatchStatus.TO_WATCH)),
             any(LocalDate.class)))
@@ -118,16 +131,16 @@ class DashboardServiceTest {
         assertEquals(8202L, result.getItems().get(1).getTmdbId());
         assertEquals(7L, result.getItems().get(1).getDaysUntilAirDate());
 
-        verify(userMediaStatusRepository).findUpcomingEpisodesByUser(
+        verify(userShowTrackingRepository).findUpcomingEpisodesByUser(
             eq(user),
             eq(List.of(WatchStatus.WATCHING, WatchStatus.UP_TO_DATE, WatchStatus.TO_WATCH)),
             any(LocalDate.class));
     }
 
-    @Test
+        @Test
     void getUpcomingEpisodesForUser_returnsEmptyItems_whenNothingIsTracked() {
         Users user = Users.builder().id(2L).username("dashboard-empty").build();
-        when(userMediaStatusRepository.findUpcomingEpisodesByUser(
+        when(userShowTrackingRepository.findUpcomingEpisodesByUser(
             eq(user),
             eq(List.of(WatchStatus.WATCHING, WatchStatus.UP_TO_DATE, WatchStatus.TO_WATCH)),
             any(LocalDate.class)))
@@ -144,7 +157,7 @@ class DashboardServiceTest {
         LocalDate from = LocalDate.of(2099, 1, 1);
         LocalDate to = LocalDate.of(2099, 1, 31);
 
-        UserMediaStatus status = UserMediaStatus.builder()
+        UserShowTracking status = UserShowTracking.builder()
             .user(user)
             .status(WatchStatus.WATCHING)
             .media(Media.builder()
@@ -161,7 +174,7 @@ class DashboardServiceTest {
                 .build())
             .build();
 
-        when(userMediaStatusRepository.findCalendarItemsByUser(
+        when(userShowTrackingRepository.findCalendarItemsByUser(
             user,
             List.of(WatchStatus.WATCHING, WatchStatus.UP_TO_DATE, WatchStatus.TO_WATCH),
             from,

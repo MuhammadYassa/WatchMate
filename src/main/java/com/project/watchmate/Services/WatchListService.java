@@ -21,13 +21,11 @@ import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.Review;
 import com.project.watchmate.Models.Role;
-import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchList;
 import com.project.watchmate.Models.WatchListItem;
 import com.project.watchmate.Models.WatchStatus;
 import com.project.watchmate.Repositories.ReviewRepository;
-import com.project.watchmate.Repositories.UserMediaStatusRepository;
 import com.project.watchmate.Repositories.WatchListRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -44,7 +42,7 @@ public class WatchListService {
 
     private final ReviewRepository reviewsRepo;
 
-    private final UserMediaStatusRepository userMediaStatusRepository;
+    private final UserWatchStatusResolver userWatchStatusResolver;
 
     public Page<WatchList> getWatchListPage(Users user){
         Pageable pageable = PageRequest.of(0, 5, Sort.by("name").descending().and(Sort.by("id").ascending()));
@@ -157,10 +155,7 @@ public class WatchListService {
             Media m = item.getMedia();
             List<Review> reviews = reviewsRepo.findByMedia(m);
             boolean isFavourited = user.getFavorites().contains(m);
-            WatchStatus status = userMediaStatusRepository
-            .findByUserAndMedia(user, m)
-            .map(UserMediaStatus::getStatus)
-            .orElse(WatchStatus.NONE);
+            WatchStatus status = userWatchStatusResolver.resolveWatchStatus(user, m);
 
             return watchMateMapper.mapToMediaDetailsDTO(m, reviews, isFavourited, status);
         }).toList();

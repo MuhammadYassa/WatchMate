@@ -63,7 +63,8 @@ public class ShowEpisode {
 
     private Integer runtime;
 
-    private LocalDateTime syncedAt;
+    @Column(name = "last_tmdb_sync_at")
+    private LocalDateTime lastTmdbSyncAt;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;

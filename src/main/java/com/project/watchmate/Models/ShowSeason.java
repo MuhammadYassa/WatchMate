@@ -57,7 +57,8 @@ public class ShowSeason {
     @Column(nullable = false)
     private Integer episodeCount;
 
-    private LocalDateTime syncedAt;
+    @Column(name = "last_tmdb_sync_at")
+    private LocalDateTime lastTmdbSyncAt;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;

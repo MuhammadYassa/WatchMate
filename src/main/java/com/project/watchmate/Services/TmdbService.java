@@ -95,6 +95,13 @@ public class TmdbService {
             throw new IllegalArgumentException("Only shows can store next-airing snapshot data.");
         }
 
+        LocalDateTime now = LocalDateTime.now();
+        media.setTitle(tvDetails.getName());
+        media.setOverview(tvDetails.getOverview());
+        media.setPosterPath(tvDetails.getPosterPath());
+        media.setBackdropPath(tvDetails.getBackdropPath());
+        media.setReleaseDate(TmdbMovieDTO.parseDate(tvDetails.getFirstAirDate()).orElse(null));
+        media.setRating(tvDetails.getVoteAverage());
         media.setNextEpisodeAirDate(TmdbMovieDTO.parseDate(tvDetails.getNextEpisodeToAir() == null ? null : tvDetails.getNextEpisodeToAir().getAirDate()).orElse(null));
         media.setNextEpisodeSeasonNumber(tvDetails.getNextEpisodeToAir() == null ? null : tvDetails.getNextEpisodeToAir().getSeasonNumber());
         media.setNextEpisodeEpisodeNumber(tvDetails.getNextEpisodeToAir() == null ? null : tvDetails.getNextEpisodeToAir().getEpisodeNumber());
@@ -106,7 +113,8 @@ public class TmdbService {
         media.setNumberOfSeasons(tvDetails.getNumberOfSeasons());
         media.setNumberOfEpisodes(tvDetails.getNumberOfEpisodes());
         media.setTmdbShowStatus(tvDetails.getStatus());
-        media.setNextAiringSyncedAt(LocalDateTime.now());
+        media.setNextAiringSyncedAt(now);
+        media.setLastTmdbSyncAt(now);
         return mediaRepository.save(media);
     }
 

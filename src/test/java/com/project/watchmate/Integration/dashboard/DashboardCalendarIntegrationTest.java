@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import com.project.watchmate.Integration.support.AbstractIntegrationTest;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
-import com.project.watchmate.Models.UserMediaStatus;
+import com.project.watchmate.Models.UserShowTracking;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
 
@@ -188,7 +188,11 @@ class DashboardCalendarIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void saveStatus(Users user, Media media, WatchStatus watchStatus) {
-        userMediaStatusRepository.save(UserMediaStatus.builder()
+        if (media.getType() != MediaType.SHOW) {
+            return;
+        }
+
+        userShowTrackingRepository.save(UserShowTracking.builder()
             .user(user)
             .media(media)
             .status(watchStatus)

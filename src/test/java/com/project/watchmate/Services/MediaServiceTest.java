@@ -35,6 +35,7 @@ import com.project.watchmate.Models.WatchStatus;
 import com.project.watchmate.Repositories.MediaRepository;
 import com.project.watchmate.Repositories.ReviewRepository;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
+import com.project.watchmate.Repositories.UserShowTrackingRepository;
 import com.project.watchmate.Repositories.UsersRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -57,6 +58,12 @@ class MediaServiceTest {
 
     @Mock
     private UserMediaStatusRepository userMediaStatusRepository;
+
+    @Mock
+    private UserShowTrackingRepository userShowTrackingRepository;
+
+    @Mock
+    private UserWatchStatusResolver userWatchStatusResolver;
 
     @Mock
     private TmdbService tmdbService;
@@ -92,7 +99,7 @@ class MediaServiceTest {
             when(usersRepository.findByIdWithFavorites(1L)).thenReturn(Optional.of(user));
             when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, MediaType.MOVIE)).thenReturn(media);
             when(reviewRepository.findByMedia(media)).thenReturn(List.of());
-            when(userMediaStatusRepository.findByUserAndMedia(user, media)).thenReturn(Optional.empty());
+            when(userWatchStatusResolver.resolveWatchStatus(user, media)).thenReturn(WatchStatus.NONE);
             when(watchMateMapper.mapToMovieDetailsDTO(media, List.of(), Boolean.FALSE, WatchStatus.NONE)).thenReturn(expectedDto);
 
             MovieDetailsDTO result = mediaService.getMovieDetails(TMDB_ID, user);
@@ -155,7 +162,7 @@ class MediaServiceTest {
         @Test
         void getShowsWatchedPage_DelegatesToRepository() {
             Page<Media> page = new PageImpl<>(List.of(media));
-            when(userMediaStatusRepository.findWatchedShowsByUser(eq(user), any(Pageable.class)))
+            when(userShowTrackingRepository.findWatchedShowsByUser(eq(user), any(Pageable.class)))
                 .thenReturn(page);
 
             Page<Media> result = mediaService.getShowsWatchedPage(user);
@@ -163,7 +170,7 @@ class MediaServiceTest {
             assertNotNull(result);
             assertEquals(1, result.getContent().size());
             assertEquals(media, result.getContent().get(0));
-            verify(userMediaStatusRepository).findWatchedShowsByUser(eq(user), any(Pageable.class));
+            verify(userShowTrackingRepository).findWatchedShowsByUser(eq(user), any(Pageable.class));
         }
     }
 }

@@ -13,10 +13,8 @@ import com.project.watchmate.Exception.UserNotFoundException;
 import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Exception.DuplicateFavouriteException;
 import com.project.watchmate.Models.Media;
-import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
-import com.project.watchmate.Repositories.UserMediaStatusRepository;
 import com.project.watchmate.Repositories.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -31,7 +29,7 @@ public class FavouriteService {
 
     private final WatchMateMapper watchMateMapper;
 
-    private final UserMediaStatusRepository userMediaStatusRepository;
+    private final UserWatchStatusResolver userWatchStatusResolver;
 
     @Transactional
     public FavouriteStatusDTO addToFavourites (Long tmdbId, String type, Users user){
@@ -68,10 +66,7 @@ public class FavouriteService {
         Users managedUser = loadUserWithFavorites(user);
         List<Media> allMedia = managedUser.getFavorites();
         List<MediaDetailsDTO> allMediaDetails = allMedia.stream().map(m -> {
-            WatchStatus watchStatus = userMediaStatusRepository
-                .findByUserAndMedia(managedUser, m)
-                .map(UserMediaStatus::getStatus)
-                .orElse(WatchStatus.NONE);
+            WatchStatus watchStatus = userWatchStatusResolver.resolveWatchStatus(managedUser, m);
             boolean isFavourited = managedUser.getFavorites().contains(m);
 
             return watchMateMapper.mapToMediaDetailsDTO(m, m.getReviews(), isFavourited, watchStatus);

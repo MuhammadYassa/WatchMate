@@ -40,7 +40,6 @@ import com.project.watchmate.Models.FollowStatuses;
 import com.project.watchmate.Models.PrivacyStatuses;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Repositories.FollowRequestRepository;
-import com.project.watchmate.Repositories.UserMediaStatusRepository;
 import com.project.watchmate.Repositories.UsersRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -57,9 +56,6 @@ class SocialServiceTest {
 
     @Mock
     private WatchListService watchListService;
-
-    @Mock
-    private UserMediaStatusRepository userMediaStatusRepository;
 
     @Mock
     private MediaService mediaService;
@@ -303,8 +299,8 @@ class SocialServiceTest {
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
             when(usersRepository.countFollowersByUserId(TARGET_ID)).thenReturn(0L);
             when(usersRepository.countFollowingByUserId(TARGET_ID)).thenReturn(0L);
-            when(userMediaStatusRepository.countWatchedMoviesByUser(targetUser)).thenReturn(0L);
-            when(userMediaStatusRepository.countWatchedShowsByUser(targetUser)).thenReturn(0L);
+            when(mediaService.countMoviesWatched(targetUser)).thenReturn(0L);
+            when(mediaService.countShowsWatched(targetUser)).thenReturn(0L);
             when(watchListService.getWatchListPage(targetUser)).thenReturn(Page.empty());
 
             UserProfileDTO result = socialService.getUserProfile("target", user);

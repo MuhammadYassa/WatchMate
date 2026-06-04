@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.stereotype.Component;
 
@@ -91,11 +92,15 @@ public class ShowMetadataMapper {
             .stillPath(episode.getStillPath())
             .airDate(TmdbMovieDTO.parseDate(episode.getAirDate()).orElse(null))
             .runtime(episode.getRuntime())
-            .syncedAt(syncedAt)
+            .lastTmdbSyncAt(syncedAt)
             .build();
     }
 
     public ShowSeasonsDetailsDTO mapToShowSeasonDetails(Long tmdbId, ShowSeason season, List<ShowEpisode> episodes) {
+        return mapToShowSeasonDetails(tmdbId, season, episodes, Set.of());
+    }
+
+    public ShowSeasonsDetailsDTO mapToShowSeasonDetails(Long tmdbId, ShowSeason season, List<ShowEpisode> episodes, Set<String> watchedEpisodeKeys) {
         return ShowSeasonsDetailsDTO.builder()
             .tmdbId(tmdbId)
             .seasonNumber(season.getSeasonNumber())
@@ -106,7 +111,7 @@ public class ShowMetadataMapper {
             .episodeCount(season.getEpisodeCount())
             .episodes(episodes.stream()
                 .sorted(Comparator.comparing(ShowEpisode::getEpisodeNumber, Comparator.nullsLast(Integer::compareTo)))
-                .map(this::mapCachedEpisode)
+                .map(episode -> mapCachedEpisode(episode, watchedEpisodeKeys))
                 .toList())
             .build();
     }
@@ -130,7 +135,7 @@ public class ShowMetadataMapper {
             .build();
     }
 
-    private ShowEpisodeDetailsDTO mapCachedEpisode(ShowEpisode episode) {
+    private ShowEpisodeDetailsDTO mapCachedEpisode(ShowEpisode episode, Set<String> watchedEpisodeKeys) {
         LocalDate airDate = episode.getAirDate();
         return ShowEpisodeDetailsDTO.builder()
             .tmdbEpisodeId(null)
@@ -142,6 +147,11 @@ public class ShowMetadataMapper {
             .runtime(episode.getRuntime())
             .stillPath(episode.getStillPath())
             .isAired(airDate != null && !airDate.isAfter(LocalDate.now()))
+            .watched(watchedEpisodeKeys.contains(progressKey(episode.getSeasonNumber(), episode.getEpisodeNumber())))
             .build();
+    }
+
+    private String progressKey(Integer seasonNumber, Integer episodeNumber) {
+        return seasonNumber + ":" + episodeNumber;
     }
 }

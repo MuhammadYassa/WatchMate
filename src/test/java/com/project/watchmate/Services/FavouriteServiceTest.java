@@ -27,10 +27,8 @@ import com.project.watchmate.Dto.UserFavouritesDTO;
 import com.project.watchmate.Exception.DuplicateFavouriteException;
 import com.project.watchmate.Mappers.WatchMateMapper;
 import com.project.watchmate.Models.Media;
-import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
-import com.project.watchmate.Repositories.UserMediaStatusRepository;
 import com.project.watchmate.Repositories.UsersRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,7 +44,7 @@ class FavouriteServiceTest {
     private WatchMateMapper watchMateMapper;
 
     @Mock
-    private UserMediaStatusRepository userMediaStatusRepository;
+    private UserWatchStatusResolver userWatchStatusResolver;
 
     @InjectMocks
     private FavouriteService favouriteService;
@@ -177,8 +175,7 @@ class FavouriteServiceTest {
             managedUser.getFavorites().add(media);
             MediaDetailsDTO mappedDto = MediaDetailsDTO.builder().tmdbId(TMDB_ID).title("Test Media").build();
             when(usersRepository.findByIdWithFavorites(user.getId())).thenReturn(Optional.of(managedUser));
-            when(userMediaStatusRepository.findByUserAndMedia(managedUser, media))
-                .thenReturn(Optional.of(UserMediaStatus.builder().status(WatchStatus.WATCHED).build()));
+            when(userWatchStatusResolver.resolveWatchStatus(managedUser, media)).thenReturn(WatchStatus.WATCHED);
             when(watchMateMapper.mapToMediaDetailsDTO(any(), any(), eq(true), eq(WatchStatus.WATCHED)))
                 .thenReturn(mappedDto);
 
@@ -203,7 +200,7 @@ class FavouriteServiceTest {
             managedUser.getFavorites().add(media);
             MediaDetailsDTO mappedDto = MediaDetailsDTO.builder().tmdbId(TMDB_ID).build();
             when(usersRepository.findByIdWithFavorites(user.getId())).thenReturn(Optional.of(managedUser));
-            when(userMediaStatusRepository.findByUserAndMedia(managedUser, media)).thenReturn(Optional.empty());
+            when(userWatchStatusResolver.resolveWatchStatus(managedUser, media)).thenReturn(WatchStatus.NONE);
             when(watchMateMapper.mapToMediaDetailsDTO(any(), any(), eq(true), eq(WatchStatus.NONE)))
                 .thenReturn(mappedDto);
 

@@ -27,7 +27,7 @@ import lombok.NoArgsConstructor;
     columnNames = {"user_show_progress_id", "season_number", "episode_number"}
 ))
 @BatchSize(size = 50)
-public class UserEpisodeProgress {
+public class UserEpisodeWatch {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,13 +35,31 @@ public class UserEpisodeProgress {
 
     @ManyToOne
     @JoinColumn(name = "user_show_progress_id", nullable = false)
-    private UserShowProgress userShowProgress;
+    private UserShowTracking userShowTracking;
 
     private Integer seasonNumber;
 
     private Integer episodeNumber;
 
-    private boolean watched;
-
     private LocalDateTime watchedAt;
+
+    private LocalDateTime createdAt;
+
+    private LocalDateTime updatedAt;
+
+    @jakarta.persistence.PrePersist
+    void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = watchedAt == null ? now : watchedAt;
+        }
+        if (updatedAt == null) {
+            updatedAt = watchedAt == null ? now : watchedAt;
+        }
+    }
+
+    @jakarta.persistence.PreUpdate
+    void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

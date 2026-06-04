@@ -10,7 +10,6 @@ import com.project.watchmate.Dto.FollowListUserDetailsDTO;
 import com.project.watchmate.Dto.DiscoveryMediaItemDTO;
 import com.project.watchmate.Dto.MediaDetailsDTO;
 import com.project.watchmate.Dto.MovieDetailsDTO;
-import com.project.watchmate.Dto.UserMediaStatusDTO;
 import com.project.watchmate.Dto.ReviewResponseDTO;
 import com.project.watchmate.Dto.SearchItemDTO;
 import com.project.watchmate.Dto.TmdbMovieDTO;
@@ -21,7 +20,6 @@ import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.Review;
 import com.project.watchmate.Models.WatchList;
-import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
 
@@ -119,13 +117,6 @@ public class WatchMateMapper {
     public FollowListUserDetailsDTO mapToFollowListUserDetailsDTO(Users user) {
         return FollowListUserDetailsDTO.builder()
             .username(user.getUsername())
-            .build();
-    }
-
-    public UserMediaStatusDTO mapToUserMediaStatusDTO(UserMediaStatus userMediaStatus) {
-        return UserMediaStatusDTO.builder()
-            .tmdbId(userMediaStatus.getMedia().getTmdbId())
-            .status(userMediaStatus.getStatus())
             .build();
     }
 

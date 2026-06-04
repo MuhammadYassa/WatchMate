@@ -35,9 +35,9 @@ import com.project.watchmate.Repositories.RefreshTokenRepository;
 import com.project.watchmate.Repositories.ReviewRepository;
 import com.project.watchmate.Repositories.ShowEpisodeRepository;
 import com.project.watchmate.Repositories.ShowSeasonRepository;
-import com.project.watchmate.Repositories.UserEpisodeProgressRepository;
+import com.project.watchmate.Repositories.UserEpisodeWatchRepository;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
-import com.project.watchmate.Repositories.UserShowProgressRepository;
+import com.project.watchmate.Repositories.UserShowTrackingRepository;
 import com.project.watchmate.Repositories.UsersRepository;
 import com.project.watchmate.Repositories.WatchListRepository;
 import com.project.watchmate.Services.JwtService;
@@ -104,10 +104,10 @@ public abstract class AbstractIntegrationTest {
 	protected UserMediaStatusRepository userMediaStatusRepository;
 
 	@Autowired
-	protected UserEpisodeProgressRepository userEpisodeProgressRepository;
+	protected UserEpisodeWatchRepository userEpisodeWatchRepository;
 
 	@Autowired
-	protected UserShowProgressRepository userShowProgressRepository;
+	protected UserShowTrackingRepository userShowTrackingRepository;
 
 	@Autowired
 	protected GenreRepository genreRepository;
@@ -166,8 +166,8 @@ public abstract class AbstractIntegrationTest {
 		followRequestRepository.deleteAll();
 		refreshTokenRepository.deleteAll();
 		reviewRepository.deleteAll();
-		userEpisodeProgressRepository.deleteAll();
-		userShowProgressRepository.deleteAll();
+		userEpisodeWatchRepository.deleteAll();
+		userShowTrackingRepository.deleteAll();
 		userMediaStatusRepository.deleteAll();
 		showEpisodeRepository.deleteAll();
 		showSeasonRepository.deleteAll();

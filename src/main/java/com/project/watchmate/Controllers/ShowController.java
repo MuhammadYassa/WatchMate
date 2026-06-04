@@ -13,24 +13,23 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.project.watchmate.Dto.ApiError;
-import com.project.watchmate.Dto.EpisodeProgressDTO;
 import com.project.watchmate.Dto.MarkEpisodeRequest;
 import com.project.watchmate.Dto.MarkSeasonRequest;
 import com.project.watchmate.Dto.NextEpisodeAiringDTO;
 import com.project.watchmate.Dto.ReviewResponseDTO;
 import com.project.watchmate.Dto.ShowDetailsDTO;
-import com.project.watchmate.Dto.ShowProgressDTO;
+import com.project.watchmate.Dto.ShowTrackingDTO;
+import com.project.watchmate.Dto.ShowTrackingStatusDTO;
 import com.project.watchmate.Dto.ShowSeasonsDetailsDTO;
-import com.project.watchmate.Dto.UpdateShowProgressRequestDTO;
+import com.project.watchmate.Dto.UpdateShowTrackingPositionRequestDTO;
 import com.project.watchmate.Dto.UpdateWatchStatusRequestDTO;
-import com.project.watchmate.Dto.UserMediaStatusDTO;
+import com.project.watchmate.Dto.WatchedEpisodeDTO;
 import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.UserPrincipal;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Services.ReviewService;
 import com.project.watchmate.Services.ShowMetadataService;
-import com.project.watchmate.Services.ShowProgressService;
-import com.project.watchmate.Services.StatusService;
+import com.project.watchmate.Services.ShowTrackingService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -54,11 +53,9 @@ public class ShowController {
 
     private static final MediaType MEDIA_TYPE = MediaType.SHOW;
 
-    private final StatusService statusService;
-
     private final ReviewService reviewService;
 
-    private final ShowProgressService showProgressService;
+    private final ShowTrackingService showTrackingService;
 
     private final ShowMetadataService showMetadataService;
 
@@ -81,73 +78,75 @@ public class ShowController {
     }
 
     @PutMapping("/{tmdbId}/status")
-    @Operation(summary = "Update show watch status", description = "Updates the authenticated user's watch status for a show. WATCHED and UP_TO_DATE requests are normalized from real episode progress.")
+    @Operation(summary = "Set show tracking status", description = "Sets the authenticated user's canonical show tracking status. NONE is returned but not stored. WATCHED on ongoing shows normalizes to UP_TO_DATE, and bulk WATCHED or UP_TO_DATE requests never trigger automatic full-series sync.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Watch status updated", content = @Content(schema = @Schema(implementation = UserMediaStatusDTO.class))),
+        @ApiResponse(responseCode = "200", description = "Show tracking status updated", content = @Content(schema = @Schema(implementation = ShowTrackingStatusDTO.class))),
         @ApiResponse(responseCode = "400", description = "Validation failed or watch status is invalid", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "422", description = "Required cached episode metadata is incomplete for the requested bulk status change", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "404", description = "Show not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<UserMediaStatusDTO> updateStatus(
+    public ResponseEntity<ShowTrackingStatusDTO> updateStatus(
         @PathVariable @Min(1) Long tmdbId,
         @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
         @Valid @RequestBody UpdateWatchStatusRequestDTO request
     ) {
         Users user = userPrincipal.getUser();
-        UserMediaStatusDTO dto = statusService.updateWatchStatus(user, tmdbId, MEDIA_TYPE, request);
+        ShowTrackingStatusDTO dto = showTrackingService.setShowStatus(user, tmdbId, MEDIA_TYPE, request);
         return ResponseEntity.ok(dto);
     }
 
     @GetMapping("/{tmdbId}/progress")
-    @Operation(summary = "Get show progress", description = "Returns show progress for the authenticated user.")
+    @Operation(summary = "Get show tracking", description = "Returns canonical show tracking for the authenticated user. When no tracking row exists, the response returns status NONE without storing it.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Show progress returned", content = @Content(schema = @Schema(implementation = ShowProgressDTO.class))),
+        @ApiResponse(responseCode = "200", description = "Show tracking returned", content = @Content(schema = @Schema(implementation = ShowTrackingDTO.class))),
         @ApiResponse(responseCode = "400", description = "Invalid request parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "404", description = "Show not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<ShowProgressDTO> getShowProgress(
+    public ResponseEntity<ShowTrackingDTO> getShowTracking(
         @PathVariable @Min(1) Long tmdbId,
         @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
         Users user = userPrincipal.getUser();
-        return ResponseEntity.ok(showProgressService.getShowProgress(user, tmdbId, MEDIA_TYPE));
+        return ResponseEntity.ok(showTrackingService.getShowTracking(user, tmdbId, MEDIA_TYPE));
     }
 
     @PutMapping("/{tmdbId}/progress")
-    @Operation(summary = "Update show progress", description = "Updates summary progress for a show and normalizes status from synchronized episode progress.")
+    @Operation(summary = "Set show watch position", description = "Sets the authenticated user's manual show watch position. The endpoint only caches the pointed season in normal flows. When markPreviousEpisodesWatched is true, prior required seasons must already be cached or the API returns SHOW_METADATA_SYNC_REQUIRED.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Show progress updated", content = @Content(schema = @Schema(implementation = ShowProgressDTO.class))),
+        @ApiResponse(responseCode = "200", description = "Show tracking updated", content = @Content(schema = @Schema(implementation = ShowTrackingDTO.class))),
         @ApiResponse(responseCode = "400", description = "Validation failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "422", description = "Required cached episode metadata is incomplete for backfilling watched episodes", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "404", description = "Show not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<ShowProgressDTO> updateShowProgress(
+    public ResponseEntity<ShowTrackingDTO> updateWatchPosition(
         @PathVariable @Min(1) Long tmdbId,
         @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
-        @Valid @RequestBody UpdateShowProgressRequestDTO request
+        @Valid @RequestBody UpdateShowTrackingPositionRequestDTO request
     ) {
         Users user = userPrincipal.getUser();
-        return ResponseEntity.ok(showProgressService.updateShowProgress(user, tmdbId, MEDIA_TYPE, request));
+        return ResponseEntity.ok(showTrackingService.updateWatchPosition(user, tmdbId, MEDIA_TYPE, request));
     }
 
     @PutMapping("/{tmdbId}/episodes/{seasonNumber}/{episodeNumber}")
-    @Operation(summary = "Mark episode watched", description = "Marks one show episode watched or unwatched.")
+    @Operation(summary = "Mark episode watched", description = "Creates or deletes one canonical watched-episode row for the requested show episode. Normal request handling only caches the targeted season.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Episode watch state updated", content = @Content(schema = @Schema(implementation = ShowProgressDTO.class))),
+        @ApiResponse(responseCode = "200", description = "Episode watch state updated", content = @Content(schema = @Schema(implementation = ShowTrackingDTO.class))),
         @ApiResponse(responseCode = "400", description = "Validation failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "404", description = "Show or episode not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<ShowProgressDTO> markEpisodeWatched(
+    public ResponseEntity<ShowTrackingDTO> markEpisodeWatched(
         @PathVariable @Min(1) Long tmdbId,
         @PathVariable @Min(0) Integer seasonNumber,
         @PathVariable @Min(1) Integer episodeNumber,
@@ -155,45 +154,45 @@ public class ShowController {
         @Valid @RequestBody MarkEpisodeRequest request
     ) {
         Users user = userPrincipal.getUser();
-        return ResponseEntity.ok(showProgressService.markEpisodeWatched(user, tmdbId, MEDIA_TYPE, seasonNumber, episodeNumber, request.watched()));
+        return ResponseEntity.ok(showTrackingService.markEpisodeWatched(user, tmdbId, MEDIA_TYPE, seasonNumber, episodeNumber, request.watched()));
     }
 
     @PutMapping("/{tmdbId}/seasons/{seasonNumber}/watched")
-    @Operation(summary = "Mark season watched", description = "Marks every episode in a show season watched or unwatched.")
+    @Operation(summary = "Mark season watched", description = "Creates or deletes canonical watched-episode rows for one cached season only. Bulk season writes never trigger a full-series sync.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Season watch state updated", content = @Content(schema = @Schema(implementation = ShowProgressDTO.class))),
+        @ApiResponse(responseCode = "200", description = "Season watch state updated", content = @Content(schema = @Schema(implementation = ShowTrackingDTO.class))),
         @ApiResponse(responseCode = "400", description = "Validation failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "404", description = "Show or season not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<ShowProgressDTO> markSeasonWatched(
+    public ResponseEntity<ShowTrackingDTO> markSeasonWatched(
         @PathVariable @Min(1) Long tmdbId,
         @PathVariable @Min(0) Integer seasonNumber,
         @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
         @Valid @RequestBody MarkSeasonRequest request
     ) {
         Users user = userPrincipal.getUser();
-        return ResponseEntity.ok(showProgressService.markSeasonWatched(user, tmdbId, seasonNumber, request.watched()));
+        return ResponseEntity.ok(showTrackingService.markSeasonWatched(user, tmdbId, seasonNumber, request.watched()));
     }
 
     @GetMapping("/{tmdbId}/episodes/watched")
-    @Operation(summary = "List watched show episodes", description = "Returns watched episodes for a show.")
+    @Operation(summary = "List watched show episodes", description = "Returns canonical watched-episode rows for a tracked show. Row exists means watched.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Watched episodes returned", content = @Content(array = @ArraySchema(schema = @Schema(implementation = EpisodeProgressDTO.class)))),
+        @ApiResponse(responseCode = "200", description = "Watched episodes returned", content = @Content(array = @ArraySchema(schema = @Schema(implementation = WatchedEpisodeDTO.class)))),
         @ApiResponse(responseCode = "400", description = "Invalid request parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "404", description = "Show not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<List<EpisodeProgressDTO>> getWatchedEpisodes(
+    public ResponseEntity<List<WatchedEpisodeDTO>> getWatchedEpisodes(
         @PathVariable @Min(1) Long tmdbId,
         @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
         Users user = userPrincipal.getUser();
-        return ResponseEntity.ok(showProgressService.getWatchedEpisodes(user, tmdbId, MEDIA_TYPE));
+        return ResponseEntity.ok(showTrackingService.getWatchedEpisodes(user, tmdbId, MEDIA_TYPE));
     }
 
     @GetMapping("/{tmdbId}/next-episode")
@@ -211,7 +210,7 @@ public class ShowController {
     }
 
     @GetMapping("/{tmdbId}/seasons/{seasonNumber}/episodes")
-    @Operation(summary = "Get public show season episodes", description = "Returns public TMDB episode details for one requested season.")
+    @Operation(summary = "Get public show season episodes", description = "Returns public episode details for one requested season. Season and episode metadata is cached lazily per season, and authenticated responses include watched flags from canonical watched-episode rows.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Public season episode details returned", content = @Content(schema = @Schema(implementation = ShowSeasonsDetailsDTO.class))),
         @ApiResponse(responseCode = "400", description = "Invalid request parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
@@ -220,9 +219,11 @@ public class ShowController {
     })
     public ResponseEntity<ShowSeasonsDetailsDTO> getShowSeasonDetails(
         @PathVariable @Min(1) Long tmdbId,
-        @PathVariable @Min(0) Integer seasonNumber
+        @PathVariable @Min(0) Integer seasonNumber,
+        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        return ResponseEntity.ok(showMetadataService.getShowSeasonDetails(tmdbId, seasonNumber, MEDIA_TYPE));
+        Users user = userPrincipal == null ? null : userPrincipal.getUser();
+        return ResponseEntity.ok(showMetadataService.getShowSeasonDetails(tmdbId, seasonNumber, MEDIA_TYPE, user));
     }
 
     @GetMapping("/{tmdbId}/reviews")

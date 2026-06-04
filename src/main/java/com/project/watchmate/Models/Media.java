@@ -75,6 +75,8 @@ public class Media {
 
     private LocalDateTime nextAiringSyncedAt;
 
+    private LocalDateTime lastTmdbSyncAt;
+
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private MediaType type;

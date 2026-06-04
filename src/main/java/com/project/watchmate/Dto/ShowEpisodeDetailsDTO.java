@@ -32,4 +32,6 @@ public class ShowEpisodeDetailsDTO {
     private String stillPath;
 
     private Boolean isAired;
+
+    private Boolean watched;
 }

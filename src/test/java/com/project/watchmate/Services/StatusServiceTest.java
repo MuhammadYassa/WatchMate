@@ -36,9 +36,6 @@ class StatusServiceTest {
     @Mock
     private UserMediaStatusRepository userMediaStatusRepository;
 
-    @Mock
-    private ShowProgressService showProgressService;
-
     @InjectMocks
     private StatusService statusService;
 
@@ -65,7 +62,6 @@ class StatusServiceTest {
         assertEquals(TMDB_ID, result.getTmdbId());
         assertEquals(WatchStatus.WATCHED, result.getStatus());
         verify(userMediaStatusRepository).save(status);
-        verify(showProgressService, never()).updateShowStatus(any(), anyLong(), any(), any());
     }
 
     @Test
@@ -77,22 +73,18 @@ class StatusServiceTest {
 
         assertEquals("Invalid status. Allowed: TO_WATCH, WATCHING, WATCHED, NONE", exception.getMessage());
         verify(mediaResolutionService, never()).resolveMediaByTmdbId(anyLong(), any(MediaType.class));
-        verify(showProgressService, never()).updateShowStatus(any(), anyLong(), any(), any());
     }
 
     @Test
-    void updateWatchStatus_whenShowStatusRequested_delegatesToShowProgressService() {
+    void updateWatchStatus_whenShowStatusRequested_rejectsNonMovieUsage() {
         UpdateWatchStatusRequestDTO request = UpdateWatchStatusRequestDTO.builder().status("UP_TO_DATE").build();
-        UserMediaStatusDTO delegated = UserMediaStatusDTO.builder()
-            .tmdbId(TMDB_ID)
-            .status(WatchStatus.UP_TO_DATE)
-            .build();
-        when(showProgressService.updateShowStatus(user, TMDB_ID, MediaType.SHOW, request)).thenReturn(delegated);
 
-        UserMediaStatusDTO result = statusService.updateWatchStatus(user, TMDB_ID, MediaType.SHOW, request);
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> statusService.updateWatchStatus(user, TMDB_ID, MediaType.SHOW, request)
+        );
 
-        assertEquals(WatchStatus.UP_TO_DATE, result.getStatus());
-        verify(showProgressService).updateShowStatus(user, TMDB_ID, MediaType.SHOW, request);
+        assertEquals("StatusService only handles movie watch status updates.", exception.getMessage());
         verify(userMediaStatusRepository, never()).save(any());
     }
 

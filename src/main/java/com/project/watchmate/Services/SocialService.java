@@ -32,7 +32,6 @@ import com.project.watchmate.Models.PrivacyStatuses;
 import com.project.watchmate.Models.Role;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Repositories.FollowRequestRepository;
-import com.project.watchmate.Repositories.UserMediaStatusRepository;
 import com.project.watchmate.Repositories.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -50,8 +49,6 @@ public class SocialService {
     private final WatchMateMapper watchMateMapper;
 
     private final WatchListService watchListService;
-
-    private final UserMediaStatusRepository userMediaStatusRepository;
 
     private final MediaService mediaService;
 
@@ -321,8 +318,8 @@ public class SocialService {
             .followingCount(usersRepository.countFollowingByUserId(user.getId()))
             .watchlists((watchListService.getWatchListPage(user)).map(watchList -> watchListService.mapToWatchListDTO(watchList)))
             .reviews(reviewService.getReviewPage(user).map(review -> watchMateMapper.mapToReviewDTO(review)))
-            .moviesWatchedCount(userMediaStatusRepository.countWatchedMoviesByUser(user))
-            .showsWatchedCount(userMediaStatusRepository.countWatchedShowsByUser(user))
+            .moviesWatchedCount(mediaService.countMoviesWatched(user))
+            .showsWatchedCount(mediaService.countShowsWatched(user))
             .moviesWatched(mediaService.getMoviesWatchedPage(user).map(m -> watchMateMapper.mapToSearchItemDTO(m)))
             .showsWatched(mediaService.getShowsWatchedPage(user).map(m -> watchMateMapper.mapToSearchItemDTO(m)))
             .build();
@@ -337,8 +334,8 @@ public class SocialService {
                 .followersCount(usersRepository.countFollowersByUserId(targetUser.getId()))
                 .followingCount(usersRepository.countFollowingByUserId(targetUser.getId()))
                 .watchlists((watchListService.getWatchListPage(targetUser)).map(watchList -> watchListService.mapToWatchListDTO(watchList)))
-                .moviesWatchedCount(userMediaStatusRepository.countWatchedMoviesByUser(targetUser))
-                .showsWatchedCount(userMediaStatusRepository.countWatchedShowsByUser(targetUser))
+                .moviesWatchedCount(mediaService.countMoviesWatched(targetUser))
+                .showsWatchedCount(mediaService.countShowsWatched(targetUser))
                 .build();
         } else {
             return UserProfileDTO.builder()

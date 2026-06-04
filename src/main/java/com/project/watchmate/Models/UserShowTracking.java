@@ -17,6 +17,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
@@ -33,7 +35,7 @@ import lombok.NoArgsConstructor;
     columnNames = {"user_id", "media_id"}
 ))
 @Builder
-public class UserShowProgress {
+public class UserShowTracking {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -47,10 +49,6 @@ public class UserShowProgress {
     @JoinColumn(name = "media_id", nullable = false)
     private Media media;
 
-    private Integer currentSeasonNumber;
-
-    private Integer currentEpisodeNumber;
-
     @Column(name = "watch_position_season")
     private Integer watchPositionSeason;
 
@@ -58,8 +56,8 @@ public class UserShowProgress {
     private Integer watchPositionEpisode;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "tracking_state")
-    private ShowTrackingState trackingState;
+    @Column(nullable = false)
+    private WatchStatus status;
 
     @Builder.Default
     @Column(nullable = false)
@@ -71,8 +69,30 @@ public class UserShowProgress {
 
     private LocalDateTime lastWatchedAt;
 
+    @Column(nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
+
     @Builder.Default
     @BatchSize(size = 50)
-    @OneToMany(mappedBy = "userShowProgress", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<UserEpisodeProgress> episodeProgress = new ArrayList<>();
+    @OneToMany(mappedBy = "userShowTracking", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<UserEpisodeWatch> episodeWatches = new ArrayList<>();
+
+    @PrePersist
+    void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

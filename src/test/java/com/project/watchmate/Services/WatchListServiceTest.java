@@ -34,7 +34,6 @@ import com.project.watchmate.Models.WatchList;
 import com.project.watchmate.Models.WatchListItem;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Repositories.ReviewRepository;
-import com.project.watchmate.Repositories.UserMediaStatusRepository;
 import com.project.watchmate.Repositories.WatchListRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,7 +52,7 @@ class WatchListServiceTest {
     private ReviewRepository reviewsRepo;
 
     @Mock
-    private UserMediaStatusRepository userMediaStatusRepository;
+    private UserWatchStatusResolver userWatchStatusResolver;
 
     @InjectMocks
     private WatchListService watchListService;
@@ -153,7 +152,7 @@ class WatchListServiceTest {
             when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
             when(watchListRepository.save(any(WatchList.class))).thenReturn(watchList);
             when(reviewsRepo.findByMedia(media)).thenReturn(List.of());
-            when(userMediaStatusRepository.findByUserAndMedia(user, media)).thenReturn(Optional.empty());
+            when(userWatchStatusResolver.resolveWatchStatus(user, media)).thenReturn(com.project.watchmate.Models.WatchStatus.NONE);
             WatchListDTO dto = WatchListDTO.builder().id(WATCHLIST_ID).name("My List").build();
             when(watchMateMapper.mapToMediaDetailsDTO(any(), any(), any(Boolean.class), any())).thenReturn(MediaDetailsDTO.builder().build());
             when(watchMateMapper.mapToWatchListDTO(any(WatchList.class), any())).thenReturn(dto);

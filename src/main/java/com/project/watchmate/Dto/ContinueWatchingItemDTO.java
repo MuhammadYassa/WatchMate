@@ -36,11 +36,11 @@ public class ContinueWatchingItemDTO {
     @Schema(description = "Current user watch status.")
     private WatchStatus watchStatus;
 
-    @Schema(description = "Current season number for shows.", example = "2")
-    private Integer currentSeasonNumber;
+    @Schema(description = "Resume season number for shows. This prefers the saved watch position and otherwise falls back to the latest watched episode.", example = "2")
+    private Integer resumeSeasonNumber;
 
-    @Schema(description = "Current episode number for shows.", example = "5")
-    private Integer currentEpisodeNumber;
+    @Schema(description = "Resume episode number for shows. This prefers the saved watch position and otherwise falls back to the latest watched episode.", example = "5")
+    private Integer resumeEpisodeNumber;
 
     @Schema(description = "Next season number for shows when available locally.", example = "2")
     private Integer nextSeasonNumber;

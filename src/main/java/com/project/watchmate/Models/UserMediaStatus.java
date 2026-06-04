@@ -10,9 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinColumns;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -28,6 +26,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(uniqueConstraints = @UniqueConstraint(name = "uq_user_media_status_user_media", columnNames = {"user_id", "media_id"}))
 @Builder
+// Movies use this entity as their canonical watch-status store. Shows use UserShowTracking instead.
 public class UserMediaStatus {
     
     @Id
@@ -48,13 +47,6 @@ public class UserMediaStatus {
 
     @Column(nullable = false)
     private LocalDateTime updatedAt;
-
-    @OneToOne
-    @JoinColumns({
-        @JoinColumn(name = "user_id", referencedColumnName = "user_id", insertable = false, updatable = false),
-        @JoinColumn(name = "media_id", referencedColumnName = "media_id", insertable = false, updatable = false)
-    })
-    private UserShowProgress showProgress;
 
     @PrePersist
     void onCreate() {

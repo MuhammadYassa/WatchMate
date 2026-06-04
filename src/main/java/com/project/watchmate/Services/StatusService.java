@@ -22,11 +22,9 @@ public class StatusService {
 
 	private final UserMediaStatusRepository userMediaStatusRepository;
 
-	private final ShowProgressService showProgressService;
-
 	public UserMediaStatusDTO updateWatchStatus(Users user, Long tmdbId, MediaType mediaType, UpdateWatchStatusRequestDTO request) {
-		if (mediaType == MediaType.SHOW) {
-			return showProgressService.updateShowStatus(user, tmdbId, mediaType, request);
+		if (mediaType != MediaType.MOVIE) {
+			throw new IllegalArgumentException("StatusService only handles movie watch status updates.");
 		}
 
 		WatchStatus desiredStatus = parseMovieWatchStatus(request.getStatus());

@@ -1,6 +1,7 @@
 package com.project.watchmate.Services;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.data.domain.PageRequest;
@@ -10,11 +11,14 @@ import org.springframework.transaction.annotation.Transactional;
 import com.project.watchmate.Dto.CalendarResponseDTO;
 import com.project.watchmate.Dto.ContinueWatchingResponseDTO;
 import com.project.watchmate.Dto.UpcomingEpisodesResponseDTO;
+import com.project.watchmate.Dto.ContinueWatchingItemDTO;
 import com.project.watchmate.Mappers.DashboardMapper;
 import com.project.watchmate.Models.UserMediaStatus;
+import com.project.watchmate.Models.UserShowTracking;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Models.WatchStatus;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
+import com.project.watchmate.Repositories.UserShowTrackingRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -36,20 +40,40 @@ public class DashboardService {
 
     private final UserMediaStatusRepository userMediaStatusRepository;
 
+    private final UserShowTrackingRepository userShowTrackingRepository;
+
     private final DashboardMapper dashboardMapper;
 
     @Transactional(readOnly = true)
     public ContinueWatchingResponseDTO getContinueWatching(Users user, Integer limit) {
         int resolvedLimit = normalizeLimit(limit);
-        List<UserMediaStatus> statuses = userMediaStatusRepository.findContinueWatchingByUser(
+        List<UserMediaStatus> movieStatuses = userMediaStatusRepository.findContinueWatchingMoviesByUser(
+            user,
+            CONTINUE_WATCHING_STATUSES,
+            PageRequest.of(0, resolvedLimit)
+        );
+        List<UserShowTracking> trackings = userShowTrackingRepository.findContinueWatchingByUser(
             user,
             CONTINUE_WATCHING_STATUSES,
             PageRequest.of(0, resolvedLimit)
         );
 
+        List<ContinueWatchingItemDTO> items = new ArrayList<>();
+        items.addAll(movieStatuses.stream().map(dashboardMapper::mapToContinueWatchingItem).toList());
+        items.addAll(trackings.stream().map(dashboardMapper::mapToContinueWatchingItem).toList());
+        items.sort((left, right) -> {
+            java.time.LocalDateTime leftSort = left.getLastWatchedAt() != null ? left.getLastWatchedAt() : left.getUpdatedAt();
+            java.time.LocalDateTime rightSort = right.getLastWatchedAt() != null ? right.getLastWatchedAt() : right.getUpdatedAt();
+            int byTimestamp = java.util.Comparator.nullsLast(java.time.LocalDateTime::compareTo).compare(rightSort, leftSort);
+            if (byTimestamp != 0) {
+                return byTimestamp;
+            }
+            return java.util.Comparator.nullsLast(Long::compareTo).compare(right.getTmdbId(), left.getTmdbId());
+        });
+
         return ContinueWatchingResponseDTO.builder()
-            .items(statuses.stream()
-                .map(dashboardMapper::mapToContinueWatchingItem)
+            .items(items.stream()
+                .limit(resolvedLimit)
                 .toList())
             .build();
     }
@@ -57,15 +81,15 @@ public class DashboardService {
     @Transactional(readOnly = true)
     public UpcomingEpisodesResponseDTO getUpcomingEpisodesForUser(Users user) {
         LocalDate today = LocalDate.now();
-        List<UserMediaStatus> statuses = userMediaStatusRepository.findUpcomingEpisodesByUser(
+        List<UserShowTracking> trackings = userShowTrackingRepository.findUpcomingEpisodesByUser(
             user,
             UPCOMING_EPISODE_TRACKING_STATUSES,
             today
         );
 
         return UpcomingEpisodesResponseDTO.builder()
-            .items(statuses.stream()
-                .map(status -> dashboardMapper.mapToUpcomingEpisodeItem(status, today))
+            .items(trackings.stream()
+                .map(tracking -> dashboardMapper.mapToUpcomingEpisodeItem(tracking, today))
                 .toList())
             .build();
     }
@@ -74,7 +98,7 @@ public class DashboardService {
     public CalendarResponseDTO getCalendarForUser(Users user, LocalDate from, LocalDate to) {
         validateDateRange(from, to);
 
-        List<UserMediaStatus> statuses = userMediaStatusRepository.findCalendarItemsByUser(
+        List<UserShowTracking> trackings = userShowTrackingRepository.findCalendarItemsByUser(
             user,
             UPCOMING_EPISODE_TRACKING_STATUSES,
             from,
@@ -82,7 +106,7 @@ public class DashboardService {
         );
 
         return CalendarResponseDTO.builder()
-            .items(statuses.stream()
+            .items(trackings.stream()
                 .map(dashboardMapper::mapToCalendarItem)
                 .toList())
             .build();

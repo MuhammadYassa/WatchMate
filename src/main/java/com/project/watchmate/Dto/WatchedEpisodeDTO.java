@@ -12,8 +12,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Schema(name = "EpisodeProgress", description = "Watched episode progress for a show.")
-public class EpisodeProgressDTO {
+@Schema(name = "WatchedEpisode", description = "One watched episode row for a tracked show.")
+public class WatchedEpisodeDTO {
 
     private Integer seasonNumber;
 
