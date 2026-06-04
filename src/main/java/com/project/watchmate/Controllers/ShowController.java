@@ -1,7 +1,9 @@
 package com.project.watchmate.Controllers;
 
+import java.net.URI;
 import java.util.List;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -19,6 +21,7 @@ import com.project.watchmate.Dto.NextEpisodeAiringDTO;
 import com.project.watchmate.Dto.ReviewResponseDTO;
 import com.project.watchmate.Dto.ShowDetailsDTO;
 import com.project.watchmate.Dto.ShowTrackingDTO;
+import com.project.watchmate.Dto.ShowTrackingJobDTO;
 import com.project.watchmate.Dto.ShowTrackingStatusDTO;
 import com.project.watchmate.Dto.ShowSeasonsDetailsDTO;
 import com.project.watchmate.Dto.UpdateShowTrackingPositionRequestDTO;
@@ -29,6 +32,7 @@ import com.project.watchmate.Models.UserPrincipal;
 import com.project.watchmate.Models.Users;
 import com.project.watchmate.Services.ReviewService;
 import com.project.watchmate.Services.ShowMetadataService;
+import com.project.watchmate.Services.ShowTrackingActionResult;
 import com.project.watchmate.Services.ShowTrackingService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -78,24 +82,27 @@ public class ShowController {
     }
 
     @PutMapping("/{tmdbId}/status")
-    @Operation(summary = "Set show tracking status", description = "Sets the authenticated user's canonical show tracking status. NONE is returned but not stored. WATCHED on ongoing shows normalizes to UP_TO_DATE, and bulk WATCHED or UP_TO_DATE requests never trigger automatic full-series sync.")
+    @Operation(summary = "Set show tracking status", description = "Sets the authenticated user's canonical show tracking status. NONE is returned but not stored. WATCHED on ongoing shows normalizes to UP_TO_DATE. When required metadata is already local, the action completes immediately with 200. Small missing metadata gaps are hydrated synchronously, while larger gaps return 202 and continue in the background.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Show tracking status updated", content = @Content(schema = @Schema(implementation = ShowTrackingStatusDTO.class))),
+        @ApiResponse(responseCode = "202", description = "Show tracking update accepted and processing in the background. Poll the Location header for job state.", content = @Content(schema = @Schema(implementation = ShowTrackingJobDTO.class))),
         @ApiResponse(responseCode = "400", description = "Validation failed or watch status is invalid", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "422", description = "Required cached episode metadata is incomplete for the requested bulk status change", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "422", description = "The server could not complete or queue the required metadata hydration for the requested bulk status change", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "404", description = "Show not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<ShowTrackingStatusDTO> updateStatus(
+    public ResponseEntity<?> updateStatus(
         @PathVariable @Min(1) Long tmdbId,
         @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
         @Valid @RequestBody UpdateWatchStatusRequestDTO request
     ) {
         Users user = userPrincipal.getUser();
-        ShowTrackingStatusDTO dto = showTrackingService.setShowStatus(user, tmdbId, MEDIA_TYPE, request);
-        return ResponseEntity.ok(dto);
+        ShowTrackingActionResult<ShowTrackingStatusDTO> result = showTrackingService.setShowStatus(user, tmdbId, MEDIA_TYPE, request);
+        return result.isAccepted()
+            ? acceptedJobResponse(result.acceptedJob())
+            : ResponseEntity.ok(result.completedBody());
     }
 
     @GetMapping("/{tmdbId}/progress")
@@ -117,23 +124,27 @@ public class ShowController {
     }
 
     @PutMapping("/{tmdbId}/progress")
-    @Operation(summary = "Set show watch position", description = "Sets the authenticated user's manual show watch position. The endpoint only caches the pointed season in normal flows. When markPreviousEpisodesWatched is true, prior required seasons must already be cached or the API returns SHOW_METADATA_SYNC_REQUIRED.")
+    @Operation(summary = "Set show watch position", description = "Sets the authenticated user's manual show watch position. The endpoint only caches the pointed season in normal flows. When markPreviousEpisodesWatched is true, small metadata gaps may be hydrated synchronously and larger gaps are accepted for background processing with 202.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Show tracking updated", content = @Content(schema = @Schema(implementation = ShowTrackingDTO.class))),
+        @ApiResponse(responseCode = "202", description = "Watch position backfill accepted and processing in the background. Poll the Location header for job state.", content = @Content(schema = @Schema(implementation = ShowTrackingJobDTO.class))),
         @ApiResponse(responseCode = "400", description = "Validation failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "422", description = "Required cached episode metadata is incomplete for backfilling watched episodes", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "422", description = "The server could not complete or queue the metadata hydration required to backfill watched episodes", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "404", description = "Show not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<ShowTrackingDTO> updateWatchPosition(
+    public ResponseEntity<?> updateWatchPosition(
         @PathVariable @Min(1) Long tmdbId,
         @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
         @Valid @RequestBody UpdateShowTrackingPositionRequestDTO request
     ) {
         Users user = userPrincipal.getUser();
-        return ResponseEntity.ok(showTrackingService.updateWatchPosition(user, tmdbId, MEDIA_TYPE, request));
+        ShowTrackingActionResult<ShowTrackingDTO> result = showTrackingService.updateWatchPosition(user, tmdbId, MEDIA_TYPE, request);
+        return result.isAccepted()
+            ? acceptedJobResponse(result.acceptedJob())
+            : ResponseEntity.ok(result.completedBody());
     }
 
     @PutMapping("/{tmdbId}/episodes/{seasonNumber}/{episodeNumber}")
@@ -243,5 +254,12 @@ public class ShowController {
         Users user = userPrincipal.getUser();
         List<ReviewResponseDTO> reviewResponses = reviewService.getReviews(user, tmdbId, MEDIA_TYPE);
         return ResponseEntity.ok(reviewResponses);
+    }
+
+    private ResponseEntity<ShowTrackingJobDTO> acceptedJobResponse(ShowTrackingJobDTO job) {
+        return ResponseEntity.accepted()
+            .location(URI.create("/api/v1/show-tracking-jobs/" + job.getJobId()))
+            .header(HttpHeaders.RETRY_AFTER, "2")
+            .body(job);
     }
 }

@@ -12,6 +12,8 @@ import java.util.function.Predicate;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.project.watchmate.Dto.TmdbMovieDTO;
 import com.project.watchmate.Dto.TmdbTvDetailsDTO;
@@ -48,6 +50,8 @@ public class ShowCatalogService {
 
     private final ShowEpisodeRepository showEpisodeRepository;
 
+    private final PlatformTransactionManager transactionManager;
+
     public MediaType validateShowType(MediaType mediaType) {
         if (mediaType == null) {
             throw new IllegalArgumentException("Media type is required.");
@@ -68,19 +72,18 @@ public class ShowCatalogService {
         return mediaResolutionService.resolveMediaByTmdbId(tmdbId, MediaType.SHOW);
     }
 
-    @Transactional
     public TmdbTvDetailsDTO fetchAndRefreshShowDetails(Long tmdbId, Media media) {
         TmdbTvDetailsDTO tvDetails = tmdbService.fetchTvDetails(tmdbId);
         tmdbService.refreshShowSnapshot(media, tvDetails);
         return tvDetails;
     }
 
-    @Transactional
     public CachedSeasonData ensureSeasonCached(Media media, Long tmdbId, Integer seasonNumber) {
-        ShowSeason cachedSeason = showSeasonRepository.findByMediaIdAndSeasonNumber(media.getId(), seasonNumber).orElse(null);
-        List<ShowEpisode> cachedEpisodes = getCachedEpisodesForSeason(media.getId(), seasonNumber);
+        CachedSeasonData cachedData = getCachedSeasonData(media.getId(), seasonNumber);
+        ShowSeason cachedSeason = cachedData.season();
+        List<ShowEpisode> cachedEpisodes = cachedData.episodes();
         if (isFreshSeasonCache(cachedSeason, cachedEpisodes)) {
-            return new CachedSeasonData(cachedSeason, cachedEpisodes);
+            return cachedData;
         }
 
         TmdbTvSeasonDTO seasonDetails = tmdbService.fetchTvSeasonDetails(tmdbId, seasonNumber);
@@ -105,6 +108,74 @@ public class ShowCatalogService {
     @Transactional(readOnly = true)
     public boolean isFullMetadataAvailable(Media media, TmdbTvDetailsDTO tvDetails) {
         return areRequiredSeasonsCached(media, requiredStandardSeasonNumbers(tvDetails));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Integer> findMissingOrStaleRequiredSeasons(Media media, Collection<Integer> seasonNumbers) {
+        List<Integer> missingSeasons = new ArrayList<>();
+        for (Integer seasonNumber : seasonNumbers) {
+            CachedSeasonData cachedSeasonData = getCachedSeasonData(media.getId(), seasonNumber);
+            if (!isFreshSeasonCache(cachedSeasonData.season(), cachedSeasonData.episodes())) {
+                missingSeasons.add(seasonNumber);
+            }
+        }
+        return missingSeasons.stream().sorted().toList();
+    }
+
+    public int estimateEpisodeCountForSeasons(TmdbTvDetailsDTO tvDetails, Collection<Integer> seasonNumbers) {
+        Set<Integer> targetSeasons = new LinkedHashSet<>(seasonNumbers);
+        return tvDetails.getSeasons().stream()
+            .filter(season -> targetSeasons.contains(season.getSeasonNumber()))
+            .map(TmdbTvSeasonSummaryDTO::getEpisodeCount)
+            .filter(java.util.Objects::nonNull)
+            .mapToInt(Integer::intValue)
+            .sum();
+    }
+
+    public boolean canHydrateSynchronously(
+        Media media,
+        TmdbTvDetailsDTO tvDetails,
+        Collection<Integer> requiredSeasonNumbers,
+        ShowHydrationProperties properties
+    ) {
+        List<Integer> missingSeasonNumbers = findMissingOrStaleRequiredSeasons(media, requiredSeasonNumbers);
+        if (missingSeasonNumbers.isEmpty()) {
+            return true;
+        }
+        if (missingSeasonNumbers.size() > properties.getMaxSynchronousMissingSeasons()) {
+            return false;
+        }
+        return estimateEpisodeCountForSeasons(tvDetails, missingSeasonNumbers) <= properties.getMaxSynchronousEpisodes();
+    }
+
+    public List<Integer> hydrateMissingSeasons(
+        Media media,
+        Long tmdbId,
+        Collection<Integer> requiredSeasonNumbers,
+        int maxSeasons,
+        int maxEpisodes
+    ) {
+        List<Integer> missingSeasonNumbers = findMissingOrStaleRequiredSeasons(media, requiredSeasonNumbers);
+        if (missingSeasonNumbers.isEmpty()) {
+            return List.of();
+        }
+        if (missingSeasonNumbers.size() > maxSeasons) {
+            throw new IllegalArgumentException("Missing season count exceeds synchronous hydration limit.");
+        }
+
+        int hydratedEpisodes = 0;
+        List<Integer> hydratedSeasons = new ArrayList<>();
+        for (Integer seasonNumber : missingSeasonNumbers) {
+            TmdbTvSeasonDTO seasonDetails = tmdbService.fetchTvSeasonDetails(tmdbId, seasonNumber);
+            int episodeCount = seasonDetails.getEpisodes() == null ? 0 : seasonDetails.getEpisodes().size();
+            if (hydratedEpisodes + episodeCount > maxEpisodes) {
+                throw new IllegalArgumentException("Missing episode count exceeds synchronous hydration limit.");
+            }
+            cacheSeasonDetails(media, seasonNumber, seasonDetails);
+            hydratedEpisodes += episodeCount;
+            hydratedSeasons.add(seasonNumber);
+        }
+        return hydratedSeasons;
     }
 
     @Transactional(readOnly = true)
@@ -160,7 +231,6 @@ public class ShowCatalogService {
             .toList();
     }
 
-    @Transactional(readOnly = true)
     public ShowEpisode requireEpisodeFromCachedSeason(Media media, Long tmdbId, Integer seasonNumber, Integer episodeNumber) {
         CachedSeasonData cachedSeason = ensureSeasonCached(media, tmdbId, seasonNumber);
         return cachedSeason.episodes().stream()
@@ -201,15 +271,32 @@ public class ShowCatalogService {
             || normalized.equals("CANCELLED");
     }
 
+    public List<Integer> getRequiredAiredSeasonNumbers(TmdbTvDetailsDTO tvDetails) {
+        return requiredAiredSeasonNumbers(tvDetails);
+    }
+
+    public List<Integer> getRequiredStandardSeasonNumbers(TmdbTvDetailsDTO tvDetails) {
+        return requiredStandardSeasonNumbers(tvDetails);
+    }
+
+    public List<Integer> getRequiredSeasonNumbersThroughPointer(TmdbTvDetailsDTO tvDetails, Integer seasonNumber) {
+        validateTrackableSeasonNumber(seasonNumber);
+        return tvDetails.getSeasons().stream()
+            .map(TmdbTvSeasonSummaryDTO::getSeasonNumber)
+            .filter(this::isTrackableSeasonNumber)
+            .filter(currentSeason -> currentSeason <= seasonNumber)
+            .sorted()
+            .toList();
+    }
+
     private List<ShowEpisode> requireEligibleEpisodesFromCache(Media media, List<Integer> seasonNumbers, String message) {
         List<ShowEpisode> episodes = new ArrayList<>();
         for (Integer seasonNumber : seasonNumbers) {
-            ShowSeason cachedSeason = showSeasonRepository.findByMediaIdAndSeasonNumber(media.getId(), seasonNumber).orElse(null);
-            List<ShowEpisode> cachedEpisodes = getCachedEpisodesForSeason(media.getId(), seasonNumber);
-            if (!isFreshSeasonCache(cachedSeason, cachedEpisodes)) {
+            CachedSeasonData cachedSeasonData = getCachedSeasonData(media.getId(), seasonNumber);
+            if (!isFreshSeasonCache(cachedSeasonData.season(), cachedSeasonData.episodes())) {
                 throw new ShowMetadataSyncRequiredException(message);
             }
-            cachedEpisodes.stream()
+            cachedSeasonData.episodes().stream()
                 .filter(this::isEligibleEpisode)
                 .sorted(Comparator.comparing(ShowEpisode::getSeasonNumber).thenComparing(ShowEpisode::getEpisodeNumber))
                 .forEach(episodes::add);
@@ -219,9 +306,8 @@ public class ShowCatalogService {
 
     private boolean areRequiredSeasonsCached(Media media, Collection<Integer> seasonNumbers) {
         for (Integer seasonNumber : seasonNumbers) {
-            ShowSeason cachedSeason = showSeasonRepository.findByMediaIdAndSeasonNumber(media.getId(), seasonNumber).orElse(null);
-            List<ShowEpisode> cachedEpisodes = getCachedEpisodesForSeason(media.getId(), seasonNumber);
-            if (!isFreshSeasonCache(cachedSeason, cachedEpisodes)) {
+            CachedSeasonData cachedSeasonData = getCachedSeasonData(media.getId(), seasonNumber);
+            if (!isFreshSeasonCache(cachedSeasonData.season(), cachedSeasonData.episodes())) {
                 return false;
             }
         }
@@ -273,6 +359,13 @@ public class ShowCatalogService {
             );
     }
 
+    private CachedSeasonData getCachedSeasonData(Long mediaId, Integer seasonNumber) {
+        return new CachedSeasonData(
+            showSeasonRepository.findByMediaIdAndSeasonNumber(mediaId, seasonNumber).orElse(null),
+            getCachedEpisodesForSeason(mediaId, seasonNumber)
+        );
+    }
+
     private CachedSeasonData cacheSeasonDetails(Media media, Integer seasonNumber, TmdbTvSeasonDTO seasonDetails) {
         LocalDateTime now = LocalDateTime.now();
         List<TmdbTvEpisodeDTO> seasonEpisodes = seasonDetails.getEpisodes() == null
@@ -281,29 +374,32 @@ public class ShowCatalogService {
                 .sorted(Comparator.comparing(TmdbTvEpisodeDTO::getEpisodeNumber, Comparator.nullsLast(Integer::compareTo)))
                 .toList();
 
-        ShowSeason season = showSeasonRepository.findByMediaIdAndSeasonNumber(media.getId(), seasonNumber)
-            .orElse(ShowSeason.builder()
-                .media(media)
-                .seasonNumber(seasonNumber)
-                .episodeCount(0)
-                .build());
-        season.setName(seasonDetails.getName());
-        season.setOverview(seasonDetails.getOverview());
-        season.setPosterPath(seasonDetails.getPosterPath());
-        season.setAirDate(TmdbMovieDTO.parseDate(seasonDetails.getAirDate()).orElse(null));
-        season.setEpisodeCount(seasonDetails.getEpisodeCount() == null ? seasonEpisodes.size() : seasonDetails.getEpisodeCount());
-        season.setLastTmdbSyncAt(now);
-        ShowSeason savedSeason = showSeasonRepository.save(season);
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        return transactionTemplate.execute(status -> {
+            ShowSeason season = showSeasonRepository.findByMediaIdAndSeasonNumber(media.getId(), seasonNumber)
+                .orElse(ShowSeason.builder()
+                    .media(media)
+                    .seasonNumber(seasonNumber)
+                    .episodeCount(0)
+                    .build());
+            season.setName(seasonDetails.getName());
+            season.setOverview(seasonDetails.getOverview());
+            season.setPosterPath(seasonDetails.getPosterPath());
+            season.setAirDate(TmdbMovieDTO.parseDate(seasonDetails.getAirDate()).orElse(null));
+            season.setEpisodeCount(seasonDetails.getEpisodeCount() == null ? seasonEpisodes.size() : seasonDetails.getEpisodeCount());
+            season.setLastTmdbSyncAt(now);
+            ShowSeason savedSeason = showSeasonRepository.save(season);
 
-        showEpisodeRepository.deleteByMediaIdAndSeasonNumber(media.getId(), seasonNumber);
-        showEpisodeRepository.flush();
-        List<ShowEpisode> savedEpisodes = seasonEpisodes.isEmpty()
-            ? List.of()
-            : showEpisodeRepository.saveAll(seasonEpisodes.stream()
-                .map(episode -> showMetadataMapper.mapToCachedEpisode(media, seasonNumber, episode, now))
-                .toList());
+            showEpisodeRepository.deleteByMediaIdAndSeasonNumber(media.getId(), seasonNumber);
+            showEpisodeRepository.flush();
+            List<ShowEpisode> savedEpisodes = seasonEpisodes.isEmpty()
+                ? List.of()
+                : showEpisodeRepository.saveAll(seasonEpisodes.stream()
+                    .map(episode -> showMetadataMapper.mapToCachedEpisode(media, seasonNumber, episode, now))
+                    .toList());
 
-        return new CachedSeasonData(savedSeason, savedEpisodes);
+            return new CachedSeasonData(savedSeason, savedEpisodes);
+        });
     }
 
     private int compareEpisodeOrder(Integer leftSeason, Integer leftEpisode, Integer rightSeason, Integer rightEpisode) {

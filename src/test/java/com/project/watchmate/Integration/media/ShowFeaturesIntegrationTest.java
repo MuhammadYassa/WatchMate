@@ -10,12 +10,16 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.test.web.servlet.MvcResult;
+
+import com.project.watchmate.Dto.ShowTrackingJobDTO;
 import com.project.watchmate.Dto.TmdbEpisodeSummaryDTO;
 import com.project.watchmate.Dto.TmdbMovieDTO;
 import com.project.watchmate.Dto.TmdbTvDetailsDTO;
@@ -27,6 +31,9 @@ import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.ShowEpisode;
 import com.project.watchmate.Models.ShowSeason;
+import com.project.watchmate.Models.ShowTrackingJob;
+import com.project.watchmate.Models.ShowTrackingJobStatus;
+import com.project.watchmate.Models.ShowTrackingJobType;
 import com.project.watchmate.Models.UserEpisodeWatch;
 import com.project.watchmate.Models.UserShowTracking;
 import com.project.watchmate.Models.Users;
@@ -321,7 +328,7 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void updateShowStatus_watchedForOngoingShow_returns422WhenFullAiredMetadataIsMissing() throws Exception {
+    void updateShowStatus_watchedForOngoingShow_returns202WhenFullAiredMetadataIsMissing() throws Exception {
         Users user = saveUser("show-status-ongoing-user", true);
         when(tmdbClient.fetchMediaById(eq(9500L), eq(MediaType.SHOW)))
             .thenReturn(TmdbMovieDTO.builder()
@@ -332,7 +339,7 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
                 .releaseDate("2020-01-01")
                 .genres(List.of())
                 .build());
-        when(tmdbClient.fetchTvDetailsById(eq(9500L))).thenReturn(tmdbTvDetailsWithId(9500L));
+        when(tmdbClient.fetchTvDetailsById(eq(9500L))).thenReturn(largeOngoingShowDetailsWithId(9500L));
 
         mockMvc.perform(put("/api/v1/shows/{tmdbId}/status", 9500L)
             .header("Authorization", bearerToken(user))
@@ -340,8 +347,13 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
             .content("""
                 {"status":"WATCHED"}
                 """))
-            .andExpect(status().isUnprocessableContent())
-            .andExpect(jsonPath("$.code").value("SHOW_METADATA_SYNC_REQUIRED"));
+            .andExpect(status().isAccepted())
+            .andExpect(header().string("Location", org.hamcrest.Matchers.startsWith("/api/v1/show-tracking-jobs/")))
+            .andExpect(header().string("Retry-After", "2"))
+            .andExpect(jsonPath("$.status").value("PENDING"))
+            .andExpect(jsonPath("$.jobType").value("MARK_SHOW_UP_TO_DATE"));
+
+        verify(tmdbClient, never()).fetchTvSeasonDetails(eq(9500L), anyInt());
     }
 
     @Test
@@ -427,6 +439,147 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
         assertThat(userEpisodeWatchRepository.findAll()).isEmpty();
     }
 
+    @Test
+    void updateShowStatus_watchedForEndedShow_withLargeMissingMetadata_returns202AndCompletesLater() throws Exception {
+        Users user = saveUser("show-status-ended-job-user", true);
+        Media show = saveMedia(9600L, "Ended Job Show", MediaType.SHOW);
+        when(tmdbClient.fetchTvDetailsById(eq(9600L))).thenReturn(endedShowDetailsWithId(9600L));
+
+        MvcResult mvcResult = mockMvc.perform(put("/api/v1/shows/{tmdbId}/status", 9600L)
+            .header("Authorization", bearerToken(user))
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .content("""
+                {"status":"WATCHED"}
+                """))
+            .andExpect(status().isAccepted())
+            .andReturn();
+
+        ShowTrackingJobDTO job = objectMapper.readValue(mvcResult.getResponse().getContentAsString(), ShowTrackingJobDTO.class);
+        assertThat(showTrackingJobRepository.findById(job.getJobId())).isPresent();
+        verify(tmdbClient, never()).fetchTvSeasonDetails(eq(9600L), anyInt());
+
+        when(tmdbClient.fetchTvSeasonDetails(eq(9600L), eq(1))).thenReturn(singleEpisodeSeason(1, "2020-01-01"));
+        when(tmdbClient.fetchTvSeasonDetails(eq(9600L), eq(2))).thenReturn(singleEpisodeSeason(2, "2020-01-08"));
+        when(tmdbClient.fetchTvSeasonDetails(eq(9600L), eq(3))).thenReturn(singleEpisodeSeason(3, "2020-01-15"));
+        when(tmdbClient.fetchTvSeasonDetails(eq(9600L), eq(4))).thenReturn(singleEpisodeSeason(4, "2020-01-22"));
+
+        showTrackingJobService.pollPendingJobs();
+
+        assertThat(showTrackingJobRepository.findById(job.getJobId())).get()
+            .extracting(com.project.watchmate.Models.ShowTrackingJob::getStatus)
+            .isEqualTo(ShowTrackingJobStatus.COMPLETED);
+        UserShowTracking persistedTracking = userShowTrackingRepository.findByUserAndMedia(user, show).orElseThrow();
+        assertThat(persistedTracking.getStatus()).isEqualTo(WatchStatus.WATCHED);
+        assertThat(persistedTracking.getEpisodesWatchedCount()).isEqualTo(4);
+    }
+
+    @Test
+    void updateShowStatus_repeatingSameBulkAction_returnsExistingPendingJob() throws Exception {
+        Users user = saveUser("show-status-duplicate-job-user", true);
+        when(tmdbClient.fetchMediaById(eq(9601L), eq(MediaType.SHOW)))
+            .thenReturn(TmdbMovieDTO.builder()
+                .id(9601L)
+                .title("Duplicate Job Show")
+                .overview("Duplicate Job overview")
+                .posterPath("/dup.jpg")
+                .releaseDate("2020-01-01")
+                .genres(List.of())
+                .build());
+        when(tmdbClient.fetchTvDetailsById(eq(9601L))).thenReturn(endedShowDetailsWithId(9601L));
+
+        MvcResult first = mockMvc.perform(put("/api/v1/shows/{tmdbId}/status", 9601L)
+            .header("Authorization", bearerToken(user))
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .content("""
+                {"status":"WATCHED"}
+                """))
+            .andExpect(status().isAccepted())
+            .andReturn();
+
+        MvcResult second = mockMvc.perform(put("/api/v1/shows/{tmdbId}/status", 9601L)
+            .header("Authorization", bearerToken(user))
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .content("""
+                {"status":"WATCHED"}
+                """))
+            .andExpect(status().isAccepted())
+            .andReturn();
+
+        ShowTrackingJobDTO firstJob = objectMapper.readValue(first.getResponse().getContentAsString(), ShowTrackingJobDTO.class);
+        ShowTrackingJobDTO secondJob = objectMapper.readValue(second.getResponse().getContentAsString(), ShowTrackingJobDTO.class);
+
+        assertThat(firstJob.getJobId()).isEqualTo(secondJob.getJobId());
+        assertThat(showTrackingJobRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void failedShowTrackingJob_marksFailedWithoutCorruptingTracking() throws Exception {
+        Users user = saveUser("show-status-failed-job-user", true);
+        Media show = saveMedia(9602L, "Failed Job Show", MediaType.SHOW);
+        when(tmdbClient.fetchTvDetailsById(eq(9602L))).thenReturn(endedShowDetailsWithId(9602L));
+
+        MvcResult mvcResult = mockMvc.perform(put("/api/v1/shows/{tmdbId}/status", 9602L)
+            .header("Authorization", bearerToken(user))
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .content("""
+                {"status":"WATCHED"}
+                """))
+            .andExpect(status().isAccepted())
+            .andReturn();
+
+        ShowTrackingJobDTO job = objectMapper.readValue(mvcResult.getResponse().getContentAsString(), ShowTrackingJobDTO.class);
+        when(tmdbClient.fetchTvSeasonDetails(eq(9602L), eq(1)))
+            .thenThrow(new com.project.watchmate.Exception.TmdbUnavailableException("TMDB temporarily unavailable"));
+
+        showTrackingJobService.pollPendingJobs();
+
+        assertThat(showTrackingJobRepository.findById(job.getJobId())).get()
+            .extracting(com.project.watchmate.Models.ShowTrackingJob::getStatus)
+            .isEqualTo(ShowTrackingJobStatus.FAILED);
+        UserShowTracking persistedTracking = userShowTrackingRepository.findByUserAndMedia(user, show).orElseThrow();
+        assertThat(persistedTracking.getStatus()).isEqualTo(WatchStatus.WATCHING);
+        assertThat(userEpisodeWatchRepository.findByUserShowTrackingOrderBySeasonNumberAscEpisodeNumberAsc(persistedTracking)).isEmpty();
+    }
+
+    @Test
+    void showTrackingJobEndpoint_returns404ForDifferentUser() throws Exception {
+        Users owner = saveUser("show-job-owner", true);
+        Users otherUser = saveUser("show-job-other", true);
+        Media show = saveMedia(9603L, "Job Visibility Show", MediaType.SHOW);
+        ShowTrackingJob job = showTrackingJobRepository.save(ShowTrackingJob.builder()
+            .user(owner)
+            .media(show)
+            .jobType(ShowTrackingJobType.MARK_SHOW_WATCHED)
+            .status(ShowTrackingJobStatus.PENDING)
+            .requestedStatus(WatchStatus.WATCHED)
+            .totalSeasons(4)
+            .completedSeasons(0)
+            .build());
+
+        mockMvc.perform(get("/api/v1/show-tracking-jobs/{jobId}", job.getId())
+            .header("Authorization", bearerToken(otherUser)))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("SHOW_TRACKING_JOB_NOT_FOUND"));
+    }
+
+    @Test
+    void claimPendingJob_allowsOnlyOneSuccessfulClaim() {
+        Users owner = saveUser("show-job-claim-user", true);
+        Media show = saveMedia(9604L, "Claimable Job Show", MediaType.SHOW);
+        ShowTrackingJob job = showTrackingJobRepository.save(ShowTrackingJob.builder()
+            .user(owner)
+            .media(show)
+            .jobType(ShowTrackingJobType.MARK_SHOW_UP_TO_DATE)
+            .status(ShowTrackingJobStatus.PENDING)
+            .requestedStatus(WatchStatus.UP_TO_DATE)
+            .totalSeasons(4)
+            .completedSeasons(0)
+            .build());
+
+        assertThat(showTrackingJobService.claimPendingJob(job.getId())).isTrue();
+        assertThat(showTrackingJobService.claimPendingJob(job.getId())).isFalse();
+    }
+
     private ShowEpisode cachedEpisode(Media show, int seasonNumber, int episodeNumber, String airDate) {
         return ShowEpisode.builder()
             .media(show)
@@ -474,6 +627,52 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
             .build();
     }
 
+    private TmdbTvDetailsDTO endedShowDetailsWithId(Long tmdbId) {
+        return TmdbTvDetailsDTO.builder()
+            .id(tmdbId)
+            .name("Ended Show")
+            .overview("A fully ended show payload")
+            .posterPath("/ended.jpg")
+            .backdropPath("/ended-bg.jpg")
+            .firstAirDate("2020-01-01")
+            .voteAverage(8.3)
+            .numberOfSeasons(4)
+            .numberOfEpisodes(4)
+            .lastAirDate("2020-01-22")
+            .status("Ended")
+            .genres(List.of())
+            .seasons(List.of(
+                TmdbTvSeasonSummaryDTO.builder().id(201L).seasonNumber(1).name("Season 1").episodeCount(1).airDate("2020-01-01").build(),
+                TmdbTvSeasonSummaryDTO.builder().id(202L).seasonNumber(2).name("Season 2").episodeCount(1).airDate("2020-01-08").build(),
+                TmdbTvSeasonSummaryDTO.builder().id(203L).seasonNumber(3).name("Season 3").episodeCount(1).airDate("2020-01-15").build(),
+                TmdbTvSeasonSummaryDTO.builder().id(204L).seasonNumber(4).name("Season 4").episodeCount(1).airDate("2020-01-22").build()
+            ))
+            .build();
+    }
+
+    private TmdbTvDetailsDTO largeOngoingShowDetailsWithId(Long tmdbId) {
+        return TmdbTvDetailsDTO.builder()
+            .id(tmdbId)
+            .name("Large Ongoing Show")
+            .overview("A large ongoing show payload")
+            .posterPath("/ongoing-large.jpg")
+            .backdropPath("/ongoing-large-bg.jpg")
+            .firstAirDate("2020-01-01")
+            .voteAverage(8.1)
+            .numberOfSeasons(4)
+            .numberOfEpisodes(4)
+            .lastAirDate("2026-04-01")
+            .status("Returning Series")
+            .genres(List.of())
+            .seasons(List.of(
+                TmdbTvSeasonSummaryDTO.builder().id(301L).seasonNumber(1).name("Season 1").episodeCount(1).airDate("2020-01-01").build(),
+                TmdbTvSeasonSummaryDTO.builder().id(302L).seasonNumber(2).name("Season 2").episodeCount(1).airDate("2021-01-01").build(),
+                TmdbTvSeasonSummaryDTO.builder().id(303L).seasonNumber(3).name("Season 3").episodeCount(1).airDate("2022-01-01").build(),
+                TmdbTvSeasonSummaryDTO.builder().id(304L).seasonNumber(4).name("Season 4").episodeCount(1).airDate("2026-04-01").build()
+            ))
+            .build();
+    }
+
     private TmdbTvSeasonDTO seasonOne() {
         return TmdbTvSeasonDTO.builder()
             .id(101L)
@@ -510,6 +709,27 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
             .episodes(List.of(
                 TmdbTvEpisodeDTO.builder().id(2102L).seasonNumber(21).episodeNumber(2).name("Arrival").overview("Second episode").airDate("2017-04-16").runtime(24).stillPath("/arrival.jpg").build(),
                 TmdbTvEpisodeDTO.builder().id(2101L).seasonNumber(21).episodeNumber(1).name("Departure").overview("First episode").airDate("2017-04-09").runtime(24).stillPath("/departure.jpg").build()))
+            .build();
+    }
+
+    private TmdbTvSeasonDTO singleEpisodeSeason(int seasonNumber, String airDate) {
+        return TmdbTvSeasonDTO.builder()
+            .id(3000L + seasonNumber)
+            .seasonNumber(seasonNumber)
+            .name("Season " + seasonNumber)
+            .airDate(airDate)
+            .episodeCount(1)
+            .episodes(List.of(
+                TmdbTvEpisodeDTO.builder()
+                    .id(4000L + seasonNumber)
+                    .seasonNumber(seasonNumber)
+                    .episodeNumber(1)
+                    .name("Episode " + seasonNumber)
+                    .airDate(airDate)
+                    .runtime(45)
+                    .stillPath("/episode-" + seasonNumber + ".jpg")
+                    .build()
+            ))
             .build();
     }
 }

@@ -1,8 +1,8 @@
 package com.project.watchmate.Services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -24,14 +24,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.quality.Strictness;
 
 import com.project.watchmate.Dto.ShowTrackingDTO;
+import com.project.watchmate.Dto.ShowTrackingJobDTO;
 import com.project.watchmate.Dto.ShowTrackingStatusDTO;
 import com.project.watchmate.Dto.TmdbTvDetailsDTO;
 import com.project.watchmate.Dto.UpdateShowTrackingPositionRequestDTO;
 import com.project.watchmate.Dto.UpdateWatchStatusRequestDTO;
-import com.project.watchmate.Exception.ShowMetadataSyncRequiredException;
 import com.project.watchmate.Models.Media;
 import com.project.watchmate.Models.MediaType;
 import com.project.watchmate.Models.ShowEpisode;
+import com.project.watchmate.Models.ShowTrackingJobStatus;
+import com.project.watchmate.Models.ShowTrackingJobType;
 import com.project.watchmate.Models.UserMediaStatus;
 import com.project.watchmate.Models.UserShowTracking;
 import com.project.watchmate.Models.Users;
@@ -52,7 +54,18 @@ class ShowTrackingServiceTest {
     @Mock
     private UserShowTrackingRepository userShowTrackingRepository;
 
+    @Mock
+    private ShowTrackingJobService showTrackingJobService;
+
+    @Mock
+    private ShowHydrationProperties showHydrationProperties;
+
+    @Mock
+    private ShowTrackingJobProperties showTrackingJobProperties;
+
     private final ShowStatusCalculator showStatusCalculator = new ShowStatusCalculator();
+
+    private ShowTrackingWriteSupport showTrackingWriteSupport;
 
     private ShowTrackingService showTrackingService;
 
@@ -65,10 +78,18 @@ class ShowTrackingServiceTest {
 
     @BeforeEach
     void setUp() {
+        showTrackingWriteSupport = new ShowTrackingWriteSupport(
+            showStatusCalculator,
+            userMediaStatusRepository,
+            userShowTrackingRepository
+        );
         showTrackingService = new ShowTrackingService(
             showCatalogService,
             showStatusCalculator,
-            userMediaStatusRepository,
+            showTrackingWriteSupport,
+            showTrackingJobService,
+            showHydrationProperties,
+            showTrackingJobProperties,
             userShowTrackingRepository
         );
 
@@ -83,6 +104,9 @@ class ShowTrackingServiceTest {
         when(showCatalogService.isEndedShow(any())).thenReturn(false);
         when(showCatalogService.isAiredMetadataAvailable(any(), any())).thenReturn(false);
         when(showCatalogService.isFullMetadataAvailable(any(), any())).thenReturn(false);
+        when(showHydrationProperties.getMaxSynchronousMissingSeasons()).thenReturn(3);
+        when(showHydrationProperties.getMaxSynchronousEpisodes()).thenReturn(100);
+        when(showTrackingJobProperties.isEnabled()).thenReturn(true);
         when(showCatalogService.getAllCachedEpisodes(show.getId())).thenReturn(List.of());
         when(showCatalogService.isAiredEpisode(any())).thenAnswer(inv -> {
             ShowEpisode episode = inv.getArgument(0);
@@ -136,14 +160,15 @@ class ShowTrackingServiceTest {
             .build();
         persistedTracking.set(existing);
 
-        ShowTrackingStatusDTO result = showTrackingService.setShowStatus(
+        ShowTrackingActionResult<ShowTrackingStatusDTO> result = showTrackingService.setShowStatus(
             user,
             999L,
             MediaType.SHOW,
             UpdateWatchStatusRequestDTO.builder().status("TO_WATCH").build()
         );
 
-        assertEquals(WatchStatus.TO_WATCH, result.getStatus());
+        assertFalse(result.isAccepted());
+        assertEquals(WatchStatus.TO_WATCH, result.completedBody().getStatus());
         assertEquals(WatchStatus.TO_WATCH, persistedTracking.get().getStatus());
         assertTrue(persistedTracking.get().getEpisodeWatches().isEmpty());
         assertNull(persistedTracking.get().getWatchPositionSeason());
@@ -152,35 +177,43 @@ class ShowTrackingServiceTest {
 
     @Test
     void setShowStatus_watching_createsZeroEpisodeTracking() {
-        ShowTrackingStatusDTO result = showTrackingService.setShowStatus(
+        ShowTrackingActionResult<ShowTrackingStatusDTO> result = showTrackingService.setShowStatus(
             user,
             999L,
             MediaType.SHOW,
             UpdateWatchStatusRequestDTO.builder().status("WATCHING").build()
         );
 
-        assertEquals(WatchStatus.WATCHING, result.getStatus());
+        assertFalse(result.isAccepted());
+        assertEquals(WatchStatus.WATCHING, result.completedBody().getStatus());
         assertEquals(WatchStatus.WATCHING, persistedTracking.get().getStatus());
         assertTrue(persistedTracking.get().getEpisodeWatches().isEmpty());
         assertEquals(0, persistedTracking.get().getEpisodesWatchedCount());
     }
 
     @Test
-    void setShowStatus_upToDate_whenMetadataMissing_throwsControlledException() {
-        when(showCatalogService.requireAiredEligibleEpisodesFromCache(show, ongoingShow))
-            .thenThrow(new ShowMetadataSyncRequiredException("sync required"));
+    void setShowStatus_upToDate_whenMetadataMissing_returnsAcceptedJob() {
+        when(showCatalogService.getRequiredAiredSeasonNumbers(ongoingShow)).thenReturn(List.of(1, 2));
+        when(showCatalogService.canHydrateSynchronously(show, ongoingShow, List.of(1, 2), showHydrationProperties))
+            .thenReturn(false);
+        when(showTrackingJobService.createOrReuseMarkUpToDateJob(user, show, 2))
+            .thenReturn(ShowTrackingJobDTO.builder()
+                .jobId(44L)
+                .status(ShowTrackingJobStatus.PENDING)
+                .jobType(ShowTrackingJobType.MARK_SHOW_UP_TO_DATE)
+                .tmdbId(999L)
+                .mediaId(show.getId())
+                .build());
 
-        ShowMetadataSyncRequiredException exception = assertThrows(
-            ShowMetadataSyncRequiredException.class,
-            () -> showTrackingService.setShowStatus(
-                user,
-                999L,
-                MediaType.SHOW,
-                UpdateWatchStatusRequestDTO.builder().status("UP_TO_DATE").build()
-            )
+        ShowTrackingActionResult<ShowTrackingStatusDTO> result = showTrackingService.setShowStatus(
+            user,
+            999L,
+            MediaType.SHOW,
+            UpdateWatchStatusRequestDTO.builder().status("UP_TO_DATE").build()
         );
 
-        assertEquals("sync required", exception.getMessage());
+        assertTrue(result.isAccepted());
+        assertEquals(44L, result.acceptedJob().getJobId());
     }
 
     @Test
@@ -193,7 +226,7 @@ class ShowTrackingServiceTest {
             .build();
         when(showCatalogService.requireEpisodeFromCachedSeason(show, 999L, 2, 1)).thenReturn(pointerEpisode);
 
-        ShowTrackingDTO result = showTrackingService.updateWatchPosition(
+        ShowTrackingActionResult<ShowTrackingDTO> result = showTrackingService.updateWatchPosition(
             user,
             999L,
             MediaType.SHOW,
@@ -204,10 +237,11 @@ class ShowTrackingServiceTest {
                 .build()
         );
 
-        assertEquals(WatchStatus.WATCHING, result.getStatus());
-        assertEquals(Integer.valueOf(2), result.getWatchPositionSeason());
-        assertEquals(Integer.valueOf(1), result.getWatchPositionEpisode());
-        assertEquals(0, result.getEpisodesWatchedCount());
+        assertFalse(result.isAccepted());
+        assertEquals(WatchStatus.WATCHING, result.completedBody().getStatus());
+        assertEquals(Integer.valueOf(2), result.completedBody().getWatchPositionSeason());
+        assertEquals(Integer.valueOf(1), result.completedBody().getWatchPositionEpisode());
+        assertEquals(0, result.completedBody().getEpisodesWatchedCount());
         verify(showCatalogService, never()).requireEligibleEpisodesThroughPointerFromCache(any(), any(), any(), any());
     }
 }

@@ -22,7 +22,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(uniqueConstraints = @UniqueConstraint(
+@Table(name = "user_episode_progress", uniqueConstraints = @UniqueConstraint(
     name = "uq_user_episode_progress_progress_season_episode",
     columnNames = {"user_show_progress_id", "season_number", "episode_number"}
 ))

@@ -43,5 +43,45 @@
     "name": "watchmate.discovery.sync.startup-enabled",
     "type": "java.lang.Boolean",
     "description": "Whether startup discovery sync should run when the application becomes ready."
+  },
+  {
+    "name": "watchmate.show-hydration.max-synchronous-missing-seasons",
+    "type": "java.lang.Integer",
+    "description": "Maximum number of missing show seasons that may be hydrated synchronously during a bulk show tracking request."
+  },
+  {
+    "name": "watchmate.show-hydration.max-synchronous-episodes",
+    "type": "java.lang.Integer",
+    "description": "Maximum number of missing show episodes that may be hydrated synchronously during a bulk show tracking request."
+  },
+  {
+    "name": "watchmate.show-hydration.batch-size",
+    "type": "java.lang.Integer",
+    "description": "Number of show seasons to hydrate per bounded batch step."
+  },
+  {
+    "name": "watchmate.show-jobs.enabled",
+    "type": "java.lang.Boolean",
+    "description": "Whether background show tracking jobs are enabled."
+  },
+  {
+    "name": "watchmate.show-jobs.poll-delay-ms",
+    "type": "java.lang.Long",
+    "description": "Fixed delay in milliseconds between show tracking job polling cycles."
+  },
+  {
+    "name": "watchmate.show-jobs.max-jobs-per-poll",
+    "type": "java.lang.Integer",
+    "description": "Maximum number of pending show tracking jobs to attempt per polling cycle."
+  },
+  {
+    "name": "watchmate.show-jobs.stale-running-minutes",
+    "type": "java.lang.Integer",
+    "description": "Minutes after which a running show tracking job is considered stale and eligible for recovery."
+  },
+  {
+    "name": "watchmate.show-jobs.max-attempts",
+    "type": "java.lang.Integer",
+    "description": "Maximum number of processing attempts for one show tracking job before it is marked failed."
   }
 ]}

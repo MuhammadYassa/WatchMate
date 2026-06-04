@@ -69,6 +69,11 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage(), "SHOW_METADATA_SYNC_REQUIRED", null, ex, request);
     }
 
+    @ExceptionHandler(ShowTrackingJobNotFoundException.class)
+    public ResponseEntity<ApiError> handleShowTrackingJobNotFound(ShowTrackingJobNotFoundException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), "SHOW_TRACKING_JOB_NOT_FOUND", null, ex, request);
+    }
+
     @ExceptionHandler(WatchListNotFoundException.class)
     public ResponseEntity<ApiError> handleWatchlistNotFound(WatchListNotFoundException ex, HttpServletRequest request) {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), "WATCHLIST_NOT_FOUND", null, ex, request);

@@ -35,12 +35,14 @@ import com.project.watchmate.Repositories.RefreshTokenRepository;
 import com.project.watchmate.Repositories.ReviewRepository;
 import com.project.watchmate.Repositories.ShowEpisodeRepository;
 import com.project.watchmate.Repositories.ShowSeasonRepository;
+import com.project.watchmate.Repositories.ShowTrackingJobRepository;
 import com.project.watchmate.Repositories.UserEpisodeWatchRepository;
 import com.project.watchmate.Repositories.UserMediaStatusRepository;
 import com.project.watchmate.Repositories.UserShowTrackingRepository;
 import com.project.watchmate.Repositories.UsersRepository;
 import com.project.watchmate.Repositories.WatchListRepository;
 import com.project.watchmate.Services.JwtService;
+import com.project.watchmate.Services.ShowTrackingJobService;
 
 import tools.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.ses.SesClient;
@@ -64,7 +66,8 @@ import static org.mockito.Mockito.mock;
 	"tmdb.api.token=test-token",
 	"app.domain=http://localhost",
 	"verified.sender=test@example.com",
-	"watchmate.discovery.sync.startup-enabled=false"
+	"watchmate.discovery.sync.startup-enabled=false",
+	"watchmate.show-jobs.poll-delay-ms=3600000"
 })
 public abstract class AbstractIntegrationTest {
 
@@ -110,6 +113,9 @@ public abstract class AbstractIntegrationTest {
 	protected UserShowTrackingRepository userShowTrackingRepository;
 
 	@Autowired
+	protected ShowTrackingJobRepository showTrackingJobRepository;
+
+	@Autowired
 	protected GenreRepository genreRepository;
 
 	@Autowired
@@ -123,6 +129,9 @@ public abstract class AbstractIntegrationTest {
 
 	@Autowired
 	protected JwtService jwtService;
+
+	@Autowired
+	protected ShowTrackingJobService showTrackingJobService;
 
 	@MockitoBean
 	protected SesClient sesClient;
@@ -166,6 +175,7 @@ public abstract class AbstractIntegrationTest {
 		followRequestRepository.deleteAll();
 		refreshTokenRepository.deleteAll();
 		reviewRepository.deleteAll();
+		showTrackingJobRepository.deleteAll();
 		userEpisodeWatchRepository.deleteAll();
 		userShowTrackingRepository.deleteAll();
 		userMediaStatusRepository.deleteAll();
