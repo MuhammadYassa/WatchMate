@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.project.watchmate.common.error.EmailDeliveryUnavailableException;
 import com.project.watchmate.common.error.InvalidEmailVerificationTokenException;
 import com.project.watchmate.auth.domain.EmailVerificationToken;
 import com.project.watchmate.user.domain.Users;
@@ -58,7 +59,7 @@ public class EmailVerificationTokenService {
     }
 
     @Transactional
-    public void verifyToken(String token){
+    public void verifyEmailToken(String token){
         Optional<EmailVerificationToken> tokenOpt = tokenRepository.getByToken(token);
         if (tokenOpt.isEmpty()){
             log.warn("Email verification failed reason=token_not_found");
@@ -133,7 +134,10 @@ public class EmailVerificationTokenService {
                     ex.awsErrorDetails() != null ? ex.awsErrorDetails().errorCode() : "unknown",
                     ex.statusCode(),
                     ex);
-                throw ex;
+                throw new EmailDeliveryUnavailableException("Email delivery is temporarily unavailable", ex);
+            } catch (RuntimeException ex) {
+                log.error("Verification email send failed due to client/runtime error", ex);
+                throw new EmailDeliveryUnavailableException("Email delivery is temporarily unavailable", ex);
             }
     }
 

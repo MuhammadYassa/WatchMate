@@ -17,8 +17,10 @@ import com.project.watchmate.common.error.ApiError;
 import com.project.watchmate.auth.dto.LoginResponseDTO;
 import com.project.watchmate.auth.application.EmailVerificationTokenService;
 import com.project.watchmate.auth.application.UserService;
+import com.project.watchmate.common.security.auth.UserPrincipal;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -29,6 +31,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 
 
@@ -49,6 +52,7 @@ public class UserController {
         @ApiResponse(responseCode = "201", description = "User registered"),
         @ApiResponse(responseCode = "400", description = "Validation failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "409", description = "Username or email already in use", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "503", description = "Email delivery unavailable", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequestDTO registerRequest) {
@@ -64,7 +68,7 @@ public class UserController {
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<?> verifyUser(@RequestParam("token") @NotBlank String token){
-        emailVerificationService.verifyToken(token);
+        emailVerificationService.verifyEmailToken(token);
         return ResponseEntity.ok("Email verified successfully");
     }
 
@@ -91,7 +95,7 @@ public class UserController {
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<?> loginUser(@Valid @RequestBody LoginRequestDTO loginRequest){
-        return ResponseEntity.ok(userService.verify(loginRequest));
+        return ResponseEntity.ok(userService.authenticateAndIssueTokens(loginRequest));
     }
 
     @PostMapping("/refresh")
@@ -113,10 +117,14 @@ public class UserController {
         @ApiResponse(responseCode = "200", description = "Logout successful"),
         @ApiResponse(responseCode = "400", description = "Validation failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "403", description = "Refresh token not owned by authenticated user", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<?> logout (@Valid @RequestBody LogoutRequestDTO request) {
-        userService.logout(request.getRefreshToken());
+    public ResponseEntity<?> logout (
+        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @Valid @RequestBody LogoutRequestDTO request
+    ) {
+        userService.logout(userPrincipal, request.getRefreshToken());
         return ResponseEntity.ok("Logged out successfully");
     }
 }

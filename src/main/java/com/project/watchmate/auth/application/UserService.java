@@ -9,12 +9,15 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.project.watchmate.auth.dto.LoginRequestDTO;
 import com.project.watchmate.auth.dto.LoginResponseDTO;
 import com.project.watchmate.auth.dto.RegisterRequestDTO;
 import com.project.watchmate.common.error.EmailException;
+import com.project.watchmate.common.error.RegistrationConflictException;
 import com.project.watchmate.common.error.UsernameException;
+import com.project.watchmate.common.security.auth.UserPrincipal;
 import com.project.watchmate.common.security.jwt.JwtService;
 import com.project.watchmate.auth.domain.RefreshToken;
 import com.project.watchmate.user.domain.Role;
@@ -41,6 +44,7 @@ public class UserService {
 
     private final BCryptPasswordEncoder encoder;
 
+    @Transactional
     public void register(RegisterRequestDTO registerRequest){
         if (userRepo.existsByUsername(registerRequest.getUsername())) {
             log.warn("Registration rejected username already exists username={}", registerRequest.getUsername());
@@ -59,17 +63,17 @@ public class UserService {
                 .emailVerified(false)
                 .role(Role.USER)
                 .build());
-            userRepo.save(user);
+            userRepo.saveAndFlush(user);
 
             emailService.sendVerificationEmail(user.getEmail(), emailService.createToken(user));
             log.info("Registered user username={}", user.getUsername());
         } catch (DataIntegrityViolationException ex){
-            log.error("User registration failed due to database constraint username={}", registerRequest.getUsername(), ex);
-            throw new RuntimeException("Account could not be created. Please try again.", ex);
+            log.warn("Registration failed due to database conflict username={}", registerRequest.getUsername(), ex);
+            throw mapRegistrationConflict(ex);
         }
     }
 
-    public LoginResponseDTO verify(LoginRequestDTO loginRequest) {
+    public LoginResponseDTO authenticateAndIssueTokens(LoginRequestDTO loginRequest) {
         Authentication auth = authManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
 
         if (auth.isAuthenticated()){
@@ -90,12 +94,10 @@ public class UserService {
     }
 
     public LoginResponseDTO refreshToken(String refreshTokenString) {
-        RefreshToken refreshToken = refreshTokenService.verifyRefreshToken(refreshTokenString);
-        Users user = refreshToken.getUser();
+        RefreshToken newRefreshToken = refreshTokenService.rotateRefreshToken(refreshTokenString);
+        Users user = newRefreshToken.getUser();
 
         String newAccessToken = jwtService.generateAccessToken(user.getUsername());
-
-        RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user);
         log.info("Refresh token issued username={}", user.getUsername());
 
         return LoginResponseDTO.builder()
@@ -105,9 +107,33 @@ public class UserService {
             .build();
     }
 
-    public void logout(String refreshTokenString) {
-        refreshTokenService.revokeRefreshToken(refreshTokenString);
-        log.info("Refresh token revoked");
+    public void logout(UserPrincipal userPrincipal, String refreshTokenString) {
+        Users authenticatedUser = userPrincipal.getUser();
+        refreshTokenService.revokeRefreshTokenForUser(refreshTokenString, authenticatedUser);
+        log.info("Refresh token revoked username={}", authenticatedUser.getUsername());
+    }
+
+    private RuntimeException mapRegistrationConflict(DataIntegrityViolationException ex) {
+        String message = collectMessages(ex).toLowerCase();
+        if (message.contains("uq_users_username") || message.contains("users.username")) {
+            return new UsernameException("Username is already taken.");
+        }
+        if (message.contains("uq_users_email") || message.contains("users.email")) {
+            return new EmailException("Email is already in use.");
+        }
+        return new RegistrationConflictException("Account already exists.");
+    }
+
+    private String collectMessages(Throwable throwable) {
+        StringBuilder builder = new StringBuilder();
+        Throwable current = throwable;
+        while (current != null) {
+            if (current.getMessage() != null) {
+                builder.append(current.getMessage()).append(' ');
+            }
+            current = current.getCause();
+        }
+        return builder.toString();
     }
 }
 

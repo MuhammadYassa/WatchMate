@@ -21,7 +21,7 @@ class AuthExternalIntegrationTest extends AbstractIntegrationTest {
 	@Test
 	void register_surfacesSesFailure_asMappedError() throws Exception {
 		when(sesClient.sendEmail(any(SendEmailRequest.class)))
-			.thenThrow(SesException.builder().message("SES unavailable").statusCode(400).build());
+			.thenThrow(SesException.builder().message("SES unavailable").statusCode(503).build());
 
 		mockMvc.perform(post("/api/v1/auth/register")
 			.contentType(MediaType.APPLICATION_JSON)
@@ -29,10 +29,11 @@ class AuthExternalIntegrationTest extends AbstractIntegrationTest {
 				"ses-failure-user",
 				TEST_PASSWORD,
 				"ses-failure@example.com"))))
-			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.code").value("SES_EXCEPTION"));
+			.andExpect(status().isServiceUnavailable())
+			.andExpect(jsonPath("$.code").value("EMAIL_DELIVERY_UNAVAILABLE"));
 
-		assertThat(usersRepository.findByUsername("ses-failure-user")).isPresent();
+		assertThat(usersRepository.findByUsername("ses-failure-user")).isEmpty();
+		assertThat(emailVerificationTokenRepository.findAll()).isEmpty();
 	}
 }
 

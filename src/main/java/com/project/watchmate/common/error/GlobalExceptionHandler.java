@@ -41,9 +41,19 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), "DUPLICATE_EMAIL", null, ex, request);
     }
 
+    @ExceptionHandler(EmailDeliveryUnavailableException.class)
+    public ResponseEntity<ApiError> handleEmailDeliveryUnavailable(EmailDeliveryUnavailableException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), "EMAIL_DELIVERY_UNAVAILABLE", null, ex, request);
+    }
+
     @ExceptionHandler(UsernameException.class)
     public ResponseEntity<ApiError> handleDuplicate(UsernameException ex, HttpServletRequest request){
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), "DUPLICATE_USERNAME", null, ex, request);
+    }
+
+    @ExceptionHandler(RegistrationConflictException.class)
+    public ResponseEntity<ApiError> handleRegistrationConflict(RegistrationConflictException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), "REGISTRATION_CONFLICT", null, ex, request);
     }
 
     @ExceptionHandler(SesException.class)
@@ -54,6 +64,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidRefreshTokenException.class)
     public ResponseEntity<ApiError> handleInvalidRefreshToken(InvalidRefreshTokenException ex, HttpServletRequest request) {
         return buildResponse(HttpStatus.UNAUTHORIZED, ex.getMessage(), "INVALID_REFRESH_TOKEN", null, ex, request);
+    }
+
+    @ExceptionHandler(UnauthorizedRefreshTokenAccessException.class)
+    public ResponseEntity<ApiError> handleUnauthorizedRefreshTokenAccess(UnauthorizedRefreshTokenAccessException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage(), "UNAUTHORIZED_REFRESH_TOKEN_ACCESS", null, ex, request);
     }
 
     @ExceptionHandler(TmdbUnavailableException.class)

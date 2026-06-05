@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -26,14 +27,17 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
+import com.project.watchmate.auth.domain.RefreshToken;
 import com.project.watchmate.auth.dto.LoginRequestDTO;
 import com.project.watchmate.auth.dto.LoginResponseDTO;
 import com.project.watchmate.auth.dto.RegisterRequestDTO;
+import com.project.watchmate.common.error.EmailDeliveryUnavailableException;
 import com.project.watchmate.common.error.EmailException;
 import com.project.watchmate.common.error.InvalidRefreshTokenException;
+import com.project.watchmate.common.error.RegistrationConflictException;
 import com.project.watchmate.common.error.UsernameException;
+import com.project.watchmate.common.security.auth.UserPrincipal;
 import com.project.watchmate.common.security.jwt.JwtService;
-import com.project.watchmate.auth.domain.RefreshToken;
 import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.user.persistence.UsersRepository;
 
@@ -74,24 +78,26 @@ class UserServiceTest {
             .password("password123")
             .build();
     }
+
     @Nested
     @DisplayName("Register Tests")
-    class RegisterTests{
+    class RegisterTests {
         @Test
         void register_WithValidData_ShouldSaveUserAndSendEmail() {
             when(usersRepository.existsByUsername("testuser")).thenReturn(false);
             when(usersRepository.existsByEmail("test@example.com")).thenReturn(false);
-            when(usersRepository.save(any(Users.class))).thenReturn(Objects.requireNonNull(new Users()));
+            when(usersRepository.saveAndFlush(any(Users.class))).thenAnswer(invocation -> invocation.getArgument(0, Users.class));
             when(emailService.createToken(any(Users.class))).thenReturn("verification-token");
 
             userService.register(validRegisterRequest);
 
             ArgumentCaptor<Users> userCaptor = ArgumentCaptor.forClass(Users.class);
-            verify(usersRepository).save(userCaptor.capture());
-            
+            verify(usersRepository).saveAndFlush(userCaptor.capture());
+
             Users savedUser = Objects.requireNonNull(userCaptor.getValue(), "savedUser");
             assertEquals("testuser", savedUser.getUsername());
             assertEquals("test@example.com", savedUser.getEmail());
+            assertEquals(false, savedUser.isEmailVerified());
 
             verify(emailService).sendVerificationEmail("test@example.com", "verification-token");
         }
@@ -102,32 +108,16 @@ class UserServiceTest {
             when(usersRepository.existsByUsername("testuser")).thenReturn(false);
             when(usersRepository.existsByEmail("test@example.com")).thenReturn(false);
             when(encoder.encode("password123")).thenReturn(expectedEncodedPassword);
-            when(usersRepository.save(any(Users.class))).thenReturn(Objects.requireNonNull(new Users()));
+            when(usersRepository.saveAndFlush(any(Users.class))).thenAnswer(invocation -> invocation.getArgument(0, Users.class));
             when(emailService.createToken(any(Users.class))).thenReturn("verification-token");
 
             userService.register(validRegisterRequest);
 
             ArgumentCaptor<Users> userCaptor = ArgumentCaptor.forClass(Users.class);
-            verify(usersRepository).save(userCaptor.capture());
-            
+            verify(usersRepository).saveAndFlush(userCaptor.capture());
+
             Users savedUser = Objects.requireNonNull(userCaptor.getValue(), "savedUser");
             assertEquals(expectedEncodedPassword, savedUser.getPassword());
-        }
-
-        @Test
-        void register_WithValidData_ShouldSaveUserWithEmailVerifiedToFalse() {
-            when(usersRepository.existsByUsername("testuser")).thenReturn(false);
-            when(usersRepository.existsByEmail("test@example.com")).thenReturn(false);
-            when(usersRepository.save(any(Users.class))).thenReturn(Objects.requireNonNull(new Users()));
-            when(emailService.createToken(any(Users.class))).thenReturn("verification-token");
-
-            userService.register(validRegisterRequest);
-
-            ArgumentCaptor<Users> userCaptor = ArgumentCaptor.forClass(Users.class);
-            verify(usersRepository).save(userCaptor.capture());
-            
-            Users savedUser = Objects.requireNonNull(userCaptor.getValue(), "savedUser");
-            assertEquals(false, savedUser.isEmailVerified());
         }
 
         @Test
@@ -138,46 +128,91 @@ class UserServiceTest {
 
             assertEquals("Username is already taken.", exception.getMessage());
             verify(usersRepository).existsByUsername("testuser");
-            verify(usersRepository, never()).save(any(Users.class));
+            verify(usersRepository, never()).saveAndFlush(any(Users.class));
         }
 
         @Test
         void register_WithExistingEmail_ShouldThrowEmailException() {
             when(usersRepository.existsByUsername("testuser")).thenReturn(false);
             when(usersRepository.existsByEmail("test@example.com")).thenReturn(true);
-            
+
             EmailException exception = assertThrows(EmailException.class, () -> userService.register(validRegisterRequest));
 
             assertEquals("Email is already in use.", exception.getMessage());
             verify(usersRepository).existsByUsername("testuser");
             verify(usersRepository).existsByEmail("test@example.com");
-            verify(usersRepository, never()).save(any(Users.class));
+            verify(usersRepository, never()).saveAndFlush(any(Users.class));
         }
 
         @Test
-        void register_WhenDatabaseFails_ShouldThrowRuntimeException() {
+        void register_WhenDatabaseUsernameConstraintFails_ShouldThrowUsernameException() {
             when(usersRepository.existsByUsername("testuser")).thenReturn(false);
             when(usersRepository.existsByEmail("test@example.com")).thenReturn(false);
-            when(usersRepository.save(any(Users.class)))
-                .thenThrow(new DataIntegrityViolationException("Database error"));
+            when(usersRepository.saveAndFlush(any(Users.class)))
+                .thenThrow(new DataIntegrityViolationException("constraint [uq_users_username]"));
 
-            RuntimeException exception = assertThrows(
-                RuntimeException.class,
+            UsernameException exception = assertThrows(
+                UsernameException.class,
                 () -> userService.register(validRegisterRequest)
             );
-            
-            assertEquals("Account could not be created. Please try again.", exception.getMessage());
-            verify(usersRepository).existsByUsername("testuser");
-            verify(usersRepository).existsByEmail("test@example.com");
-            verify(usersRepository).save(any(Users.class));
+
+            assertEquals("Username is already taken.", exception.getMessage());
+        }
+
+        @Test
+        void register_WhenDatabaseEmailConstraintFails_ShouldThrowEmailException() {
+            when(usersRepository.existsByUsername("testuser")).thenReturn(false);
+            when(usersRepository.existsByEmail("test@example.com")).thenReturn(false);
+            when(usersRepository.saveAndFlush(any(Users.class)))
+                .thenThrow(new DataIntegrityViolationException("constraint [uq_users_email]"));
+
+            EmailException exception = assertThrows(
+                EmailException.class,
+                () -> userService.register(validRegisterRequest)
+            );
+
+            assertEquals("Email is already in use.", exception.getMessage());
+        }
+
+        @Test
+        void register_WhenDatabaseConflictCannotBeParsed_ShouldThrowRegistrationConflictException() {
+            when(usersRepository.existsByUsername("testuser")).thenReturn(false);
+            when(usersRepository.existsByEmail("test@example.com")).thenReturn(false);
+            when(usersRepository.saveAndFlush(any(Users.class)))
+                .thenThrow(new DataIntegrityViolationException("Database error"));
+
+            RegistrationConflictException exception = assertThrows(
+                RegistrationConflictException.class,
+                () -> userService.register(validRegisterRequest)
+            );
+
+            assertEquals("Account already exists.", exception.getMessage());
+        }
+
+        @Test
+        void register_WhenEmailDeliveryFails_ShouldSurfaceDedicatedException() {
+            when(usersRepository.existsByUsername("testuser")).thenReturn(false);
+            when(usersRepository.existsByEmail("test@example.com")).thenReturn(false);
+            when(usersRepository.saveAndFlush(any(Users.class))).thenAnswer(invocation -> invocation.getArgument(0, Users.class));
+            when(emailService.createToken(any(Users.class))).thenReturn("verification-token");
+            doThrow(new EmailDeliveryUnavailableException("Email delivery is temporarily unavailable", new RuntimeException("ses")))
+                .when(emailService)
+                .sendVerificationEmail(anyString(), anyString());
+
+            EmailDeliveryUnavailableException exception = assertThrows(
+                EmailDeliveryUnavailableException.class,
+                () -> userService.register(validRegisterRequest)
+            );
+
+            assertEquals("Email delivery is temporarily unavailable", exception.getMessage());
         }
     }
-    
+
     @Nested
-    @DisplayName("Verify Tests")
-    class VerifyTests{
+    @DisplayName("Authenticate Tests")
+    class AuthenticateTests {
         @Test
-        void verify_WithValidCredentials_ShouldReturnAccessAndRefreshToken(){
+        void authenticateAndIssueTokens_WithValidCredentials_ShouldReturnAccessAndRefreshToken() {
             LoginRequestDTO loginRequest = new LoginRequestDTO("testuser", "password123");
             Users user = Users.builder().username("testuser").build();
 
@@ -197,7 +232,7 @@ class UserServiceTest {
             when(refreshTokenService.createRefreshToken(user)).thenReturn(createdRefreshToken);
             when(jwtService.getAccessTokenExpiry()).thenReturn(expectedExpiry);
 
-            LoginResponseDTO response = userService.verify(loginRequest);
+            LoginResponseDTO response = userService.authenticateAndIssueTokens(loginRequest);
 
             assertEquals("access-token-1", response.getAccessToken());
             assertEquals("refresh-token-1", response.getRefreshToken());
@@ -212,13 +247,13 @@ class UserServiceTest {
         }
 
         @Test
-        void verify_WithInvalidCredentials_ShouldThrowRuntimeException(){
+        void authenticateAndIssueTokens_WithInvalidCredentials_ShouldThrowRuntimeException() {
             LoginRequestDTO loginRequest = new LoginRequestDTO("testuser", "wrong_password");
 
             when(authManager.authenticate(any())).thenReturn(auth);
             when(auth.isAuthenticated()).thenReturn(false);
 
-            RuntimeException exception = assertThrows(RuntimeException.class, () -> userService.verify(loginRequest));
+            RuntimeException exception = assertThrows(RuntimeException.class, () -> userService.authenticateAndIssueTokens(loginRequest));
             assertEquals("Authentication Failed", exception.getMessage());
 
             verify(authManager).authenticate(any());
@@ -230,18 +265,10 @@ class UserServiceTest {
 
     @Nested
     @DisplayName("Refresh Token Tests")
-    class RefreshTokenTests{
+    class RefreshTokenTests {
         @Test
-        void refreshToken_WithValidToken_ShouldReturnNewAccessAndRefreshToken(){
-            Users user = Users.builder().username("testuser").build();
-
-            RefreshToken existingRefreshToken = RefreshToken.builder()
-                .token("refresh-token-old")
-                .user(user)
-                .expiryDate(LocalDateTime.of(2030, 1, 8, 0, 0))
-                .createdAt(LocalDateTime.of(2030, 1, 1, 0, 0))
-                .revoked(false)
-                .build();
+        void refreshToken_WithValidToken_ShouldReturnNewAccessAndRefreshToken() {
+            Users user = Users.builder().username("testuser").id(1L).build();
 
             RefreshToken newRefreshToken = RefreshToken.builder()
                 .token("refresh-token-new")
@@ -253,9 +280,8 @@ class UserServiceTest {
 
             LocalDateTime expectedExpiry = LocalDateTime.of(2030, 1, 1, 0, 0);
 
-            when(refreshTokenService.verifyRefreshToken("refresh-token-old")).thenReturn(existingRefreshToken);
+            when(refreshTokenService.rotateRefreshToken("refresh-token-old")).thenReturn(newRefreshToken);
             when(jwtService.generateAccessToken("testuser")).thenReturn("access-token-new");
-            when(refreshTokenService.createRefreshToken(user)).thenReturn(newRefreshToken);
             when(jwtService.getAccessTokenExpiry()).thenReturn(expectedExpiry);
 
             LoginResponseDTO response = userService.refreshToken("refresh-token-old");
@@ -265,15 +291,15 @@ class UserServiceTest {
             assertEquals(expectedExpiry, response.getAccessTokenExpiry());
             assertEquals("Bearer", response.getTokenType());
 
-            verify(refreshTokenService).verifyRefreshToken("refresh-token-old");
+            verify(refreshTokenService).rotateRefreshToken("refresh-token-old");
             verify(jwtService).generateAccessToken("testuser");
-            verify(refreshTokenService).createRefreshToken(user);
             verify(jwtService).getAccessTokenExpiry();
+            verify(refreshTokenService, never()).createRefreshToken(any(Users.class));
         }
 
         @Test
-        void refreshToken_WithInvalidToken_ShouldThrowInvalidRefreshTokenException(){
-            when(refreshTokenService.verifyRefreshToken("bad-token"))
+        void refreshToken_WithInvalidToken_ShouldThrowInvalidRefreshTokenException() {
+            when(refreshTokenService.rotateRefreshToken("bad-token"))
                 .thenThrow(new InvalidRefreshTokenException("Invalid refresh token"));
 
             InvalidRefreshTokenException exception = assertThrows(
@@ -283,12 +309,18 @@ class UserServiceTest {
 
             assertEquals("Invalid refresh token", exception.getMessage());
 
-            verify(refreshTokenService).verifyRefreshToken("bad-token");
+            verify(refreshTokenService).rotateRefreshToken("bad-token");
             verify(jwtService, never()).generateAccessToken(anyString());
-            verify(refreshTokenService, never()).createRefreshToken(any(Users.class));
         }
     }
+
+    @Test
+    void logout_WithAuthenticatedPrincipal_ShouldRevokeOwnedToken() {
+        Users user = Users.builder().id(1L).username("testuser").build();
+        UserPrincipal userPrincipal = UserPrincipal.builder().user(user).build();
+
+        userService.logout(userPrincipal, "refresh-token");
+
+        verify(refreshTokenService).revokeRefreshTokenForUser("refresh-token", user);
+    }
 }
-
-
-

@@ -6,6 +6,7 @@ import com.project.watchmate.common.integration.support.AbstractIntegrationTest;
 import com.project.watchmate.user.domain.Role;
 import com.project.watchmate.user.domain.Users;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -36,6 +37,16 @@ class JwtSecurityIntegrationTest extends AbstractIntegrationTest {
 			.header("Authorization", "Bearer invalid.jwt.token"))
 			.andExpect(status().isUnauthorized())
 			.andExpect(jsonPath("$.message").value("Authentication failed"))
+			.andExpect(jsonPath("$.code").value("AUTH_FAILED"));
+	}
+
+	@Test
+	void httpBasic_isDisabled_forProtectedEndpoint() throws Exception {
+		saveUser("basic-user", true);
+
+		mockMvc.perform(get("/api/v1/watchlists")
+			.with(httpBasic("basic-user", TEST_PASSWORD)))
+			.andExpect(status().isUnauthorized())
 			.andExpect(jsonPath("$.code").value("AUTH_FAILED"));
 	}
 

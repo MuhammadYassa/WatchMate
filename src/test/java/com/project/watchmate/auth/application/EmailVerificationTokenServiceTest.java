@@ -24,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.project.watchmate.common.error.InvalidEmailVerificationTokenException;
+import com.project.watchmate.common.error.EmailDeliveryUnavailableException;
 import com.project.watchmate.auth.domain.EmailVerificationToken;
 import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.auth.persistence.EmailVerificationTokenRepository;
@@ -31,6 +32,7 @@ import com.project.watchmate.user.persistence.UsersRepository;
 
 import software.amazon.awssdk.services.ses.SesClient;
 import software.amazon.awssdk.services.ses.model.SendEmailRequest;
+import software.amazon.awssdk.services.ses.model.SesException;
 
 @ExtendWith(MockitoExtension.class)
 public class EmailVerificationTokenServiceTest {
@@ -78,7 +80,7 @@ public class EmailVerificationTokenServiceTest {
     @DisplayName("Verify Token Tests")
     class verifyTokenTests{
         @Test
-        void verifyToken_WithValidData_ReturnsTrueAndSetsEmailVerifiedToTrue(){
+        void verifyEmailToken_WithValidData_ReturnsTrueAndSetsEmailVerifiedToTrue(){
             String token = "test-token";
             LocalDateTime expiryDate = LocalDateTime.now().plusDays(4);
             Users user = Users.builder().username("test-user").build();
@@ -86,7 +88,7 @@ public class EmailVerificationTokenServiceTest {
             .thenReturn(Optional.of(EmailVerificationToken.builder().token(token).expiresAt(expiryDate).user(user).build()));
             when(usersRepository.save(any(Users.class))).thenAnswer(invocation -> invocation.getArgument(0, Users.class));
 
-            emailVerificationTokenService.verifyToken(token);
+            emailVerificationTokenService.verifyEmailToken(token);
 
             ArgumentCaptor<Users> captor = ArgumentCaptor.forClass(Users.class);
             verify(usersRepository).save(captor.capture());
@@ -98,18 +100,18 @@ public class EmailVerificationTokenServiceTest {
         }
 
         @Test
-        void verifyToken_WhenTokenNotFound_ReturnsFalseAndDoesNotSaveOrDelete(){
+        void verifyEmailToken_WhenTokenNotFound_ReturnsFalseAndDoesNotSaveOrDelete(){
             String token = "missing-token";
             when(tokenRepository.getByToken(token)).thenReturn(Optional.empty());
 
-            assertThrows(InvalidEmailVerificationTokenException.class, () -> emailVerificationTokenService.verifyToken(token));
+            assertThrows(InvalidEmailVerificationTokenException.class, () -> emailVerificationTokenService.verifyEmailToken(token));
 
             verify(usersRepository, never()).save(any(Users.class));
             verify(tokenRepository, never()).delete(any(EmailVerificationToken.class));
         }
 
         @Test
-        void verifyToken_WhenTokenExpired_ReturnsFalseAndDeletesTokenAndDoesNotSaveUser(){
+        void verifyEmailToken_WhenTokenExpired_ReturnsFalseAndDeletesTokenAndDoesNotSaveUser(){
             String token = "expired-token";
             LocalDateTime pastExpiry = LocalDateTime.now().minusMinutes(1);
             Users user = Users.builder().username("test-user").build();
@@ -120,7 +122,7 @@ public class EmailVerificationTokenServiceTest {
                     .build();
             when(tokenRepository.getByToken(token)).thenReturn(Optional.of(expiredToken));
 
-            assertThrows(InvalidEmailVerificationTokenException.class, () -> emailVerificationTokenService.verifyToken(token));
+            assertThrows(InvalidEmailVerificationTokenException.class, () -> emailVerificationTokenService.verifyEmailToken(token));
 
             verify(tokenRepository).delete(expiredToken);
             verify(usersRepository, never()).save(any(Users.class));
@@ -149,6 +151,21 @@ public class EmailVerificationTokenServiceTest {
             assertEquals("Verify Your Email - WatchMate", request.message().subject().data());
             assertTrue(request.message().body().html().data().contains(token));
             assertTrue(request.message().body().html().data().contains("https://app.example.com/api/v1/auth/verify?token=" + token));
+        }
+
+        @Test
+        void sendVerificationEmail_WhenSesFails_ThrowsEmailDeliveryUnavailableException(){
+            ReflectionTestUtils.setField(emailVerificationTokenService, "appDomain", "https://app.example.com");
+            ReflectionTestUtils.setField(emailVerificationTokenService, "verifiedSender", "noreply@watchmate.com");
+            when(sesClient.sendEmail(any(SendEmailRequest.class)))
+                .thenThrow(SesException.builder().message("SES unavailable").statusCode(503).build());
+
+            EmailDeliveryUnavailableException exception = assertThrows(
+                EmailDeliveryUnavailableException.class,
+                () -> emailVerificationTokenService.sendVerificationEmail("user@example.com", "abc-123-token")
+            );
+
+            assertEquals("Email delivery is temporarily unavailable", exception.getMessage());
         }
     }
 
