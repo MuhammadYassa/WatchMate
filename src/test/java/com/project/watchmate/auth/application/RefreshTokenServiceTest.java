@@ -1,0 +1,177 @@
+package com.project.watchmate.auth.application;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+
+import java.time.LocalDateTime;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.project.watchmate.common.error.InvalidRefreshTokenException;
+import com.project.watchmate.auth.domain.RefreshToken;
+import com.project.watchmate.user.domain.Users;
+import com.project.watchmate.auth.persistence.RefreshTokenRepository;
+
+@ExtendWith(MockitoExtension.class)
+class RefreshTokenServiceTest {
+
+    @Mock
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @InjectMocks
+    private RefreshTokenService refreshTokenService;
+
+    @Nested
+    @DisplayName("Create Refresh Token Tests")
+    class CreateRefreshTokenTests{
+        @Test
+        void createRefreshToken_WithValidCredentials_ShouldSaveAndReturnRefreshToken(){
+            Users user = Users.builder().username("testuser").build();
+
+            when(refreshTokenRepository.save(any(RefreshToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0, RefreshToken.class));
+
+            LocalDateTime beforeCall = LocalDateTime.now();
+
+            RefreshToken token = refreshTokenService.createRefreshToken(user);
+            LocalDateTime afterCall = LocalDateTime.now();
+
+            assertNotNull(token);
+            assertNotNull(token.getToken());
+            assertFalse(token.isRevoked());
+            assertEquals(user, token.getUser());
+
+            assertTrue(!token.getExpiryDate().isBefore(beforeCall.plusDays(7)));
+            assertTrue(!token.getExpiryDate().isAfter(afterCall.plusDays(7)));
+
+            verify(refreshTokenRepository).deleteByUser(user);
+
+            ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
+            verify(refreshTokenRepository).save(captor.capture());
+            RefreshToken saved = captor.getValue();
+            assertNotNull(saved);
+
+            assertEquals(user, saved.getUser());
+            assertNotNull(saved.getToken());
+            assertFalse(saved.isRevoked());
+            assertTrue(!saved.getExpiryDate().isBefore(beforeCall.plusDays(7)));
+            assertTrue(!saved.getExpiryDate().isAfter(afterCall.plusDays(7)));
+            }
+    }
+
+    @Nested
+    @DisplayName("Verify Refresh Token Tests")
+    class VerifyRefreshTokenTests {
+        @Test
+        void verifyRefreshToken_WithValidToken_ShouldReturnRefreshToken() {
+            String refreshTokenString = "refresh-token";
+            LocalDateTime futureExpiry = LocalDateTime.now().plusDays(1);
+            RefreshToken validToken = RefreshToken.builder()
+                .token(refreshTokenString)
+                .expiryDate(futureExpiry)
+                .revoked(false)
+                .build();
+            when(refreshTokenRepository.findByToken(refreshTokenString)).thenReturn(Optional.of(validToken));
+
+            RefreshToken actual = refreshTokenService.verifyRefreshToken(refreshTokenString);
+
+            assertNotNull(actual);
+            assertEquals(validToken, actual);
+            assertEquals(refreshTokenString, actual.getToken());
+            assertFalse(actual.isRevoked());
+            assertEquals(futureExpiry, actual.getExpiryDate());
+            verify(refreshTokenRepository).findByToken(refreshTokenString);
+        }
+
+        @Test
+        void verifyRefreshToken_WhenTokenNotFound_ShouldThrowInvalidRefreshTokenException() {
+            String refreshTokenString = "missing-token";
+            when(refreshTokenRepository.findByToken(refreshTokenString)).thenReturn(Optional.empty());
+
+            InvalidRefreshTokenException exception = assertThrows(
+                InvalidRefreshTokenException.class,
+                () -> refreshTokenService.verifyRefreshToken(refreshTokenString));
+
+            assertEquals("Invalid refresh token", exception.getMessage());
+            verify(refreshTokenRepository).findByToken(refreshTokenString);
+        }
+
+        @Test
+        void verifyRefreshToken_WhenTokenRevoked_ShouldThrowRuntimeException() {
+            String refreshTokenString = "revoked-token";
+            RefreshToken revokedToken = RefreshToken.builder()
+                .token(refreshTokenString)
+                .expiryDate(LocalDateTime.now().plusDays(1))
+                .revoked(true)
+                .build();
+            when(refreshTokenRepository.findByToken(refreshTokenString)).thenReturn(Optional.of(revokedToken));
+
+            RuntimeException exception = assertThrows(
+                RuntimeException.class,
+                () -> refreshTokenService.verifyRefreshToken(refreshTokenString));
+
+            assertEquals("Refresh token has been revoked", exception.getMessage());
+            verify(refreshTokenRepository).findByToken(refreshTokenString);
+        }
+
+        @Test
+        void verifyRefreshToken_WhenTokenExpired_ShouldThrowRuntimeException() {
+            String refreshTokenString = "expired-token";
+            RefreshToken expiredToken = RefreshToken.builder()
+                .token(refreshTokenString)
+                .expiryDate(LocalDateTime.now().minusDays(1))
+                .revoked(false)
+                .build();
+            when(refreshTokenRepository.findByToken(refreshTokenString)).thenReturn(Optional.of(expiredToken));
+
+            RuntimeException exception = assertThrows(
+                RuntimeException.class,
+                () -> refreshTokenService.verifyRefreshToken(refreshTokenString));
+
+            assertEquals("Refresh token has expired", exception.getMessage());
+            verify(refreshTokenRepository).findByToken(refreshTokenString);
+        }
+    }
+
+    @Nested
+    @DisplayName("Revoke Refresh Token Tests")
+    class RevokeRefreshTokenTests{
+        @Test
+        void revokeRefreshToken_WithValidToken_ShouldRevokeRefreshToken(){
+            String refreshTokenString = "refresh-token-to-be-revoked";
+            RefreshToken someRefreshToken = RefreshToken.builder()
+                    .token(refreshTokenString)
+                    .revoked(false)
+                    .expiryDate(LocalDateTime.now())
+                    .build();
+            when(refreshTokenRepository.findByToken(refreshTokenString)).thenReturn(Optional.of(someRefreshToken));
+
+            refreshTokenService.revokeRefreshToken(refreshTokenString);
+
+            ArgumentCaptor<RefreshToken> refreshTokenCaptor = ArgumentCaptor.forClass(RefreshToken.class);
+            verify(refreshTokenRepository).save(refreshTokenCaptor.capture());
+            RefreshToken savedToken = refreshTokenCaptor.getValue();
+            assertNotNull(savedToken);
+            assertEquals(someRefreshToken.getToken(), savedToken.getToken());
+            assertTrue(savedToken.isRevoked());
+            assertEquals(someRefreshToken.getExpiryDate(), savedToken.getExpiryDate());
+        }
+    }
+}
+
+
+

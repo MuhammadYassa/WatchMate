@@ -1,0 +1,80 @@
+package com.project.watchmate.media.integration;
+
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
+import com.project.watchmate.media.tmdb.dto.TmdbMovieDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbResponseDTO;
+import com.project.watchmate.common.integration.support.AbstractIntegrationTest;
+import com.project.watchmate.media.catalog.domain.Media;
+import com.project.watchmate.media.catalog.domain.MediaType;
+import com.project.watchmate.user.domain.Users;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+class ExternalMediaIntegrationTest extends AbstractIntegrationTest {
+
+	@Test
+	void search_returns200_whenTmdbClientProvidesResults() throws Exception {
+		when(tmdbClient.searchMulti(eq("matrix"), eq(1)))
+			.thenReturn(new TmdbResponseDTO(List.of(TmdbMovieDTO.builder()
+				.id(603L)
+				.title("The Matrix")
+				.mediaType("movie")
+				.overview("A computer hacker learns about the true nature of reality.")
+				.posterPath("/matrix.jpg")
+				.releaseDate("1999-03-31")
+				.voteAverage(8.2)
+				.genreIds(List.of())
+				.build()), 1, 1, 1));
+
+		mockMvc.perform(get("/api/v1/media/search")
+			.param("query", "matrix")
+			.param("page", "1"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.currentPage").value(1))
+			.andExpect(jsonPath("$.totalPages").value(1))
+			.andExpect(jsonPath("$.totalResults").value(1))
+			.andExpect(jsonPath("$.searchResults[0].id").value(603))
+			.andExpect(jsonPath("$.searchResults[0].title").value("The Matrix"));
+	}
+
+	@Test
+	void mediaDetails_fetchesAndPersistsMediaWhenMissing() throws Exception {
+		Users user = saveUser("external-details-user", true);
+		when(tmdbClient.fetchMediaById(eq(8101L), eq(MediaType.MOVIE)))
+			.thenReturn(TmdbMovieDTO.builder()
+				.id(8101L)
+				.title("Fetched Movie")
+				.overview("Fetched overview")
+				.posterPath("/fetched.jpg")
+				.releaseDate("2020-01-02")
+				.voteAverage(7.4)
+				.genres(List.of())
+				.build());
+
+        mockMvc.perform(get("/api/v1/movies/{tmdbId}", 8101L)
+            .header("Authorization", bearerToken(user)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tmdbId").value(8101))
+            .andExpect(jsonPath("$.title").value("Fetched Movie"))
+			.andExpect(jsonPath("$.type").value("MOVIE"))
+			.andExpect(jsonPath("$.watchStatus").value("NONE"));
+
+		Media persisted = mediaRepository.findByTmdbIdAndType(8101L, MediaType.MOVIE).orElseThrow();
+
+		assertThat(persisted.getTitle()).isEqualTo("Fetched Movie");
+		assertThat(persisted.getType()).isEqualTo(MediaType.MOVIE);
+	}
+}
+
+
+
+
+

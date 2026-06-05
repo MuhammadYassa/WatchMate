@@ -1,0 +1,178 @@
+package com.project.watchmate.media.tmdb.application;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.project.watchmate.media.tmdb.client.TmdbClient;
+import com.project.watchmate.media.tmdb.dto.TmdbMovieDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbEpisodeSummaryDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbTvDetailsDTO;
+import com.project.watchmate.common.error.MediaNotFoundException;
+import com.project.watchmate.media.catalog.domain.Genre;
+import com.project.watchmate.media.catalog.domain.Media;
+import com.project.watchmate.media.catalog.domain.MediaType;
+import com.project.watchmate.media.catalog.persistence.GenreRepository;
+import com.project.watchmate.media.catalog.persistence.MediaRepository;
+
+@ExtendWith(MockitoExtension.class)
+class TmdbServiceTest {
+
+    @Mock
+    private TmdbClient tmdbClient;
+
+    @Mock
+    private MediaRepository mediaRepository;
+
+    @Mock
+    private GenreRepository genreRepository;
+
+    @InjectMocks
+    private TmdbService tmdbService;
+
+    private TmdbMovieDTO tmdbMovieDto;
+    private static final Long TMDB_ID = 100L;
+
+    @BeforeEach
+    void setUp() {
+        tmdbMovieDto = TmdbMovieDTO.builder()
+            .id(TMDB_ID)
+            .title("Test Movie")
+            .overview("Overview")
+            .posterPath("/path")
+            .voteAverage(8.0)
+            .genreIds(List.of(28L))
+            .genres(List.of())
+            .build();
+    }
+
+    @Nested
+    @DisplayName("Fetch Media By TMDB ID Tests")
+    class FetchMediaByTmdbIdTests {
+
+        @Test
+        void fetchMediaByTmdbId_WhenSuccess_ReturnsMappedMedia() {
+            when(tmdbClient.fetchMediaById(TMDB_ID, MediaType.MOVIE))
+            .thenReturn(tmdbMovieDto);
+            when(genreRepository.findByTmdbGenreIdInAndMediaType(any(), any())).thenReturn(List.of(
+                Genre.builder()
+                    .tmdbGenreId(28L)
+                    .name("Action")
+                    .mediaType(MediaType.MOVIE)
+                    .syncedAt(LocalDateTime.now())
+                    .build()
+            ));
+
+            Media result = tmdbService.fetchMediaByTmdbId(TMDB_ID, MediaType.MOVIE);
+
+            assertNotNull(result);
+            assertEquals(TMDB_ID, result.getTmdbId());
+            assertEquals("Test Movie", result.getTitle());
+            assertEquals(MediaType.MOVIE, result.getType());
+            assertEquals(List.of("Action"), result.getGenres().stream().map(Genre::getName).toList());
+        }
+
+        @Test
+        void fetchMediaByTmdbId_WhenTmdbReturnsNull_ThrowsMediaNotFoundException() {
+            when(tmdbClient.fetchMediaById(TMDB_ID, MediaType.MOVIE)).thenReturn(null);
+
+            MediaNotFoundException exception = assertThrows(MediaNotFoundException.class,
+                () -> tmdbService.fetchMediaByTmdbId(TMDB_ID, MediaType.MOVIE));
+
+            assertEquals("TMDB media not found for ID: " + TMDB_ID, exception.getMessage());
+        }
+    }
+
+    @Nested
+    @DisplayName("Save and Update Media Tests")
+    class SaveAndUpdateMediaTests {
+
+        @Test
+        void saveAndUpdateMedia_WhenNewMedia_SavesEachAndReturnsList() {
+            Media newMedia = Media.builder().tmdbId(200L).title("New").type(MediaType.MOVIE).build();
+            when(mediaRepository.findByTmdbIdAndType(200L, MediaType.MOVIE)).thenReturn(Optional.empty());
+            when(mediaRepository.save(any(Media.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+            List<Media> result = tmdbService.saveAndUpdateMedia(List.of(newMedia));
+
+            assertEquals(1, result.size());
+            assertEquals(200L, result.get(0).getTmdbId());
+            verify(mediaRepository).save(newMedia);
+        }
+
+        @Test
+        void saveAndUpdateMedia_WhenMediaExists_UpdatesAndSavesExisting() {
+            Media inputMedia = Media.builder().tmdbId(TMDB_ID).title("Updated").overview("New overview").type(MediaType.MOVIE).build();
+            Media existingMedia = Media.builder().id(1L).tmdbId(TMDB_ID).title("Old").build();
+            when(mediaRepository.findByTmdbIdAndType(TMDB_ID, MediaType.MOVIE)).thenReturn(Optional.of(existingMedia));
+            when(mediaRepository.save(any(Media.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+            List<Media> result = tmdbService.saveAndUpdateMedia(List.of(inputMedia));
+
+            assertEquals(1, result.size());
+            assertEquals("Updated", existingMedia.getTitle());
+            assertEquals("New overview", existingMedia.getOverview());
+            verify(mediaRepository).save(existingMedia);
+        }
+    }
+
+    @Test
+    void refreshShowSnapshot_WhenShowDetailsProvided_UpdatesCachedNextAiringFields() {
+        Media show = Media.builder().id(1L).tmdbId(200L).type(MediaType.SHOW).title("Show").build();
+        TmdbTvDetailsDTO tvDetails = TmdbTvDetailsDTO.builder()
+            .numberOfSeasons(3)
+            .numberOfEpisodes(24)
+            .lastAirDate("2026-05-01")
+            .status("Returning Series")
+            .nextEpisodeToAir(TmdbEpisodeSummaryDTO.builder()
+                .airDate("2026-06-14")
+                .seasonNumber(3)
+                .episodeNumber(5)
+                .name("Future Episode")
+                .build())
+            .lastEpisodeToAir(TmdbEpisodeSummaryDTO.builder()
+                .seasonNumber(3)
+                .episodeNumber(4)
+                .name("Latest Episode")
+                .build())
+            .build();
+
+        when(mediaRepository.save(any(Media.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Media result = tmdbService.refreshShowSnapshot(show, tvDetails);
+
+        assertEquals(LocalDate.of(2026, 6, 14), result.getNextEpisodeAirDate());
+        assertEquals(Integer.valueOf(3), result.getNextEpisodeSeasonNumber());
+        assertEquals(Integer.valueOf(5), result.getNextEpisodeEpisodeNumber());
+        assertEquals("Future Episode", result.getNextEpisodeName());
+        assertEquals(Integer.valueOf(3), result.getLastEpisodeToAirSeasonNumber());
+        assertEquals(Integer.valueOf(4), result.getLastEpisodeToAirEpisodeNumber());
+        assertEquals("Latest Episode", result.getLastEpisodeToAirName());
+        assertEquals(LocalDate.of(2026, 5, 1), result.getLastAirDate());
+        assertEquals(Integer.valueOf(3), result.getNumberOfSeasons());
+        assertEquals(Integer.valueOf(24), result.getNumberOfEpisodes());
+        assertEquals("Returning Series", result.getTmdbShowStatus());
+    }
+}
+
+
+

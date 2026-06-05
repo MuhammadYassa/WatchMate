@@ -1,0 +1,64 @@
+package com.project.watchmate.genre.application;
+
+import java.util.List;
+import java.util.Objects;
+
+import org.springframework.stereotype.Service;
+
+import com.project.watchmate.media.tmdb.client.TmdbClient;
+import com.project.watchmate.discovery.dto.DiscoveryMediaItemDTO;
+import com.project.watchmate.genre.dto.GenreBrowseResponseDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbResponseDTO;
+import com.project.watchmate.common.error.GenreNotFoundException;
+import com.project.watchmate.common.mapper.WatchMateMapper;
+import com.project.watchmate.media.catalog.domain.Genre;
+import com.project.watchmate.media.catalog.domain.MediaType;
+import com.project.watchmate.media.catalog.persistence.GenreRepository;
+
+import lombok.RequiredArgsConstructor;
+
+@Service
+@RequiredArgsConstructor
+public class GenreBrowseService {
+
+    private final GenreRepository genreRepository;
+
+    private final TmdbClient tmdbClient;
+
+    private final WatchMateMapper watchMateMapper;
+
+    public GenreBrowseResponseDTO browseMovies(String genreName, int page, int size) {
+        return browse(genreName, MediaType.MOVIE, "movie", page, size);
+    }
+
+    public GenreBrowseResponseDTO browseShows(String genreName, int page, int size) {
+        return browse(genreName, MediaType.SHOW, "tv", page, size);
+    }
+
+    private GenreBrowseResponseDTO browse(String genreName, MediaType mediaType, String tmdbType, int page, int size) {
+        Genre genre = genreRepository.findCurrentByNameIgnoreCaseAndMediaType(Objects.requireNonNull(genreName, "genreName"), mediaType)
+            .orElseThrow(() -> new GenreNotFoundException("Genre not found: " + genreName));
+
+        TmdbResponseDTO response = tmdbClient.discoverByGenre(tmdbType, genre.getTmdbGenreId(), page);
+        List<DiscoveryMediaItemDTO> results = response == null || response.getResults() == null
+            ? List.of()
+            : response.getResults().stream()
+                .limit(size)
+                .map(result -> watchMateMapper.mapToDiscoveryMediaItemDTO(result, mediaType))
+                .toList();
+
+        return GenreBrowseResponseDTO.builder()
+            .genre(genre.getName())
+            .mediaType(mediaType)
+            .results(results)
+            .currentPage(response == null ? page : response.getPage())
+            .totalPages(response == null ? 0 : response.getTotalPages())
+            .totalResults(response == null ? 0 : response.getTotalResults())
+            .build();
+    }
+}
+
+
+
+
+

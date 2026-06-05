@@ -1,0 +1,37 @@
+package com.project.watchmate.discovery.persistence;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import com.project.watchmate.discovery.domain.CuratedContent;
+import com.project.watchmate.discovery.domain.CuratedContentCategory;
+
+public interface CuratedContentRepository extends JpaRepository<CuratedContent, Long> {
+
+    @Query("""
+        select curatedContent
+        from CuratedContent curatedContent
+        join fetch curatedContent.media media
+        where curatedContent.categoryKey = :categoryKey
+        order by curatedContent.rankPosition asc
+        """)
+    List<CuratedContent> findByCategoryKeyWithMediaOrderByRankPositionAsc(@Param("categoryKey") CuratedContentCategory categoryKey);
+
+    boolean existsByCategoryKey(CuratedContentCategory categoryKey);
+
+    long countByCategoryKey(CuratedContentCategory categoryKey);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        delete from CuratedContent curatedContent
+        where curatedContent.categoryKey = :categoryKey
+        """)
+    void deleteByCategoryKey(CuratedContentCategory categoryKey);
+}
+
+
+
