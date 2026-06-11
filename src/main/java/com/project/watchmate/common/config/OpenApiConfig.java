@@ -17,7 +17,7 @@ public class OpenApiConfig {
             .info(new Info()
                 .title("WatchMate API")
                 .version("v1")
-                .description("REST API for authentication and watchlist management in WatchMate."))
+                .description("REST API for WatchMate."))
             .components(new Components()
                 .addSecuritySchemes("bearerAuth", new SecurityScheme()
                     .type(SecurityScheme.Type.HTTP)
