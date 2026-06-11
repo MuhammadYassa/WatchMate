@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @Data
 @NoArgsConstructor
@@ -16,9 +17,11 @@ import lombok.NoArgsConstructor;
 public class LoginResponseDTO {
 
     @Schema(description = "Short-lived JWT used to authorize API requests.")
+    @ToString.Exclude
     private String accessToken;
 
     @Schema(description = "Refresh token used to obtain a new access token.")
+    @ToString.Exclude
     private String refreshToken;
 
     @Schema(description = "Timestamp when the access token expires.")

@@ -6,7 +6,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -108,8 +112,10 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(firstLogin.getRefreshToken()).isNotEqualTo(secondLogin.getRefreshToken());
         assertThat(tokens).hasSize(2);
-        assertThat(refreshTokenRepository.findByToken(firstLogin.getRefreshToken())).isPresent();
-        assertThat(refreshTokenRepository.findByToken(secondLogin.getRefreshToken())).isPresent();
+        assertThat(tokens).noneMatch(token -> token.getTokenHash().equals(firstLogin.getRefreshToken()));
+        assertThat(tokens).noneMatch(token -> token.getTokenHash().equals(secondLogin.getRefreshToken()));
+        assertThat(refreshTokenFor(firstLogin.getRefreshToken())).isNotNull();
+        assertThat(refreshTokenFor(secondLogin.getRefreshToken())).isNotNull();
         assertThat(tokens).allMatch(token -> !token.isRevoked());
     }
 
@@ -122,14 +128,16 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
 
         LoginResponseDTO refreshResponse = refresh(firstLogin.getRefreshToken());
 
-        RefreshToken oldFirstToken = refreshTokenRepository.findByToken(firstLogin.getRefreshToken()).orElseThrow();
-        RefreshToken secondToken = refreshTokenRepository.findByToken(secondLogin.getRefreshToken()).orElseThrow();
-        RefreshToken replacementToken = refreshTokenRepository.findByToken(refreshResponse.getRefreshToken()).orElseThrow();
+        RefreshToken oldFirstToken = refreshTokenFor(firstLogin.getRefreshToken());
+        RefreshToken secondToken = refreshTokenFor(secondLogin.getRefreshToken());
+        RefreshToken replacementToken = refreshTokenFor(refreshResponse.getRefreshToken());
 
         assertThat(oldFirstToken.isRevoked()).isTrue();
         assertThat(secondToken.isRevoked()).isFalse();
         assertThat(replacementToken.isRevoked()).isFalse();
         assertThat(refreshResponse.getRefreshToken()).isNotEqualTo(firstLogin.getRefreshToken());
+        assertThat(replacementToken.getTokenHash()).isEqualTo(hashRefreshToken(refreshResponse.getRefreshToken()));
+        assertThat(replacementToken.getTokenHash()).isNotEqualTo(refreshResponse.getRefreshToken());
         assertThat(refreshTokenRepository.findAll()).hasSize(3);
 
         mockMvc.perform(post("/api/v1/auth/refresh")
@@ -192,8 +200,8 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
             .content(refreshRequestBody(firstLogin.getRefreshToken())))
             .andExpect(status().isOk());
 
-        RefreshToken firstToken = refreshTokenRepository.findByToken(firstLogin.getRefreshToken()).orElseThrow();
-        RefreshToken secondToken = refreshTokenRepository.findByToken(secondLogin.getRefreshToken()).orElseThrow();
+        RefreshToken firstToken = refreshTokenFor(firstLogin.getRefreshToken());
+        RefreshToken secondToken = refreshTokenFor(secondLogin.getRefreshToken());
 
         assertThat(firstToken.isRevoked()).isTrue();
         assertThat(secondToken.isRevoked()).isFalse();
@@ -229,7 +237,7 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value("UNAUTHORIZED_REFRESH_TOKEN_ACCESS"));
 
-        assertThat(refreshTokenRepository.findByToken(ownerLogin.getRefreshToken()).orElseThrow().isRevoked()).isFalse();
+        assertThat(refreshTokenFor(ownerLogin.getRefreshToken()).isRevoked()).isFalse();
     }
 
     @Test
@@ -251,7 +259,9 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(response.getAccessToken()).isNotBlank();
         assertThat(response.getRefreshToken()).isNotBlank();
-        assertThat(refreshTokenRepository.findByToken(response.getRefreshToken())).isPresent();
+        RefreshToken persistedRefreshToken = refreshTokenFor(response.getRefreshToken());
+        assertThat(persistedRefreshToken.getTokenHash()).isNotEqualTo(response.getRefreshToken());
+        assertThat(persistedRefreshToken.getTokenHash()).isEqualTo(hashRefreshToken(response.getRefreshToken()));
     }
 
     @Test
@@ -311,5 +321,19 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
         return emailVerificationTokenRepository.findAll().stream()
             .filter(token -> token.getUser().getId().equals(user.getId()))
             .toList();
+    }
+
+    private RefreshToken refreshTokenFor(String rawRefreshToken) {
+        return refreshTokenRepository.findByTokenHash(hashRefreshToken(rawRefreshToken)).orElseThrow();
+    }
+
+    private String hashRefreshToken(String rawRefreshToken) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                .digest(rawRefreshToken.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 is not available", ex);
+        }
     }
 }

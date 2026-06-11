@@ -13,11 +13,11 @@ import com.project.watchmate.auth.domain.RefreshToken;
 
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long>{
 
-    Optional<RefreshToken> findByToken(String token);
+    Optional<RefreshToken> findByTokenHash(String tokenHash);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT rt FROM RefreshToken rt JOIN FETCH rt.user WHERE rt.token = :token")
-    Optional<RefreshToken> findByTokenForUpdate(@Param("token") String token);
+    @Query("SELECT rt FROM RefreshToken rt JOIN FETCH rt.user WHERE rt.tokenHash = :tokenHash")
+    Optional<RefreshToken> findByTokenHashForUpdate(@Param("tokenHash") String tokenHash);
     
 }
 

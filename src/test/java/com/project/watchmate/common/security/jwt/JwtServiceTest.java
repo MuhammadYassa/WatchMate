@@ -41,6 +41,27 @@ class JwtServiceTest {
     void setUp() {
         jwtService = new JwtService();
         ReflectionTestUtils.setField(jwtService, "secret", TEST_SECRET_BASE64);
+        jwtService.initializeSigningKey();
+    }
+
+    @Nested
+    @DisplayName("Initialization Tests")
+    class InitializationTests {
+
+        @Test
+        void initializeSigningKey_WithBlankSecret_ThrowsIllegalStateException() {
+            assertThrows(IllegalStateException.class, () -> jwtServiceWithSecret(" "));
+        }
+
+        @Test
+        void initializeSigningKey_WithInvalidBase64Secret_ThrowsIllegalStateException() {
+            assertThrows(IllegalStateException.class, () -> jwtServiceWithSecret("not-base64"));
+        }
+
+        @Test
+        void initializeSigningKey_WithTooShortDecodedSecret_ThrowsIllegalStateException() {
+            assertThrows(IllegalStateException.class, () -> jwtServiceWithSecret("c2hvcnQ="));
+        }
     }
 
     @Nested
@@ -160,6 +181,13 @@ class JwtServiceTest {
                     .signWith(key)
                     .compact();
         }
+    }
+
+    private JwtService jwtServiceWithSecret(String secret) {
+        JwtService service = new JwtService();
+        ReflectionTestUtils.setField(service, "secret", secret);
+        service.initializeSigningKey();
+        return service;
     }
 }
 

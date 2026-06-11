@@ -20,7 +20,7 @@ import com.project.watchmate.common.error.UserNotFoundException;
 import com.project.watchmate.common.error.UsernameException;
 import com.project.watchmate.common.security.auth.UserPrincipal;
 import com.project.watchmate.common.security.jwt.JwtService;
-import com.project.watchmate.auth.domain.RefreshToken;
+import com.project.watchmate.auth.application.RefreshTokenService.IssuedRefreshToken;
 import com.project.watchmate.user.domain.Role;
 import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.user.persistence.UsersRepository;
@@ -81,12 +81,12 @@ public class UserService {
             Users user = userRepo.findByUsername(loginRequest.getUsername())
                     .orElseThrow(() -> new UserNotFoundException("User not found"));
             String accessToken = jwtService.generateAccessToken(loginRequest.getUsername());
-            RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
+            IssuedRefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
             log.info("Login succeeded username={}", loginRequest.getUsername());
 
             return LoginResponseDTO.builder()
                 .accessToken(accessToken)
-                .refreshToken(refreshToken.getToken())
+                .refreshToken(refreshToken.rawToken())
                 .accessTokenExpiry(jwtService.getAccessTokenExpiry())
                 .build();
         }
@@ -95,15 +95,15 @@ public class UserService {
     }
 
     public LoginResponseDTO refreshToken(String refreshTokenString) {
-        RefreshToken newRefreshToken = refreshTokenService.rotateRefreshToken(refreshTokenString);
-        Users user = newRefreshToken.getUser();
+        IssuedRefreshToken newRefreshToken = refreshTokenService.rotateRefreshToken(refreshTokenString);
+        Users user = newRefreshToken.refreshToken().getUser();
 
         String newAccessToken = jwtService.generateAccessToken(user.getUsername());
         log.info("Refresh token issued username={}", user.getUsername());
 
         return LoginResponseDTO.builder()
             .accessToken(newAccessToken)
-            .refreshToken(newRefreshToken.getToken())
+            .refreshToken(newRefreshToken.rawToken())
             .accessTokenExpiry(jwtService.getAccessTokenExpiry())
             .build();
     }

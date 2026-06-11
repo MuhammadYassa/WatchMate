@@ -13,6 +13,7 @@ import com.project.watchmate.user.domain.Users;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -43,6 +44,26 @@ class ExternalMediaIntegrationTest extends AbstractIntegrationTest {
 			.andExpect(jsonPath("$.totalResults").value(1))
 			.andExpect(jsonPath("$.searchResults[0].id").value(603))
 			.andExpect(jsonPath("$.searchResults[0].title").value("The Matrix"));
+
+		verify(tmdbClient).searchMulti(eq("matrix"), eq(1));
+	}
+
+	@Test
+	void search_withPageBelowMinimum_returns400() throws Exception {
+		mockMvc.perform(get("/api/v1/media/search")
+			.param("query", "matrix")
+			.param("page", "0"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+	}
+
+	@Test
+	void search_withPageAboveMaximum_returns400() throws Exception {
+		mockMvc.perform(get("/api/v1/media/search")
+			.param("query", "matrix")
+			.param("page", "501"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
 	}
 
 	@Test

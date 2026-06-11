@@ -219,7 +219,7 @@ class UserServiceTest {
 
             LocalDateTime expectedExpiry = LocalDateTime.of(2030, 1, 1, 0, 0);
             RefreshToken createdRefreshToken = RefreshToken.builder()
-                .token("refresh-token-1")
+                .tokenHash("refresh-token-hash-1")
                 .user(user)
                 .expiryDate(LocalDateTime.of(2030, 1, 8, 0, 0))
                 .createdAt(LocalDateTime.of(2030, 1, 1, 0, 0))
@@ -230,7 +230,8 @@ class UserServiceTest {
             when(auth.isAuthenticated()).thenReturn(true);
             when(usersRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
             when(jwtService.generateAccessToken("testuser")).thenReturn("access-token-1");
-            when(refreshTokenService.createRefreshToken(user)).thenReturn(createdRefreshToken);
+            when(refreshTokenService.createRefreshToken(user))
+                .thenReturn(new RefreshTokenService.IssuedRefreshToken(createdRefreshToken, "refresh-token-1"));
             when(jwtService.getAccessTokenExpiry()).thenReturn(expectedExpiry);
 
             LoginResponseDTO response = userService.authenticateAndIssueTokens(loginRequest);
@@ -289,7 +290,7 @@ class UserServiceTest {
             Users user = Users.builder().username("testuser").id(1L).build();
 
             RefreshToken newRefreshToken = RefreshToken.builder()
-                .token("refresh-token-new")
+                .tokenHash("refresh-token-hash-new")
                 .user(user)
                 .expiryDate(LocalDateTime.of(2030, 1, 9, 0, 0))
                 .createdAt(LocalDateTime.of(2030, 1, 2, 0, 0))
@@ -298,7 +299,8 @@ class UserServiceTest {
 
             LocalDateTime expectedExpiry = LocalDateTime.of(2030, 1, 1, 0, 0);
 
-            when(refreshTokenService.rotateRefreshToken("refresh-token-old")).thenReturn(newRefreshToken);
+            when(refreshTokenService.rotateRefreshToken("refresh-token-old"))
+                .thenReturn(new RefreshTokenService.IssuedRefreshToken(newRefreshToken, "refresh-token-new"));
             when(jwtService.generateAccessToken("testuser")).thenReturn("access-token-new");
             when(jwtService.getAccessTokenExpiry()).thenReturn(expectedExpiry);
 

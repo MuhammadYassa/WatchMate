@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @Data
 @NoArgsConstructor
@@ -14,6 +15,7 @@ public class LogoutRequestDTO {
 
     @NotBlank(message = "Refresh Token is required")
     @Schema(description = "Refresh token to revoke.")
+    @ToString.Exclude
     private String refreshToken;
 
 }

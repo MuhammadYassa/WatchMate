@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -20,8 +21,32 @@ import io.jsonwebtoken.security.Keys;
 @Service
 public class JwtService {
 
+    private static final int MIN_SECRET_BYTES = 32;
+
     @Value("${jwt.secret}")
     private String secret;
+
+    private SecretKey signingKey;
+
+    @PostConstruct
+    public void initializeSigningKey() {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException("JWT secret must be configured as Base64 text");
+        }
+
+        byte[] keyBytes;
+        try {
+            keyBytes = Decoders.BASE64.decode(secret);
+        } catch (RuntimeException ex) {
+            throw new IllegalStateException("JWT secret must be valid Base64 text", ex);
+        }
+
+        if (keyBytes.length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException("JWT secret must decode to at least 32 bytes");
+        }
+
+        signingKey = Keys.hmacShaKeyFor(keyBytes);
+    }
 
     public String generateAccessToken(String username){
         Map<String, Object> claims = new HashMap<>();
@@ -45,8 +70,10 @@ public class JwtService {
     }
 
     private SecretKey getKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(secret);
-        return Keys.hmacShaKeyFor(keyBytes);
+        if (signingKey == null) {
+            initializeSigningKey();
+        }
+        return signingKey;
     }
 
     public String extractUsername(String token) {

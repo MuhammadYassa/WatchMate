@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Tag(name = "Media", description = "Media discovery endpoints.")
 public class MediaController {
 
+    private static final int MAX_SEARCH_PAGE = 500;
+
     private final SearchService searchService;
 
     @GetMapping("/search")
@@ -41,7 +44,7 @@ public class MediaController {
     })
     public ResponseEntity<PaginatedSearchResponseDTO> getSearchResponse(
         @RequestParam @NotBlank String query,
-        @RequestParam(defaultValue = "1") @Min(1) int page
+        @RequestParam(defaultValue = "1") @Min(1) @Max(MAX_SEARCH_PAGE) int page
     ) {
         PaginatedSearchResponseDTO dto = searchService.search(query, page);
         return ResponseEntity.ok(dto);
