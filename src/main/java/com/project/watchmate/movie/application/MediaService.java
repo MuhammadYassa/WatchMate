@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.project.watchmate.movie.dto.MovieDetailsDTO;
+import com.project.watchmate.common.error.UserNotFoundException;
 import com.project.watchmate.common.mapper.WatchMateMapper;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.media.catalog.domain.MediaType;
@@ -87,7 +88,7 @@ public class MediaService {
 
         Long userId = userParam.getId();
         Users user = usersRepository.findByIdWithFavorites(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new UserNotFoundException("User not found"));
 
         boolean isFavourited = user.getFavorites().contains(media);
         WatchStatus watchStatus = userWatchStatusResolver.resolveWatchStatus(user, media);

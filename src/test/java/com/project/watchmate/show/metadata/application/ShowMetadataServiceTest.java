@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.project.watchmate.show.catalog.application.ShowCatalogService;
 import com.project.watchmate.show.metadata.dto.ShowDetailsDTO;
+import com.project.watchmate.common.error.UserNotFoundException;
 import com.project.watchmate.media.tmdb.dto.TmdbTvDetailsDTO;
 import com.project.watchmate.show.metadata.mapper.ShowMetadataMapper;
 import com.project.watchmate.media.catalog.domain.Media;
@@ -117,12 +118,12 @@ class ShowMetadataServiceTest {
         }
 
         @Test
-        void getShowDetails_WhenUserNotFound_ThrowsRuntimeException() {
+        void getShowDetails_WhenUserNotFound_ThrowsUserNotFoundException() {
             when(showCatalogService.validateShowType(MediaType.SHOW)).thenReturn(MediaType.SHOW);
             when(showCatalogService.findImportedShow(TMDB_ID)).thenReturn(show);
             when(usersRepository.findByIdWithFavorites(1L)).thenReturn(Optional.empty());
 
-            RuntimeException exception = assertThrows(RuntimeException.class,
+            UserNotFoundException exception = assertThrows(UserNotFoundException.class,
                 () -> showMetadataService.getShowDetails(TMDB_ID, MediaType.SHOW, user));
 
             assertEquals("User not found", exception.getMessage());

@@ -20,6 +20,7 @@ import com.project.watchmate.common.error.DuplicateWatchListMediaException;
 import com.project.watchmate.common.error.MediaNotInWatchListException;
 import com.project.watchmate.common.error.UnauthorizedWatchListAccessException;
 import com.project.watchmate.common.error.WatchListNotFoundException;
+import com.project.watchmate.common.error.WatchlistNameConflictException;
 import com.project.watchmate.common.mapper.WatchMateMapper;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.review.domain.Review;
@@ -54,7 +55,7 @@ public class WatchListService {
     
     public WatchListDTO createWatchList(Users user, String name) {
         if (watchListRepository.existsByUserAndNameIgnoreCase(user, name)){
-            throw new IllegalArgumentException("Watchlist Already Exists.");
+            throw new WatchlistNameConflictException("Watchlist Already Exists.");
         }
         WatchList watchList = Objects.requireNonNull(WatchList.builder()
         .name(name)
@@ -84,7 +85,7 @@ public class WatchListService {
         }
 
         if (watchListRepository.existsByUserAndNameIgnoreCase(user, newName)){
-            throw new IllegalArgumentException("A WatchList with this name Already Exists");
+            throw new WatchlistNameConflictException("A WatchList with this name Already Exists");
         }
 
         watchList.setName(newName);

@@ -31,6 +31,7 @@ import com.project.watchmate.common.error.DuplicateWatchListMediaException;
 import com.project.watchmate.common.error.MediaNotInWatchListException;
 import com.project.watchmate.common.error.UnauthorizedWatchListAccessException;
 import com.project.watchmate.common.error.WatchListNotFoundException;
+import com.project.watchmate.common.error.WatchlistNameConflictException;
 import com.project.watchmate.common.mapper.WatchMateMapper;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.watchlist.domain.WatchList;
@@ -98,10 +99,10 @@ class WatchListServiceTest {
         }
 
         @Test
-        void createWatchList_WhenNameExists_ThrowsIllegalArgumentException() {
+        void createWatchList_WhenNameExists_ThrowsWatchlistNameConflictException() {
             when(watchListRepository.existsByUserAndNameIgnoreCase(user, "Existing")).thenReturn(true);
 
-            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+            WatchlistNameConflictException e = assertThrows(WatchlistNameConflictException.class,
                 () -> watchListService.createWatchList(user, "Existing"));
 
             assertEquals("Watchlist Already Exists.", e.getMessage());
@@ -270,11 +271,11 @@ class WatchListServiceTest {
         }
 
         @Test
-        void renameWatchList_WhenNewNameAlreadyExists_ThrowsIllegalArgumentException() {
+        void renameWatchList_WhenNewNameAlreadyExists_ThrowsWatchlistNameConflictException() {
             when(watchListRepository.findById(WATCHLIST_ID)).thenReturn(Optional.of(watchList));
             when(watchListRepository.existsByUserAndNameIgnoreCase(user, "Taken")).thenReturn(true);
 
-            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+            WatchlistNameConflictException e = assertThrows(WatchlistNameConflictException.class,
                 () -> watchListService.renameWatchList(user, WATCHLIST_ID, "Taken"));
                 
             assertEquals("A WatchList with this name Already Exists", e.getMessage());

@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -76,6 +77,23 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), "TMDB_UNAVAILABLE", null, ex, request);
     }
 
+    @ExceptionHandler(TmdbClientException.class)
+    public ResponseEntity<ApiError> handleTmdbClientException(TmdbClientException ex, HttpServletRequest request) {
+        return buildResponse(ex.getStatus(), ex.getMessage(), ex.getCode(), null, ex, request);
+    }
+
+    @ExceptionHandler(WebClientResponseException.class)
+    public ResponseEntity<ApiError> handleWebClientResponse(WebClientResponseException ex, HttpServletRequest request) {
+        HttpStatus status = ex.getStatusCode().value() == 429
+            ? HttpStatus.SERVICE_UNAVAILABLE
+            : HttpStatus.BAD_GATEWAY;
+        String code = status == HttpStatus.SERVICE_UNAVAILABLE ? "EXTERNAL_SERVICE_UNAVAILABLE" : "EXTERNAL_SERVICE_ERROR";
+        String message = status == HttpStatus.SERVICE_UNAVAILABLE
+            ? "External service is temporarily unavailable. Please try again shortly."
+            : "External service request failed.";
+        return buildResponse(status, message, code, null, ex, request);
+    }
+
     @ExceptionHandler(ShowMetadataSyncRequiredException.class)
     public ResponseEntity<ApiError> handleShowMetadataSyncRequired(ShowMetadataSyncRequiredException ex, HttpServletRequest request) {
         return buildResponse(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage(), "SHOW_METADATA_SYNC_REQUIRED", null, ex, request);
@@ -99,6 +117,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DuplicateWatchListMediaException.class)
     public ResponseEntity<ApiError> handleDuplicateEntry(DuplicateWatchListMediaException ex, HttpServletRequest request) {
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), "DUPLICATE_WATCHLIST_ENTRY", null, ex, request);
+    }
+
+    @ExceptionHandler(WatchlistNameConflictException.class)
+    public ResponseEntity<ApiError> handleWatchlistNameConflict(WatchlistNameConflictException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), "WATCHLIST_NAME_CONFLICT", null, ex, request);
     }
 
     @ExceptionHandler(InvalidWatchStatusException.class)

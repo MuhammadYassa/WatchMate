@@ -16,6 +16,7 @@ import com.project.watchmate.auth.dto.LoginResponseDTO;
 import com.project.watchmate.auth.dto.RegisterRequestDTO;
 import com.project.watchmate.common.error.EmailException;
 import com.project.watchmate.common.error.RegistrationConflictException;
+import com.project.watchmate.common.error.UserNotFoundException;
 import com.project.watchmate.common.error.UsernameException;
 import com.project.watchmate.common.security.auth.UserPrincipal;
 import com.project.watchmate.common.security.jwt.JwtService;
@@ -78,7 +79,7 @@ public class UserService {
 
         if (auth.isAuthenticated()){
             Users user = userRepo.findByUsername(loginRequest.getUsername())
-                    .orElseThrow(() -> new RuntimeException("User not Found"));
+                    .orElseThrow(() -> new UserNotFoundException("User not found"));
             String accessToken = jwtService.generateAccessToken(loginRequest.getUsername());
             RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
             log.info("Login succeeded username={}", loginRequest.getUsername());

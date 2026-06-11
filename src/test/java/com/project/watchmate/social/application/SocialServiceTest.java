@@ -310,6 +310,41 @@ class SocialServiceTest {
 
             assertEquals("target", result.getUsername());
             assertEquals(PrivacyStatuses.PUBLIC, result.getPrivacyStatus());
+            assertEquals(FollowStatuses.NOT_FOLLOWING, result.getFollowStatus());
+        }
+
+        @Test
+        void getUserProfileByUsername_WhenViewerFollowsVisibleTarget_ReturnsFollowing() {
+            when(usersRepository.findByUsernameIgnoreCaseAndEmailVerifiedTrue("target")).thenReturn(Optional.of(targetUser));
+            when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
+            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
+            when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(true);
+            when(usersRepository.countFollowersByUserId(TARGET_ID)).thenReturn(1L);
+            when(usersRepository.countFollowingByUserId(TARGET_ID)).thenReturn(0L);
+            when(mediaService.countMoviesWatched(targetUser)).thenReturn(0L);
+            when(mediaService.countShowsWatched(targetUser)).thenReturn(0L);
+            when(watchListService.getWatchListPage(targetUser)).thenReturn(Page.empty());
+
+            UserProfileDTO result = socialService.getUserProfile("target", user);
+
+            assertEquals(FollowStatuses.FOLLOWING, result.getFollowStatus());
+        }
+
+        @Test
+        void getUserProfileByUsername_WhenPrivateProfileNotVisibleAndRequestPending_ReturnsRequested() {
+            targetUser.setPrivacyStatus(PrivacyStatuses.PRIVATE);
+            when(usersRepository.findByUsernameIgnoreCaseAndEmailVerifiedTrue("target")).thenReturn(Optional.of(targetUser));
+            when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
+            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
+            when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
+            when(followRequestRepository.existsByRequestUserAndTargetUserAndStatus(user, targetUser, FollowRequestStatuses.PENDING))
+                .thenReturn(true);
+            when(usersRepository.countFollowersByUserId(TARGET_ID)).thenReturn(0L);
+            when(usersRepository.countFollowingByUserId(TARGET_ID)).thenReturn(0L);
+
+            UserProfileDTO result = socialService.getUserProfile("target", user);
+
+            assertEquals(FollowStatuses.REQUESTED, result.getFollowStatus());
         }
     }
 }

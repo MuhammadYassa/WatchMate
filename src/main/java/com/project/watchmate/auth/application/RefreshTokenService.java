@@ -26,28 +26,6 @@ public class RefreshTokenService {
         return refreshTokenRepository.save(buildRefreshToken(user));
     }
 
-    public RefreshToken verifyRefreshToken(String token) {
-        RefreshToken refreshToken = refreshTokenRepository.findByToken(token)
-            .orElseThrow(() -> new InvalidRefreshTokenException("Invalid refresh token"));
-
-        validateRefreshToken(refreshToken);
-        return refreshToken;
-    }
-
-    @Transactional
-    public void revokeRefreshToken(String token) {
-        refreshTokenRepository.findByToken(token)
-            .ifPresent(refreshToken -> {
-                refreshToken.setRevoked(true);
-                refreshTokenRepository.save(refreshToken);
-            });
-    }
-
-    @Transactional
-    public void revokeAllUserTokens(Users user) {
-        refreshTokenRepository.deleteByUser(user);
-    }
-
     @Transactional
     public RefreshToken rotateRefreshToken(String token) {
         RefreshToken presentedToken = loadRefreshTokenForUpdate(token);

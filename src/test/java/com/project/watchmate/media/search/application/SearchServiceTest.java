@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -234,6 +236,43 @@ class SearchServiceTest {
 
             assertEquals(List.of("Drama Movie"), result.getSearchResults().get(0).getGenres());
             assertEquals(List.of("Drama Show"), result.getSearchResults().get(1).getGenres());
+            verify(genreRepository, times(1)).findByTmdbGenreIdInAndMediaType(List.of(18L), MediaType.MOVIE);
+            verify(genreRepository, times(1)).findByTmdbGenreIdInAndMediaType(List.of(18L), MediaType.SHOW);
+        }
+
+        @Test
+        void search_WhenMultipleMovieResultsHaveGenres_BatchFetchesMovieGenresOnce() {
+            TmdbMovieDTO firstMovie = tmdbMovie("""
+                {
+                  "id": 8,
+                  "media_type": "movie",
+                  "title": "First Movie",
+                  "genre_ids": [28, 80]
+                }
+                """);
+            TmdbMovieDTO secondMovie = tmdbMovie("""
+                {
+                  "id": 9,
+                  "media_type": "movie",
+                  "title": "Second Movie",
+                  "genre_ids": [80, 35]
+                }
+                """);
+
+            when(tmdbClient.searchMulti("batch", 1))
+                .thenReturn(new TmdbResponseDTO(List.of(firstMovie, secondMovie), 1, 1, 2));
+            when(genreRepository.findByTmdbGenreIdInAndMediaType(List.of(28L, 80L, 35L), MediaType.MOVIE))
+                .thenReturn(List.of(
+                    Genre.builder().tmdbGenreId(28L).name("Action").mediaType(MediaType.MOVIE).build(),
+                    Genre.builder().tmdbGenreId(80L).name("Crime").mediaType(MediaType.MOVIE).build(),
+                    Genre.builder().tmdbGenreId(35L).name("Comedy").mediaType(MediaType.MOVIE).build()
+                ));
+
+            PaginatedSearchResponseDTO result = searchService.search("batch", 1);
+
+            assertEquals(List.of("Action", "Crime"), result.getSearchResults().get(0).getGenres());
+            assertEquals(List.of("Crime", "Comedy"), result.getSearchResults().get(1).getGenres());
+            verify(genreRepository, times(1)).findByTmdbGenreIdInAndMediaType(List.of(28L, 80L, 35L), MediaType.MOVIE);
         }
 
         private TmdbMovieDTO tmdbMovie(String json) {

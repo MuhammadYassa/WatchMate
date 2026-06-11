@@ -3,8 +3,10 @@ package com.project.watchmate.show.tracking.application;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,6 +35,7 @@ import com.project.watchmate.show.tracking.dto.ShowTrackingStatusDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbTvDetailsDTO;
 import com.project.watchmate.show.tracking.dto.UpdateShowTrackingPositionRequestDTO;
 import com.project.watchmate.common.dto.UpdateWatchStatusRequestDTO;
+import com.project.watchmate.common.error.TmdbUnavailableException;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.media.catalog.domain.MediaType;
 import com.project.watchmate.media.catalog.domain.ShowEpisode;
@@ -218,6 +221,55 @@ class ShowTrackingServiceTest {
 
         assertTrue(result.isAccepted());
         assertEquals(44L, result.acceptedJob().getJobId());
+    }
+
+    @Test
+    void setShowStatus_upToDate_whenSynchronousHydrationHasRecoverableFailure_returnsAcceptedJob() {
+        when(showCatalogService.getRequiredAiredSeasonNumbers(ongoingShow)).thenReturn(List.of(1, 2));
+        when(showCatalogService.canHydrateSynchronously(show, ongoingShow, List.of(1, 2), showHydrationProperties))
+            .thenReturn(true);
+        when(showCatalogService.hydrateMissingSeasons(eq(show), eq(999L), eq(List.of(1, 2)), eq(3), eq(100)))
+            .thenThrow(new TmdbUnavailableException("TMDB temporarily unavailable"));
+        when(showTrackingJobService.createOrReuseMarkUpToDateJob(user, show, 2))
+            .thenReturn(ShowTrackingJobDTO.builder()
+                .jobId(45L)
+                .status(ShowTrackingJobStatus.PENDING)
+                .jobType(ShowTrackingJobType.MARK_SHOW_UP_TO_DATE)
+                .tmdbId(999L)
+                .mediaId(show.getId())
+                .build());
+
+        ShowTrackingActionResult<ShowTrackingStatusDTO> result = showTrackingService.setShowStatus(
+            user,
+            999L,
+            MediaType.SHOW,
+            UpdateWatchStatusRequestDTO.builder().status("UP_TO_DATE").build()
+        );
+
+        assertTrue(result.isAccepted());
+        assertEquals(45L, result.acceptedJob().getJobId());
+    }
+
+    @Test
+    void setShowStatus_upToDate_whenSynchronousHydrationHasUnexpectedFailure_rethrows() {
+        when(showCatalogService.getRequiredAiredSeasonNumbers(ongoingShow)).thenReturn(List.of(1, 2));
+        when(showCatalogService.canHydrateSynchronously(show, ongoingShow, List.of(1, 2), showHydrationProperties))
+            .thenReturn(true);
+        when(showCatalogService.hydrateMissingSeasons(eq(show), eq(999L), eq(List.of(1, 2)), eq(3), eq(100)))
+            .thenThrow(new IllegalStateException("database write failed"));
+
+        IllegalStateException exception = assertThrows(
+            IllegalStateException.class,
+            () -> showTrackingService.setShowStatus(
+                user,
+                999L,
+                MediaType.SHOW,
+                UpdateWatchStatusRequestDTO.builder().status("UP_TO_DATE").build()
+            )
+        );
+
+        assertEquals("database write failed", exception.getMessage());
+        verify(showTrackingJobService, never()).createOrReuseMarkUpToDateJob(any(), any(), any());
     }
 
     @Test

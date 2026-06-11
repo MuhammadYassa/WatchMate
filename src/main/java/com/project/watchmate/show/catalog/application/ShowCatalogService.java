@@ -163,7 +163,7 @@ public class ShowCatalogService {
             return List.of();
         }
         if (missingSeasonNumbers.size() > maxSeasons) {
-            throw new IllegalArgumentException("Missing season count exceeds synchronous hydration limit.");
+            throw new ShowMetadataSyncRequiredException("Missing season count exceeds synchronous hydration limit.");
         }
 
         int hydratedEpisodes = 0;
@@ -172,7 +172,7 @@ public class ShowCatalogService {
             TmdbTvSeasonDTO seasonDetails = tmdbService.fetchTvSeasonDetails(tmdbId, seasonNumber);
             int episodeCount = seasonDetails.getEpisodes() == null ? 0 : seasonDetails.getEpisodes().size();
             if (hydratedEpisodes + episodeCount > maxEpisodes) {
-                throw new IllegalArgumentException("Missing episode count exceeds synchronous hydration limit.");
+                throw new ShowMetadataSyncRequiredException("Missing episode count exceeds synchronous hydration limit.");
             }
             cacheSeasonDetails(media, seasonNumber, seasonDetails);
             hydratedEpisodes += episodeCount;

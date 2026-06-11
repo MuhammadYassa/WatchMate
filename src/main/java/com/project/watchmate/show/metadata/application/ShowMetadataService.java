@@ -13,6 +13,7 @@ import com.project.watchmate.show.catalog.application.ShowCatalogService;
 import com.project.watchmate.show.metadata.dto.NextEpisodeAiringDTO;
 import com.project.watchmate.show.metadata.dto.ShowDetailsDTO;
 import com.project.watchmate.show.metadata.dto.ShowSeasonsDetailsDTO;
+import com.project.watchmate.common.error.UserNotFoundException;
 import com.project.watchmate.media.tmdb.dto.TmdbTvDetailsDTO;
 import com.project.watchmate.show.metadata.mapper.ShowMetadataMapper;
 import com.project.watchmate.media.catalog.domain.Media;
@@ -87,7 +88,7 @@ public class ShowMetadataService {
 
         Long userId = java.util.Objects.requireNonNull(java.util.Objects.requireNonNull(userParam, "userParam").getId(), "userParam.id");
         Users user = usersRepository.findByIdWithFavorites(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new UserNotFoundException("User not found"));
 
         boolean isFavourited = media != null && user.getFavorites().contains(media);
         UserShowTracking tracking = media == null ? null : userShowTrackingRepository.findByUserAndMedia(user, media).orElse(null);

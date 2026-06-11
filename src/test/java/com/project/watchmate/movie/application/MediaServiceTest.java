@@ -31,6 +31,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import com.project.watchmate.movie.dto.MovieDetailsDTO;
+import com.project.watchmate.common.error.UserNotFoundException;
 import com.project.watchmate.common.mapper.WatchMateMapper;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.media.catalog.domain.MediaType;
@@ -135,11 +136,11 @@ class MediaServiceTest {
         }
 
         @Test
-        void getMovieDetails_WhenUserNotFound_ThrowsRuntimeException() {
+        void getMovieDetails_WhenUserNotFound_ThrowsUserNotFoundException() {
             when(usersRepository.findByIdWithFavorites(1L)).thenReturn(Optional.empty());
             when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, MediaType.MOVIE)).thenReturn(media);
 
-            RuntimeException exception = assertThrows(RuntimeException.class,
+            UserNotFoundException exception = assertThrows(UserNotFoundException.class,
                 () -> mediaService.getMovieDetails(TMDB_ID, user));
             assertEquals("User not found", exception.getMessage());
         }

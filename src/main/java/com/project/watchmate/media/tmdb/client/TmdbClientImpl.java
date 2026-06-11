@@ -7,6 +7,7 @@ import java.net.UnknownHostException;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
@@ -19,6 +20,7 @@ import com.project.watchmate.media.tmdb.dto.TmdbResponseDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbTvDetailsDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbTvSeasonDTO;
 import com.project.watchmate.common.error.MediaNotFoundException;
+import com.project.watchmate.common.error.TmdbClientException;
 import com.project.watchmate.common.error.TmdbUnavailableException;
 import com.project.watchmate.media.catalog.domain.MediaType;
 
@@ -33,6 +35,7 @@ import reactor.netty.http.client.PrematureCloseException;
 @RequiredArgsConstructor
 public class TmdbClientImpl implements TmdbClient {
     private static final String TMDB_UNAVAILABLE_MESSAGE = "TMDB is temporarily unavailable. Please try again shortly.";
+    private static final String TMDB_CLIENT_MESSAGE = "TMDB request failed.";
 
     private final WebClient tmdbWebClient;
 
@@ -206,9 +209,13 @@ public class TmdbClientImpl implements TmdbClient {
             log.error("TMDB {} unavailable context={} status={}", operation, context, ex.getStatusCode().value(), ex);
             return new TmdbUnavailableException(TMDB_UNAVAILABLE_MESSAGE, ex);
         }
+        if (ex.getStatusCode().value() == 429) {
+            log.warn("TMDB {} rate limited context={} status={}", operation, context, ex.getStatusCode().value());
+            return new TmdbClientException(TMDB_UNAVAILABLE_MESSAGE, HttpStatus.SERVICE_UNAVAILABLE, "TMDB_UNAVAILABLE", ex);
+        }
 
         log.warn("TMDB {} failed context={} status={}", operation, context, ex.getStatusCode().value());
-        return ex;
+        return new TmdbClientException(TMDB_CLIENT_MESSAGE, HttpStatus.BAD_GATEWAY, "TMDB_CLIENT_ERROR", ex);
     }
 
     private RuntimeException handleGenericException(Exception ex, String operation, String context) {
@@ -218,9 +225,7 @@ public class TmdbClientImpl implements TmdbClient {
         }
 
         log.error("TMDB {} failed context={}", operation, context, ex);
-        return ex instanceof RuntimeException runtimeException
-            ? runtimeException
-            : new RuntimeException(ex);
+        return new TmdbClientException(TMDB_CLIENT_MESSAGE, HttpStatus.BAD_GATEWAY, "TMDB_CLIENT_ERROR", ex);
     }
 
     private boolean isNetworkOrTimeoutFailure(Throwable throwable) {
@@ -241,7 +246,6 @@ public class TmdbClientImpl implements TmdbClient {
         return false;
     }
 }
-
 
 
 

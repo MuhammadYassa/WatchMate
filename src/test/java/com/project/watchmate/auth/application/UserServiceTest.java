@@ -35,6 +35,7 @@ import com.project.watchmate.common.error.EmailDeliveryUnavailableException;
 import com.project.watchmate.common.error.EmailException;
 import com.project.watchmate.common.error.InvalidRefreshTokenException;
 import com.project.watchmate.common.error.RegistrationConflictException;
+import com.project.watchmate.common.error.UserNotFoundException;
 import com.project.watchmate.common.error.UsernameException;
 import com.project.watchmate.common.security.auth.UserPrincipal;
 import com.project.watchmate.common.security.jwt.JwtService;
@@ -259,6 +260,23 @@ class UserServiceTest {
             verify(authManager).authenticate(any());
             verify(usersRepository, never()).findByUsername(anyString());
             verify(jwtService, never()).generateAccessToken(anyString());
+            verify(refreshTokenService, never()).createRefreshToken(any(Users.class));
+        }
+
+        @Test
+        void authenticateAndIssueTokens_WhenAuthenticatedUserCannotBeLoaded_ShouldThrowUserNotFoundException() {
+            LoginRequestDTO loginRequest = new LoginRequestDTO("missing", "password123");
+
+            when(authManager.authenticate(any())).thenReturn(auth);
+            when(auth.isAuthenticated()).thenReturn(true);
+            when(usersRepository.findByUsername("missing")).thenReturn(Optional.empty());
+
+            UserNotFoundException exception = assertThrows(
+                UserNotFoundException.class,
+                () -> userService.authenticateAndIssueTokens(loginRequest)
+            );
+
+            assertEquals("User not found", exception.getMessage());
             verify(refreshTokenService, never()).createRefreshToken(any(Users.class));
         }
     }

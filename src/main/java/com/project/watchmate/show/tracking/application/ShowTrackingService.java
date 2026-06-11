@@ -21,6 +21,8 @@ import com.project.watchmate.common.dto.UpdateWatchStatusRequestDTO;
 import com.project.watchmate.show.tracking.dto.WatchedEpisodeDTO;
 import com.project.watchmate.common.error.InvalidWatchStatusException;
 import com.project.watchmate.common.error.ShowMetadataSyncRequiredException;
+import com.project.watchmate.common.error.TmdbClientException;
+import com.project.watchmate.common.error.TmdbUnavailableException;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.media.catalog.domain.MediaType;
 import com.project.watchmate.media.catalog.domain.ShowEpisode;
@@ -32,9 +34,11 @@ import com.project.watchmate.media.catalog.domain.WatchStatus;
 import com.project.watchmate.show.tracking.persistence.UserShowTrackingRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ShowTrackingService {
 
     private final ShowCatalogService showCatalogService;
@@ -164,9 +168,18 @@ public class ShowTrackingService {
                 );
                 return ShowTrackingActionResult.completed(completePointerBackfill(user, media, tvDetails, request));
             } catch (RuntimeException ex) {
-                if (!canQueueJobs()) {
+                if (!isRecoverableAsyncFallbackFailure(ex) || !canQueueJobs()) {
+                    log.warn("Synchronous pointer backfill failed without async fallback tmdbId={} season={} episode={}",
+                        tmdbId,
+                        request.getWatchPositionSeason(),
+                        request.getWatchPositionEpisode(),
+                        ex);
                     throw ex;
                 }
+                log.info("Queueing pointer backfill job after recoverable synchronous failure tmdbId={} season={} episode={}",
+                    tmdbId,
+                    request.getWatchPositionSeason(),
+                    request.getWatchPositionEpisode());
                 savePointerOnly(user, media, request.getWatchPositionSeason(), request.getWatchPositionEpisode(), tvDetails);
                 return ShowTrackingActionResult.accepted(createPointerJob(
                     user,
@@ -321,9 +334,16 @@ public class ShowTrackingService {
                 WatchStatus finalStatus = completeBulkStatusUpdate(user, media, tvDetails, resolvedTargetStatus);
                 return ShowTrackingActionResult.completed(mapToStatusDto(tmdbId, finalStatus));
             } catch (RuntimeException ex) {
-                if (!canQueueJobs()) {
+                if (!isRecoverableAsyncFallbackFailure(ex) || !canQueueJobs()) {
+                    log.warn("Synchronous bulk status update failed without async fallback tmdbId={} requestedStatus={}",
+                        tmdbId,
+                        resolvedTargetStatus,
+                        ex);
                     throw ex;
                 }
+                log.info("Queueing bulk status job after recoverable synchronous failure tmdbId={} requestedStatus={}",
+                    tmdbId,
+                    resolvedTargetStatus);
                 ensureTrackingRowExists(user, media);
                 return ShowTrackingActionResult.accepted(createStatusJob(user, media, resolvedTargetStatus, requiredSeasons.size()));
             }
@@ -444,6 +464,12 @@ public class ShowTrackingService {
 
     private boolean canQueueJobs() {
         return showTrackingJobProperties.isEnabled();
+    }
+
+    private boolean isRecoverableAsyncFallbackFailure(RuntimeException ex) {
+        return ex instanceof TmdbUnavailableException
+            || ex instanceof TmdbClientException
+            || ex instanceof ShowMetadataSyncRequiredException;
     }
 
     private List<ShowEpisode> eligibleEpisodesFromCache(Media media) {

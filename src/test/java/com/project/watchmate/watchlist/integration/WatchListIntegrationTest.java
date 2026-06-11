@@ -42,6 +42,19 @@ class WatchListIntegrationTest extends AbstractIntegrationTest {
 	}
 
 	@Test
+	void createWatchlist_returns409_whenNameAlreadyExists() throws Exception {
+		Users user = saveUser("watchlist-create-conflict-user", true);
+		saveWatchList(user, "Weekend Movies");
+
+		mockMvc.perform(post("/api/v1/watchlists")
+			.header("Authorization", bearerToken(user))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(createWatchListBody("weekend movies")))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("WATCHLIST_NAME_CONFLICT"));
+	}
+
+	@Test
 	void getWatchlists_returnsOnlyAuthenticatedUsersWatchlists() throws Exception {
 		Users owner = saveUser("watchlist-owner", true);
 		Users otherUser = saveUser("watchlist-other", true);
@@ -72,6 +85,20 @@ class WatchListIntegrationTest extends AbstractIntegrationTest {
 
 		assertThat(watchListRepository.findById(watchList.getId()).orElseThrow().getName())
 			.isEqualTo("After Rename");
+	}
+
+	@Test
+	void renameWatchlist_returns409_whenNameAlreadyExists() throws Exception {
+		Users owner = saveUser("watchlist-rename-conflict-owner", true);
+		WatchList watchList = saveWatchList(owner, "Before Rename");
+		saveWatchList(owner, "Taken Name");
+
+		mockMvc.perform(patch("/api/v1/watchlists/{id}", watchList.getId())
+			.header("Authorization", bearerToken(owner))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(renameWatchListBody("taken name")))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("WATCHLIST_NAME_CONFLICT"));
 	}
 
 	@Test

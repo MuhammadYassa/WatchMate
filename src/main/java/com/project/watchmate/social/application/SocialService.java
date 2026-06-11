@@ -329,11 +329,12 @@ public class SocialService {
     }
 
     private UserProfileDTO retrieveTargetUserProfile(Users user, Users targetUser){
-        if (usersRepository.isFollowing(user.getId(), targetUser.getId()) || targetUser.getPrivacyStatus() == PrivacyStatuses.PUBLIC || canViewPrivateProfile(user)){
+        boolean isFollowing = usersRepository.isFollowing(user.getId(), targetUser.getId());
+        if (isFollowing || targetUser.getPrivacyStatus() == PrivacyStatuses.PUBLIC || canViewPrivateProfile(user)){
             return UserProfileDTO.builder()
                 .username(targetUser.getUsername())
                 .privacyStatus(targetUser.getPrivacyStatus())
-                .followStatus(FollowStatuses.NOT_FOLLOWING)
+                .followStatus(isFollowing ? FollowStatuses.FOLLOWING : FollowStatuses.NOT_FOLLOWING)
                 .followersCount(usersRepository.countFollowersByUserId(targetUser.getId()))
                 .followingCount(usersRepository.countFollowingByUserId(targetUser.getId()))
                 .watchlists((watchListService.getWatchListPage(targetUser)).map(watchList -> watchListService.mapToWatchListDTO(watchList)))
