@@ -83,5 +83,25 @@
     "name": "watchmate.show-jobs.max-attempts",
     "type": "java.lang.Integer",
     "description": "Maximum number of processing attempts for one show tracking job before it is marked failed."
+  },
+  {
+    "name": "watchmate.cache.enabled",
+    "type": "java.lang.Boolean",
+    "description": "Whether Redis-backed application caching is enabled."
+  },
+  {
+    "name": "spring.data.redis.host",
+    "type": "java.lang.String",
+    "description": "Redis host used by Spring Cache."
+  },
+  {
+    "name": "spring.data.redis.port",
+    "type": "java.lang.Integer",
+    "description": "Redis port used by Spring Cache."
+  },
+  {
+    "name": "spring.data.redis.password",
+    "type": "java.lang.String",
+    "description": "Optional Redis password used by Spring Cache."
   }
 ]}

@@ -6,6 +6,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: ${DB_URL}
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
@@ -17,8 +19,12 @@ services:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      WATCHMATE_CACHE_ENABLED: "true"
     ports:
-      - "8080:8080"
+      - "8080:8080" 
     volumes:
       - ./logs:/app/logs
 
@@ -35,10 +41,21 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
-    ports:
-      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+  redis:
+    image: redis:7.4-alpine
+    container_name: watchmate-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    volumes:
+      - redis_data:/data
 
 volumes:
   mysql_data:
+  redis_data:

@@ -66,6 +66,8 @@ import static org.mockito.Mockito.mock;
 	"tmdb.api.token=test-token",
 	"app.domain=http://localhost",
 	"verified.sender=test@example.com",
+	"spring.cache.type=none",
+	"watchmate.cache.enabled=false",
 	"watchmate.discovery.sync.startup-enabled=false",
 	"watchmate.show-jobs.poll-delay-ms=3600000"
 })
