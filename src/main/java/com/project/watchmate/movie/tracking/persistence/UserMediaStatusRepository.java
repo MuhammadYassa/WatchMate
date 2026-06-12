@@ -19,6 +19,15 @@ public interface UserMediaStatusRepository extends JpaRepository<UserMediaStatus
 
     Optional<UserMediaStatus> findByUserAndMedia(Users user, Media media);
 
+    @Query("""
+        select ums
+        from UserMediaStatus ums
+        join fetch ums.media media
+        where ums.user = :user
+        and media.id in :mediaIds
+        """)
+    List<UserMediaStatus> findByUserAndMediaIdIn(@Param("user") Users user, @Param("mediaIds") Collection<Long> mediaIds);
+
     @Query("select count(ums) " +
         "from UserMediaStatus ums join ums.media m " +
         "where ums.user = :user " +

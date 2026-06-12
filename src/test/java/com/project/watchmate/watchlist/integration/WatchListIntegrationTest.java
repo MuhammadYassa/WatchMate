@@ -7,6 +7,10 @@ import org.springframework.http.MediaType;
 
 import com.project.watchmate.common.integration.support.AbstractIntegrationTest;
 import com.project.watchmate.media.catalog.domain.Media;
+import com.project.watchmate.media.catalog.domain.WatchStatus;
+import com.project.watchmate.movie.tracking.domain.UserMediaStatus;
+import com.project.watchmate.review.domain.Review;
+import com.project.watchmate.show.tracking.domain.UserShowTracking;
 import com.project.watchmate.user.domain.Role;
 import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.watchlist.domain.WatchList;
@@ -99,9 +103,105 @@ class WatchListIntegrationTest extends AbstractIntegrationTest {
 		mockMvc.perform(get("/api/v1/watchlists")
 			.header("Authorization", bearerToken(owner)))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$").isArray())
-			.andExpect(jsonPath("$", hasSize(2)))
-			.andExpect(jsonPath("$[*].name", containsInAnyOrder("Owner List A", "Owner List B")));
+			.andExpect(jsonPath("$.content").isArray())
+			.andExpect(jsonPath("$.content", hasSize(2)))
+			.andExpect(jsonPath("$.totalElements").value(2))
+			.andExpect(jsonPath("$.content[*].name", containsInAnyOrder("Owner List A", "Owner List B")));
+	}
+
+	@Test
+	void getWatchlists_withoutPaginationParams_usesDefaultFirstPage() throws Exception {
+		Users owner = saveUser("watchlist-default-page-owner", true);
+		for (int i = 1; i <= 21; i++) {
+			saveWatchList(owner, "Default Page List " + i);
+		}
+
+		mockMvc.perform(get("/api/v1/watchlists")
+			.header("Authorization", bearerToken(owner)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content", hasSize(20)))
+			.andExpect(jsonPath("$.number").value(0))
+			.andExpect(jsonPath("$.size").value(20))
+			.andExpect(jsonPath("$.totalElements").value(21));
+	}
+
+	@Test
+	void getWatchlists_withPageAndSize_returnsRequestedPage() throws Exception {
+		Users owner = saveUser("watchlist-sized-page-owner", true);
+		saveWatchList(owner, "First Page List");
+		saveWatchList(owner, "Second Page List");
+
+		mockMvc.perform(get("/api/v1/watchlists")
+			.header("Authorization", bearerToken(owner))
+			.param("page", "0")
+			.param("size", "1"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content", hasSize(1)))
+			.andExpect(jsonPath("$.content[0].name").value("First Page List"))
+			.andExpect(jsonPath("$.number").value(0))
+			.andExpect(jsonPath("$.size").value(1))
+			.andExpect(jsonPath("$.totalElements").value(2));
+	}
+
+	@Test
+	void getWatchlists_withInvalidPagination_returns400() throws Exception {
+		Users owner = saveUser("watchlist-invalid-page-owner", true);
+
+		mockMvc.perform(get("/api/v1/watchlists")
+			.header("Authorization", bearerToken(owner))
+			.param("size", "51"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+		mockMvc.perform(get("/api/v1/watchlists")
+			.header("Authorization", bearerToken(owner))
+			.param("size", "0"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+		mockMvc.perform(get("/api/v1/watchlists")
+			.header("Authorization", bearerToken(owner))
+			.param("page", "-1"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+	}
+
+	@Test
+	void getWatchlists_mapsMultipleWatchlistsWithBatchedRelatedData() throws Exception {
+		Users owner = saveUser("watchlist-batch-owner", true);
+		Users reviewer = saveUser("watchlist-batch-reviewer", true);
+		WatchList movieList = saveWatchList(owner, "Movies");
+		WatchList showList = saveWatchList(owner, "Shows");
+		Media movie = saveMedia(9101L, "Batch Movie", com.project.watchmate.media.catalog.domain.MediaType.MOVIE);
+		Media show = saveMedia(9102L, "Batch Show", com.project.watchmate.media.catalog.domain.MediaType.SHOW);
+		saveWatchListItem(movieList, movie);
+		saveWatchListItem(showList, show);
+		saveReview(reviewer, movie, 5, "Great batch movie");
+		saveFavorite(owner, movie);
+		userMediaStatusRepository.save(UserMediaStatus.builder()
+			.user(owner)
+			.media(movie)
+			.status(WatchStatus.WATCHED)
+			.build());
+		userShowTrackingRepository.save(UserShowTracking.builder()
+			.user(owner)
+			.media(show)
+			.status(WatchStatus.UP_TO_DATE)
+			.build());
+
+		mockMvc.perform(get("/api/v1/watchlists")
+			.header("Authorization", bearerToken(owner))
+			.param("page", "0")
+			.param("size", "10"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content", hasSize(2)))
+			.andExpect(jsonPath("$.content[0].media[0].tmdbId").value(movie.getTmdbId().intValue()))
+			.andExpect(jsonPath("$.content[0].media[0].isFavourited").value(true))
+			.andExpect(jsonPath("$.content[0].media[0].watchStatus").value("WATCHED"))
+			.andExpect(jsonPath("$.content[0].media[0].reviews[0].comment").value("Great batch movie"))
+			.andExpect(jsonPath("$.content[1].media[0].tmdbId").value(show.getTmdbId().intValue()))
+			.andExpect(jsonPath("$.content[1].media[0].isFavourited").value(false))
+			.andExpect(jsonPath("$.content[1].media[0].watchStatus").value("UP_TO_DATE"));
 	}
 
 	@Test
@@ -277,6 +377,24 @@ class WatchListIntegrationTest extends AbstractIntegrationTest {
 			.addedAt(LocalDateTime.now())
 			.build());
 		watchListRepository.save(watchList);
+	}
+
+	private void saveReview(Users user, Media media, int rating, String comment) {
+		reviewRepository.save(Review.builder()
+			.user(user)
+			.media(media)
+			.rating(rating)
+			.comment(comment)
+			.datePosted(LocalDateTime.now())
+			.dateLastModified(LocalDateTime.now())
+			.build());
+	}
+
+	private void saveFavorite(Users user, Media media) {
+		jdbcTemplate.update(
+			"insert into user_favorites (users_id, favorites_id) values (?, ?)",
+			user.getId(),
+			media.getId());
 	}
 
 	private void assertWatchListItemCount(WatchList watchList, Media media, int expectedCount) {

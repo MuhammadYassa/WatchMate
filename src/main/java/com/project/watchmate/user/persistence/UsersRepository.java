@@ -1,6 +1,7 @@
 package com.project.watchmate.user.persistence;
 
 import java.util.Optional;
+import java.util.Collection;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
@@ -52,6 +53,9 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
 
     @Query("SELECT DISTINCT u FROM Users u LEFT JOIN FETCH u.favorites WHERE u.id = :userId")
     Optional<Users> findByIdWithFavorites(@Param("userId") Long userId);
+
+    @Query("select favorite.id from Users u join u.favorites favorite where u.id = :userId and favorite.id in :mediaIds")
+    List<Long> findFavoriteMediaIds(@Param("userId") Long userId, @Param("mediaIds") Collection<Long> mediaIds);
 
     @Query("SELECT COUNT(f) > 0 FROM Users u JOIN u.following f WHERE u.id = :followerId AND f.id = :targetId")
     boolean isFollowing(@Param("followerId") Long followerId, @Param("targetId") Long targetId);

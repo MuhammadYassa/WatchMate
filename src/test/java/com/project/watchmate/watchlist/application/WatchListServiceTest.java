@@ -1,12 +1,13 @@
 package com.project.watchmate.watchlist.application;
 
 import com.project.watchmate.media.catalog.application.MediaResolutionService;
-import com.project.watchmate.media.catalog.application.UserWatchStatusResolver;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -24,6 +25,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import com.project.watchmate.media.catalog.dto.MediaDetailsDTO;
@@ -35,10 +39,19 @@ import com.project.watchmate.common.error.WatchListNotFoundException;
 import com.project.watchmate.common.error.WatchlistNameConflictException;
 import com.project.watchmate.common.mapper.WatchMateMapper;
 import com.project.watchmate.media.catalog.domain.Media;
+import com.project.watchmate.media.catalog.domain.MediaType;
+import com.project.watchmate.media.catalog.domain.WatchStatus;
+import com.project.watchmate.movie.tracking.domain.UserMediaStatus;
+import com.project.watchmate.movie.tracking.persistence.UserMediaStatusRepository;
+import com.project.watchmate.review.domain.Review;
 import com.project.watchmate.watchlist.domain.WatchList;
 import com.project.watchmate.watchlist.domain.WatchListItem;
 import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.review.persistence.ReviewRepository;
+import com.project.watchmate.show.tracking.domain.UserShowTracking;
+import com.project.watchmate.show.tracking.persistence.UserShowTrackingRepository;
+import com.project.watchmate.user.persistence.UsersRepository;
+import com.project.watchmate.watchlist.persistence.WatchListItemRepository;
 import com.project.watchmate.watchlist.persistence.WatchListRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -57,7 +70,16 @@ class WatchListServiceTest {
     private ReviewRepository reviewsRepo;
 
     @Mock
-    private UserWatchStatusResolver userWatchStatusResolver;
+    private WatchListItemRepository watchListItemRepository;
+
+    @Mock
+    private UserMediaStatusRepository userMediaStatusRepository;
+
+    @Mock
+    private UserShowTrackingRepository userShowTrackingRepository;
+
+    @Mock
+    private UsersRepository usersRepository;
 
     @InjectMocks
     private WatchListService watchListService;
@@ -75,7 +97,78 @@ class WatchListServiceTest {
         user = Users.builder().id(1L).username("owner").favorites(new ArrayList<>()).build();
         otherUser = Users.builder().id(2L).username("other").build();
         watchList = WatchList.builder().id(WATCHLIST_ID).name("My List").user(user).items(new ArrayList<>()).build();
-        media = Media.builder().id(10L).tmdbId(TMDB_ID).title("Movie").build();
+        media = Media.builder().id(10L).tmdbId(TMDB_ID).title("Movie").type(MediaType.MOVIE).build();
+    }
+
+    @Test
+    void getAllWatchLists_batchesMappingLookupsForCurrentPage() {
+        WatchList secondWatchList = WatchList.builder()
+            .id(2L)
+            .name("Shows")
+            .user(user)
+            .items(new ArrayList<>())
+            .build();
+        Media show = Media.builder()
+            .id(20L)
+            .tmdbId(200L)
+            .title("Show")
+            .type(MediaType.SHOW)
+            .build();
+        WatchListItem movieItem = WatchListItem.builder().watchList(watchList).media(media).build();
+        WatchListItem showItem = WatchListItem.builder().watchList(secondWatchList).media(show).build();
+        Review movieReview = Review.builder().id(1000L).user(user).media(media).rating(4).build();
+        UserMediaStatus movieStatus = UserMediaStatus.builder()
+            .user(user)
+            .media(media)
+            .status(WatchStatus.WATCHED)
+            .build();
+        UserShowTracking showStatus = UserShowTracking.builder()
+            .user(user)
+            .media(show)
+            .status(WatchStatus.UP_TO_DATE)
+            .build();
+
+        when(watchListRepository.findAllByUser(eq(user), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(watchList, secondWatchList)));
+        when(watchListItemRepository.findAllByWatchListIdInWithMediaAndGenres(any()))
+            .thenReturn(List.of(movieItem, showItem));
+        when(reviewsRepo.findAllByMediaIdInWithUserAndMedia(any())).thenReturn(List.of(movieReview));
+        when(usersRepository.findFavoriteMediaIds(eq(user.getId()), any())).thenReturn(List.of(media.getId()));
+        when(userMediaStatusRepository.findByUserAndMediaIdIn(eq(user), any())).thenReturn(List.of(movieStatus));
+        when(userShowTrackingRepository.findByUserAndMediaIdIn(eq(user), any())).thenReturn(List.of(showStatus));
+        when(watchMateMapper.mapToMediaDetailsDTO(any(), any(), any(Boolean.class), any()))
+            .thenAnswer(invocation -> MediaDetailsDTO.builder()
+                .tmdbId(((Media) invocation.getArgument(0)).getTmdbId())
+                .isFavourited(invocation.getArgument(2))
+                .watchStatus(invocation.getArgument(3))
+                .build());
+        when(watchMateMapper.mapToWatchListDTO(any(WatchList.class), any()))
+            .thenAnswer(invocation -> WatchListDTO.builder()
+                .id(((WatchList) invocation.getArgument(0)).getId())
+                .name(((WatchList) invocation.getArgument(0)).getName())
+                .media(invocation.getArgument(1))
+                .build());
+
+        Page<WatchListDTO> result = watchListService.getAllWatchLists(user, 0, 20);
+
+        assertEquals(2, result.getContent().size());
+        assertEquals(1, result.getContent().get(0).getMedia().size());
+        assertEquals(WatchStatus.WATCHED, result.getContent().get(0).getMedia().get(0).getWatchStatus());
+        assertEquals(true, result.getContent().get(0).getMedia().get(0).getIsFavourited());
+        assertEquals(WatchStatus.UP_TO_DATE, result.getContent().get(1).getMedia().get(0).getWatchStatus());
+        assertEquals(false, result.getContent().get(1).getMedia().get(0).getIsFavourited());
+
+        verify(watchListItemRepository).findAllByWatchListIdInWithMediaAndGenres(
+            argThat(ids -> ids.containsAll(List.of(WATCHLIST_ID, 2L)) && ids.size() == 2));
+        verify(reviewsRepo).findAllByMediaIdInWithUserAndMedia(
+            argThat(ids -> ids.containsAll(List.of(media.getId(), show.getId())) && ids.size() == 2));
+        verify(usersRepository).findFavoriteMediaIds(eq(user.getId()),
+            argThat(ids -> ids.containsAll(List.of(media.getId(), show.getId())) && ids.size() == 2));
+        verify(userMediaStatusRepository).findByUserAndMediaIdIn(eq(user),
+            argThat(ids -> ids.containsAll(List.of(media.getId(), show.getId())) && ids.size() == 2));
+        verify(userShowTrackingRepository).findByUserAndMediaIdIn(eq(user),
+            argThat(ids -> ids.containsAll(List.of(media.getId(), show.getId())) && ids.size() == 2));
+        verify(reviewsRepo, never()).findByMedia(any());
     }
 
     @Nested
@@ -168,8 +261,12 @@ class WatchListServiceTest {
             when(watchListRepository.findById(WATCHLIST_ID)).thenReturn(Optional.of(watchList));
             when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
             when(watchListRepository.save(any(WatchList.class))).thenReturn(watchList);
-            when(reviewsRepo.findByMedia(media)).thenReturn(List.of());
-            when(userWatchStatusResolver.resolveWatchStatus(user, media)).thenReturn(com.project.watchmate.media.catalog.domain.WatchStatus.NONE);
+            when(watchListItemRepository.findAllByWatchListIdInWithMediaAndGenres(List.of(WATCHLIST_ID)))
+                .thenReturn(watchList.getItems());
+            when(reviewsRepo.findAllByMediaIdInWithUserAndMedia(any())).thenReturn(List.of());
+            when(usersRepository.findFavoriteMediaIds(eq(user.getId()), any())).thenReturn(List.of());
+            when(userMediaStatusRepository.findByUserAndMediaIdIn(eq(user), any())).thenReturn(List.of());
+            when(userShowTrackingRepository.findByUserAndMediaIdIn(eq(user), any())).thenReturn(List.of());
             WatchListDTO dto = WatchListDTO.builder().id(WATCHLIST_ID).name("My List").build();
             when(watchMateMapper.mapToMediaDetailsDTO(any(), any(), any(Boolean.class), any())).thenReturn(MediaDetailsDTO.builder().build());
             when(watchMateMapper.mapToWatchListDTO(any(WatchList.class), any())).thenReturn(dto);
@@ -219,6 +316,8 @@ class WatchListServiceTest {
             when(watchListRepository.findById(WATCHLIST_ID)).thenReturn(Optional.of(watchList));
             when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
             when(watchListRepository.save(any(WatchList.class))).thenReturn(watchList);
+            when(watchListItemRepository.findAllByWatchListIdInWithMediaAndGenres(List.of(WATCHLIST_ID)))
+                .thenReturn(List.of());
             WatchListDTO dto = WatchListDTO.builder().id(WATCHLIST_ID).name("My List").build();
             when(watchMateMapper.mapToWatchListDTO(any(WatchList.class), any())).thenReturn(dto);
 
@@ -262,6 +361,8 @@ class WatchListServiceTest {
             when(watchListRepository.findById(WATCHLIST_ID)).thenReturn(Optional.of(watchList));
             when(watchListRepository.existsByUserAndNameIgnoreCase(user, "New Name")).thenReturn(false);
             when(watchListRepository.saveAndFlush(any(WatchList.class))).thenReturn(watchList);
+            when(watchListItemRepository.findAllByWatchListIdInWithMediaAndGenres(List.of(WATCHLIST_ID)))
+                .thenReturn(List.of());
             WatchListDTO dto = WatchListDTO.builder().id(WATCHLIST_ID).name("New Name").build();
             when(watchMateMapper.mapToWatchListDTO(any(WatchList.class), any())).thenReturn(dto);
 

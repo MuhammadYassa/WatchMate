@@ -12,7 +12,6 @@ import com.project.watchmate.watchlist.application.WatchListService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -21,8 +20,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
-import java.util.List;
-
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -37,6 +35,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
 @RestController
@@ -47,18 +46,25 @@ import jakarta.validation.constraints.Min;
 @SecurityRequirement(name = "bearerAuth")
 public class WatchListController {
 
+    private static final int MAX_SIZE = 50;
+
     private final WatchListService watchListService;
 
     @GetMapping()
-    @Operation(summary = "List user watchlists", description = "Returns all watchlists owned by the authenticated user.")
+    @Operation(summary = "List user watchlists", description = "Returns a paginated list of watchlists owned by the authenticated user.")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Watchlists returned", content = @Content(array = @ArraySchema(schema = @Schema(implementation = WatchListDTO.class)))),
+        @ApiResponse(responseCode = "200", description = "Watchlists returned"),
+        @ApiResponse(responseCode = "400", description = "Invalid pagination parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<List<WatchListDTO>> getAllWatchLists(@Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal) {
+    public ResponseEntity<Page<WatchListDTO>> getAllWatchLists(
+        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "20") @Min(1) @Max(MAX_SIZE) int size
+    ) {
         Users user = userPrincipal.getUser();
-        List<WatchListDTO> allWatchLists = watchListService.getAllWatchLists(user);
+        Page<WatchListDTO> allWatchLists = watchListService.getAllWatchLists(user, page, size);
         return ResponseEntity.ok(allWatchLists);
     }
 

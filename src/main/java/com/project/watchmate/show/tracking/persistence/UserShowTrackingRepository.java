@@ -20,6 +20,15 @@ public interface UserShowTrackingRepository extends JpaRepository<UserShowTracki
 
     Optional<UserShowTracking> findByUserAndMedia(Users user, Media media);
 
+    @Query("""
+        select ust
+        from UserShowTracking ust
+        join fetch ust.media media
+        where ust.user = :user
+        and media.id in :mediaIds
+        """)
+    List<UserShowTracking> findByUserAndMediaIdIn(@Param("user") Users user, @Param("mediaIds") Collection<Long> mediaIds);
+
     @Query("select distinct ust from UserShowTracking ust " +
         "left join fetch ust.episodeWatches ew " +
         "where ust.user = :user and ust.media = :media")
@@ -87,7 +96,6 @@ public interface UserShowTrackingRepository extends JpaRepository<UserShowTracki
         @Param("to") LocalDate to
     );
 }
-
 
 
 
