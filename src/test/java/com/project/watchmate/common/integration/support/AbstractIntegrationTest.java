@@ -68,6 +68,10 @@ import static org.mockito.Mockito.mock;
 	"verified.sender=test@example.com",
 	"spring.cache.type=none",
 	"watchmate.cache.enabled=false",
+	"spring.data.redis.host=localhost",
+	"spring.data.redis.port=6379",
+	"spring.data.redis.password=",
+	"management.health.redis.enabled=false",
 	"watchmate.discovery.sync.startup-enabled=false",
 	"watchmate.show-jobs.poll-delay-ms=3600000"
 })
