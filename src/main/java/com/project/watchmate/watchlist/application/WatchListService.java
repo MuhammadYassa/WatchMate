@@ -11,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +54,7 @@ public class WatchListService {
         return watchListRepository.findAllByUser(user, pageable);
     }
     
+    @Transactional
     public WatchListDTO createWatchList(Users user, String name) {
         if (watchListRepository.existsByUserAndNameIgnoreCase(user, name)){
             throw new WatchlistNameConflictException("Watchlist Already Exists.");
@@ -62,7 +64,7 @@ public class WatchListService {
         .user(user)
         .build());
 
-        watchListRepository.save(watchList);
+        saveWatchListOrThrowNameConflict(watchList, "Watchlist Already Exists.");
 
         return mapToWatchListDTO(watchList);
     }
@@ -77,6 +79,7 @@ public class WatchListService {
         watchListRepository.delete(watchList);
     }
 
+    @Transactional
     public WatchListDTO renameWatchList(Users user, Long id, String newName) {
         WatchList watchList = watchListRepository.findById(Objects.requireNonNull(id, "id")).orElseThrow(() -> new WatchListNotFoundException("WatchList not found"));
 
@@ -89,9 +92,17 @@ public class WatchListService {
         }
 
         watchList.setName(newName);
-        watchListRepository.save(watchList);
+        saveWatchListOrThrowNameConflict(watchList, "A WatchList with this name Already Exists");
 
         return mapToWatchListDTO(watchList);
+    }
+
+    private void saveWatchListOrThrowNameConflict(WatchList watchList, String conflictMessage) {
+        try {
+            watchListRepository.saveAndFlush(watchList);
+        } catch (DataIntegrityViolationException ex) {
+            throw new WatchlistNameConflictException(conflictMessage);
+        }
     }
 
     public List<WatchListDTO> getAllWatchLists(Users user) {

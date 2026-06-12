@@ -28,7 +28,6 @@ import org.mockito.quality.Strictness;
 import com.project.watchmate.show.catalog.application.ShowCatalogService;
 import com.project.watchmate.show.catalog.application.ShowHydrationProperties;
 import com.project.watchmate.show.jobs.application.ShowTrackingJobProperties;
-import com.project.watchmate.show.jobs.application.ShowTrackingJobService;
 import com.project.watchmate.show.tracking.dto.ShowTrackingDTO;
 import com.project.watchmate.show.jobs.dto.ShowTrackingJobDTO;
 import com.project.watchmate.show.tracking.dto.ShowTrackingStatusDTO;
@@ -62,7 +61,7 @@ class ShowTrackingServiceTest {
     private UserShowTrackingRepository userShowTrackingRepository;
 
     @Mock
-    private ShowTrackingJobService showTrackingJobService;
+    private ShowTrackingFallbackPersistenceService showTrackingFallbackPersistenceService;
 
     @Mock
     private ShowHydrationProperties showHydrationProperties;
@@ -94,7 +93,7 @@ class ShowTrackingServiceTest {
             showCatalogService,
             showStatusCalculator,
             showTrackingWriteSupport,
-            showTrackingJobService,
+            showTrackingFallbackPersistenceService,
             showHydrationProperties,
             showTrackingJobProperties,
             userShowTrackingRepository
@@ -203,7 +202,7 @@ class ShowTrackingServiceTest {
         when(showCatalogService.getRequiredAiredSeasonNumbers(ongoingShow)).thenReturn(List.of(1, 2));
         when(showCatalogService.canHydrateSynchronously(show, ongoingShow, List.of(1, 2), showHydrationProperties))
             .thenReturn(false);
-        when(showTrackingJobService.createOrReuseMarkUpToDateJob(user, show, 2))
+        when(showTrackingFallbackPersistenceService.ensureTrackingRowAndCreateStatusJob(user, show, WatchStatus.UP_TO_DATE, 2))
             .thenReturn(ShowTrackingJobDTO.builder()
                 .jobId(44L)
                 .status(ShowTrackingJobStatus.PENDING)
@@ -230,7 +229,7 @@ class ShowTrackingServiceTest {
             .thenReturn(true);
         when(showCatalogService.hydrateMissingSeasons(eq(show), eq(999L), eq(List.of(1, 2)), eq(3), eq(100)))
             .thenThrow(new TmdbUnavailableException("TMDB temporarily unavailable"));
-        when(showTrackingJobService.createOrReuseMarkUpToDateJob(user, show, 2))
+        when(showTrackingFallbackPersistenceService.ensureTrackingRowAndCreateStatusJob(user, show, WatchStatus.UP_TO_DATE, 2))
             .thenReturn(ShowTrackingJobDTO.builder()
                 .jobId(45L)
                 .status(ShowTrackingJobStatus.PENDING)
@@ -269,7 +268,7 @@ class ShowTrackingServiceTest {
         );
 
         assertEquals("database write failed", exception.getMessage());
-        verify(showTrackingJobService, never()).createOrReuseMarkUpToDateJob(any(), any(), any());
+        verify(showTrackingFallbackPersistenceService, never()).ensureTrackingRowAndCreateStatusJob(any(), any(), any(), any());
     }
 
     @Test
@@ -299,6 +298,96 @@ class ShowTrackingServiceTest {
         assertEquals(Integer.valueOf(1), result.completedBody().getWatchPositionEpisode());
         assertEquals(0, result.completedBody().getEpisodesWatchedCount());
         verify(showCatalogService, never()).requireEligibleEpisodesThroughPointerFromCache(any(), any(), any(), any());
+    }
+
+    @Test
+    void updateWatchPosition_withBackfillWhenMetadataMissing_returnsAcceptedPointerJob() {
+        ShowEpisode pointerEpisode = ShowEpisode.builder()
+            .media(show)
+            .seasonNumber(2)
+            .episodeNumber(1)
+            .airDate(LocalDate.of(2020, 2, 1))
+            .build();
+        when(showCatalogService.requireEpisodeFromCachedSeason(show, 999L, 2, 1)).thenReturn(pointerEpisode);
+        when(showCatalogService.getRequiredSeasonNumbersThroughPointer(ongoingShow, 2)).thenReturn(List.of(1, 2));
+        when(showCatalogService.canHydrateSynchronously(show, ongoingShow, List.of(1, 2), showHydrationProperties))
+            .thenReturn(false);
+        when(showTrackingFallbackPersistenceService.savePointerAndCreateJob(
+            user,
+            show,
+            2,
+            1,
+            List.of(),
+            List.of(),
+            false,
+            2
+        )).thenReturn(ShowTrackingJobDTO.builder()
+            .jobId(55L)
+            .status(ShowTrackingJobStatus.PENDING)
+            .jobType(ShowTrackingJobType.MARK_PREVIOUS_EPISODES_WATCHED)
+            .tmdbId(999L)
+            .mediaId(show.getId())
+            .build());
+
+        ShowTrackingActionResult<ShowTrackingDTO> result = showTrackingService.updateWatchPosition(
+            user,
+            999L,
+            MediaType.SHOW,
+            UpdateShowTrackingPositionRequestDTO.builder()
+                .watchPositionSeason(2)
+                .watchPositionEpisode(1)
+                .markPreviousEpisodesWatched(true)
+                .build()
+        );
+
+        assertTrue(result.isAccepted());
+        assertEquals(55L, result.acceptedJob().getJobId());
+    }
+
+    @Test
+    void updateWatchPosition_withRecoverableHydrationFailure_returnsAcceptedPointerJob() {
+        ShowEpisode pointerEpisode = ShowEpisode.builder()
+            .media(show)
+            .seasonNumber(2)
+            .episodeNumber(1)
+            .airDate(LocalDate.of(2020, 2, 1))
+            .build();
+        when(showCatalogService.requireEpisodeFromCachedSeason(show, 999L, 2, 1)).thenReturn(pointerEpisode);
+        when(showCatalogService.getRequiredSeasonNumbersThroughPointer(ongoingShow, 2)).thenReturn(List.of(1, 2));
+        when(showCatalogService.canHydrateSynchronously(show, ongoingShow, List.of(1, 2), showHydrationProperties))
+            .thenReturn(true);
+        when(showCatalogService.hydrateMissingSeasons(eq(show), eq(999L), eq(List.of(1, 2)), eq(3), eq(100)))
+            .thenThrow(new TmdbUnavailableException("TMDB temporarily unavailable"));
+        when(showTrackingFallbackPersistenceService.savePointerAndCreateJob(
+            user,
+            show,
+            2,
+            1,
+            List.of(),
+            List.of(),
+            false,
+            2
+        )).thenReturn(ShowTrackingJobDTO.builder()
+            .jobId(56L)
+            .status(ShowTrackingJobStatus.PENDING)
+            .jobType(ShowTrackingJobType.MARK_PREVIOUS_EPISODES_WATCHED)
+            .tmdbId(999L)
+            .mediaId(show.getId())
+            .build());
+
+        ShowTrackingActionResult<ShowTrackingDTO> result = showTrackingService.updateWatchPosition(
+            user,
+            999L,
+            MediaType.SHOW,
+            UpdateShowTrackingPositionRequestDTO.builder()
+                .watchPositionSeason(2)
+                .watchPositionEpisode(1)
+                .markPreviousEpisodesWatched(true)
+                .build()
+        );
+
+        assertTrue(result.isAccepted());
+        assertEquals(56L, result.acceptedJob().getJobId());
     }
 }
 

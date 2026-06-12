@@ -13,6 +13,7 @@ import com.project.watchmate.watchlist.domain.WatchList;
 import com.project.watchmate.watchlist.domain.WatchListItem;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -21,6 +22,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import org.springframework.dao.DataIntegrityViolationException;
 
 class WatchListIntegrationTest extends AbstractIntegrationTest {
 
@@ -52,6 +55,37 @@ class WatchListIntegrationTest extends AbstractIntegrationTest {
 			.content(createWatchListBody("weekend movies")))
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.code").value("WATCHLIST_NAME_CONFLICT"));
+	}
+
+	@Test
+	void createWatchlist_allowsSameNameForDifferentUsers() throws Exception {
+		Users firstUser = saveUser("watchlist-shared-name-user-a", true);
+		Users secondUser = saveUser("watchlist-shared-name-user-b", true);
+		saveWatchList(firstUser, "Shared Name");
+
+		mockMvc.perform(post("/api/v1/watchlists")
+			.header("Authorization", bearerToken(secondUser))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(createWatchListBody("Shared Name")))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.name").value("Shared Name"));
+
+		assertThat(watchListRepository.findAll()).hasSize(2);
+	}
+
+	@Test
+	void directRepositorySaveAndFlush_rejectsSameUserCaseInsensitiveDuplicate() {
+		Users user = saveUser("watchlist-db-constraint-user", true);
+		watchListRepository.saveAndFlush(WatchList.builder()
+			.name("Favorites")
+			.user(user)
+			.build());
+
+		assertThatThrownBy(() -> watchListRepository.saveAndFlush(WatchList.builder()
+			.name("favorites")
+			.user(user)
+			.build()))
+			.isInstanceOf(DataIntegrityViolationException.class);
 	}
 
 	@Test

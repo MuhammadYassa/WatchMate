@@ -24,6 +24,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import com.project.watchmate.media.catalog.dto.MediaDetailsDTO;
 import com.project.watchmate.watchlist.dto.WatchListDTO;
@@ -84,14 +85,14 @@ class WatchListServiceTest {
         @Test
         void createWatchList_WithNewName_SavesAndReturnsDto() {
             when(watchListRepository.existsByUserAndNameIgnoreCase(user, "New List")).thenReturn(false);
-            when(watchListRepository.save(any(WatchList.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(watchListRepository.saveAndFlush(any(WatchList.class))).thenAnswer(inv -> inv.getArgument(0));
             WatchListDTO dto = WatchListDTO.builder().id(1L).name("New List").build();
             when(watchMateMapper.mapToWatchListDTO(any(WatchList.class), any())).thenReturn(dto);
 
             WatchListDTO result = watchListService.createWatchList(user, "New List");
 
             ArgumentCaptor<WatchList> captor = ArgumentCaptor.forClass(WatchList.class);
-            verify(watchListRepository).save(captor.capture());
+            verify(watchListRepository).saveAndFlush(captor.capture());
             WatchList saved = captor.getValue();
             assertNotNull(saved);
             assertEquals("New List", saved.getName());
@@ -106,7 +107,19 @@ class WatchListServiceTest {
                 () -> watchListService.createWatchList(user, "Existing"));
 
             assertEquals("Watchlist Already Exists.", e.getMessage());
-            verify(watchListRepository, never()).save(any(WatchList.class));
+            verify(watchListRepository, never()).saveAndFlush(any(WatchList.class));
+        }
+
+        @Test
+        void createWatchList_WhenDatabaseConstraintFails_ThrowsWatchlistNameConflictException() {
+            when(watchListRepository.existsByUserAndNameIgnoreCase(user, "Existing")).thenReturn(false);
+            when(watchListRepository.saveAndFlush(any(WatchList.class)))
+                .thenThrow(new DataIntegrityViolationException("constraint [uk_watchlist_user_name]"));
+
+            WatchlistNameConflictException e = assertThrows(WatchlistNameConflictException.class,
+                () -> watchListService.createWatchList(user, "Existing"));
+
+            assertEquals("Watchlist Already Exists.", e.getMessage());
         }
     }
 
@@ -248,7 +261,7 @@ class WatchListServiceTest {
         void renameWatchList_WhenOwnerAndNewNameUnique_SavesAndReturnsDto() {
             when(watchListRepository.findById(WATCHLIST_ID)).thenReturn(Optional.of(watchList));
             when(watchListRepository.existsByUserAndNameIgnoreCase(user, "New Name")).thenReturn(false);
-            when(watchListRepository.save(any(WatchList.class))).thenReturn(watchList);
+            when(watchListRepository.saveAndFlush(any(WatchList.class))).thenReturn(watchList);
             WatchListDTO dto = WatchListDTO.builder().id(WATCHLIST_ID).name("New Name").build();
             when(watchMateMapper.mapToWatchListDTO(any(WatchList.class), any())).thenReturn(dto);
 
@@ -257,7 +270,7 @@ class WatchListServiceTest {
             assertNotNull(result);
             assertEquals(WATCHLIST_ID, result.getId());
             assertEquals("New Name", watchList.getName());
-            verify(watchListRepository).save(watchList);
+            verify(watchListRepository).saveAndFlush(watchList);
         }
 
         @Test
@@ -278,6 +291,19 @@ class WatchListServiceTest {
             WatchlistNameConflictException e = assertThrows(WatchlistNameConflictException.class,
                 () -> watchListService.renameWatchList(user, WATCHLIST_ID, "Taken"));
                 
+            assertEquals("A WatchList with this name Already Exists", e.getMessage());
+        }
+
+        @Test
+        void renameWatchList_WhenDatabaseConstraintFails_ThrowsWatchlistNameConflictException() {
+            when(watchListRepository.findById(WATCHLIST_ID)).thenReturn(Optional.of(watchList));
+            when(watchListRepository.existsByUserAndNameIgnoreCase(user, "Taken")).thenReturn(false);
+            when(watchListRepository.saveAndFlush(watchList))
+                .thenThrow(new DataIntegrityViolationException("constraint [uk_watchlist_user_name]"));
+
+            WatchlistNameConflictException e = assertThrows(WatchlistNameConflictException.class,
+                () -> watchListService.renameWatchList(user, WATCHLIST_ID, "Taken"));
+
             assertEquals("A WatchList with this name Already Exists", e.getMessage());
         }
     }

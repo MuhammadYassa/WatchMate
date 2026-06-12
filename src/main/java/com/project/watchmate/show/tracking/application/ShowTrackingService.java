@@ -11,9 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.project.watchmate.show.catalog.application.ShowCatalogService;
 import com.project.watchmate.show.catalog.application.ShowHydrationProperties;
 import com.project.watchmate.show.jobs.application.ShowTrackingJobProperties;
-import com.project.watchmate.show.jobs.application.ShowTrackingJobService;
 import com.project.watchmate.show.tracking.dto.ShowTrackingDTO;
-import com.project.watchmate.show.jobs.dto.ShowTrackingJobDTO;
 import com.project.watchmate.show.tracking.dto.ShowTrackingStatusDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbTvDetailsDTO;
 import com.project.watchmate.show.tracking.dto.UpdateShowTrackingPositionRequestDTO;
@@ -47,7 +45,7 @@ public class ShowTrackingService {
 
     private final ShowTrackingWriteSupport showTrackingWriteSupport;
 
-    private final ShowTrackingJobService showTrackingJobService;
+    private final ShowTrackingFallbackPersistenceService showTrackingFallbackPersistenceService;
 
     private final ShowHydrationProperties showHydrationProperties;
 
@@ -180,12 +178,14 @@ public class ShowTrackingService {
                     tmdbId,
                     request.getWatchPositionSeason(),
                     request.getWatchPositionEpisode());
-                savePointerOnly(user, media, request.getWatchPositionSeason(), request.getWatchPositionEpisode(), tvDetails);
-                return ShowTrackingActionResult.accepted(createPointerJob(
+                return ShowTrackingActionResult.accepted(showTrackingFallbackPersistenceService.savePointerAndCreateJob(
                     user,
                     media,
                     request.getWatchPositionSeason(),
                     request.getWatchPositionEpisode(),
+                    eligibleEpisodesFromCache(media),
+                    airedEligibleEpisodesFromCache(media),
+                    showCatalogService.isEndedShow(tvDetails),
                     requiredSeasons.size()
                 ));
             }
@@ -197,12 +197,14 @@ public class ShowTrackingService {
             );
         }
 
-        savePointerOnly(user, media, request.getWatchPositionSeason(), request.getWatchPositionEpisode(), tvDetails);
-        return ShowTrackingActionResult.accepted(createPointerJob(
+        return ShowTrackingActionResult.accepted(showTrackingFallbackPersistenceService.savePointerAndCreateJob(
             user,
             media,
             request.getWatchPositionSeason(),
             request.getWatchPositionEpisode(),
+            eligibleEpisodesFromCache(media),
+            airedEligibleEpisodesFromCache(media),
+            showCatalogService.isEndedShow(tvDetails),
             requiredSeasons.size()
         ));
     }
@@ -344,8 +346,14 @@ public class ShowTrackingService {
                 log.info("Queueing bulk status job after recoverable synchronous failure tmdbId={} requestedStatus={}",
                     tmdbId,
                     resolvedTargetStatus);
-                ensureTrackingRowExists(user, media);
-                return ShowTrackingActionResult.accepted(createStatusJob(user, media, resolvedTargetStatus, requiredSeasons.size()));
+                return ShowTrackingActionResult.accepted(
+                    showTrackingFallbackPersistenceService.ensureTrackingRowAndCreateStatusJob(
+                        user,
+                        media,
+                        resolvedTargetStatus,
+                        requiredSeasons.size()
+                    )
+                );
             }
         }
 
@@ -353,8 +361,14 @@ public class ShowTrackingService {
             throw new ShowMetadataSyncRequiredException(syncRequiredMessageForStatus(resolvedTargetStatus));
         }
 
-        ensureTrackingRowExists(user, media);
-        return ShowTrackingActionResult.accepted(createStatusJob(user, media, resolvedTargetStatus, requiredSeasons.size()));
+        return ShowTrackingActionResult.accepted(
+            showTrackingFallbackPersistenceService.ensureTrackingRowAndCreateStatusJob(
+                user,
+                media,
+                resolvedTargetStatus,
+                requiredSeasons.size()
+            )
+        );
     }
 
     private WatchStatus completeBulkStatusUpdate(
@@ -411,55 +425,6 @@ public class ShowTrackingService {
             showCatalogService.isEndedShow(tvDetails)
         );
         return mapToShowTracking(media, tracking);
-    }
-
-    private void savePointerOnly(Users user, Media media, Integer seasonNumber, Integer episodeNumber, TmdbTvDetailsDTO tvDetails) {
-        UserShowTracking tracking = showTrackingWriteSupport.loadOrCreateTracking(user, media);
-        tracking.setWatchPositionSeason(seasonNumber);
-        tracking.setWatchPositionEpisode(episodeNumber);
-        tracking.setStatus(WatchStatus.WATCHING);
-        showTrackingWriteSupport.applyCalculationAndPersist(
-            tracking,
-            media,
-            eligibleEpisodesFromCache(media),
-            airedEligibleEpisodesFromCache(media),
-            false,
-            false,
-            showCatalogService.isEndedShow(tvDetails)
-        );
-    }
-
-    private void ensureTrackingRowExists(Users user, Media media) {
-        UserShowTracking tracking = userShowTrackingRepository.findByUserAndMedia(user, media).orElse(null);
-        if (tracking != null) {
-            return;
-        }
-
-        tracking = showTrackingWriteSupport.loadOrCreateTracking(user, media);
-        tracking.setStatus(WatchStatus.WATCHING);
-        showTrackingWriteSupport.persistTrackingAndCleanupProjection(tracking);
-    }
-
-    private ShowTrackingJobDTO createStatusJob(Users user, Media media, WatchStatus resolvedTargetStatus, Integer totalSeasons) {
-        return resolvedTargetStatus == WatchStatus.WATCHED
-            ? showTrackingJobService.createOrReuseMarkWatchedJob(user, media, totalSeasons)
-            : showTrackingJobService.createOrReuseMarkUpToDateJob(user, media, totalSeasons);
-    }
-
-    private ShowTrackingJobDTO createPointerJob(
-        Users user,
-        Media media,
-        Integer targetSeasonNumber,
-        Integer targetEpisodeNumber,
-        Integer totalSeasons
-    ) {
-        return showTrackingJobService.createOrReuseMarkPreviousEpisodesWatchedJob(
-            user,
-            media,
-            targetSeasonNumber,
-            targetEpisodeNumber,
-            totalSeasons
-        );
     }
 
     private boolean canQueueJobs() {
