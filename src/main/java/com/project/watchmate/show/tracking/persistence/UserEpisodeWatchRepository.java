@@ -12,8 +12,6 @@ public interface UserEpisodeWatchRepository extends JpaRepository<UserEpisodeWat
 
     List<UserEpisodeWatch> findByUserShowTrackingOrderBySeasonNumberAscEpisodeNumberAsc(UserShowTracking userShowTracking);
 
-    List<UserEpisodeWatch> findByUserShowTrackingOrderByWatchedAtAscSeasonNumberAscEpisodeNumberAsc(UserShowTracking userShowTracking);
-
     Optional<UserEpisodeWatch> findByUserShowTrackingAndSeasonNumberAndEpisodeNumber(
         UserShowTracking userShowTracking,
         Integer seasonNumber,

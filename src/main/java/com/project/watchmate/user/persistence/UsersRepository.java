@@ -27,9 +27,6 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
 
     boolean existsByUsername(String username);
 
-    @Query("SELECT COUNT(f) > 0 FROM Users u JOIN u.following f WHERE u.id = :followerId AND f.id = :followingId")
-    boolean existsByFollowerAndFollowing(@Param("followerId") Long followerId, @Param("followingId") Long followingId);
-
     @Query("select count(f) from Users u join u.followers f where u.id = :userId")
     long countFollowersByUserId(@Param("userId") Long userId);
 
@@ -41,15 +38,6 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
 
     @Query("select f from Users u join u.following f where u = :user order by f.username asc, f.id desc")
     Page<Users> findFollowingByUser(@Param("user") Users user, Pageable pageable);
-
-    @Query("SELECT u FROM Users u LEFT JOIN FETCH u.following WHERE u.id = :userId")
-    Optional<Users> findByIdWithFollowing(@Param("userId") Long userId);
-
-    @Query("SELECT u FROM Users u LEFT JOIN FETCH u.followers WHERE u.id = :userId")
-    Optional<Users> findByIdWithFollowers(@Param("userId") Long userId);
-
-    @Query("SELECT u FROM Users u LEFT JOIN FETCH u.following LEFT JOIN FETCH u.followers WHERE u.id = :userId")
-    Optional<Users> findByIdWithFollowRelations(@Param("userId") Long userId);
 
     @Query("SELECT DISTINCT u FROM Users u LEFT JOIN FETCH u.favorites WHERE u.id = :userId")
     Optional<Users> findByIdWithFavorites(@Param("userId") Long userId);

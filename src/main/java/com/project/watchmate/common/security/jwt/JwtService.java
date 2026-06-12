@@ -65,10 +65,6 @@ public class JwtService {
         return LocalDateTime.now().plusMinutes(15);
     }
 
-    public String generateToken (String username) {
-        return generateAccessToken(username);
-    }
-
     private SecretKey getKey() {
         if (signingKey == null) {
             initializeSigningKey();

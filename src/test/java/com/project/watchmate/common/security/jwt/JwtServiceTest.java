@@ -87,21 +87,6 @@ class JwtServiceTest {
     }
 
     @Nested
-    @DisplayName("Generate Token Tests")
-    class GenerateTokenTests {
-
-        @Test
-        void generateToken_WithUsername_ReturnsSameAsGenerateAccessToken() {
-            String username = "alice";
-            String accessToken = jwtService.generateAccessToken(username);
-            String token = jwtService.generateToken(username);
-
-            assertNotNull(token);
-            assertEquals(jwtService.extractUsername(accessToken), jwtService.extractUsername(token));
-        }
-    }
-
-    @Nested
     @DisplayName("Get Access Token Expiry Tests")
     class GetAccessTokenExpiryTests {
 

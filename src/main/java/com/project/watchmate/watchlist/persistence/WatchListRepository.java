@@ -1,6 +1,5 @@
 package com.project.watchmate.watchlist.persistence;
 
-import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -13,8 +12,6 @@ import com.project.watchmate.watchlist.domain.WatchList;
 public interface WatchListRepository extends JpaRepository<WatchList, Long>{
 
     Optional<WatchList> findByUserAndNameIgnoreCase(Users user, String name);
-
-    List<WatchList> findAllByUser(Users user);
 
     boolean existsByUserAndNameIgnoreCase(Users user, String Name);
 
