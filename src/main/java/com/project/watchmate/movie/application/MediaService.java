@@ -2,7 +2,6 @@ package com.project.watchmate.movie.application;
 
 import com.project.watchmate.media.catalog.application.MediaResolutionService;
 import com.project.watchmate.media.catalog.application.UserWatchStatusResolver;
-import com.project.watchmate.media.tmdb.application.TmdbService;
 
 import java.util.List;
 
@@ -13,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.project.watchmate.movie.dto.MovieDetailsDTO;
+import com.project.watchmate.movie.dto.PublicMovieDetailBaseDTO;
 import com.project.watchmate.common.error.UserNotFoundException;
 import com.project.watchmate.common.mapper.WatchMateMapper;
 import com.project.watchmate.media.catalog.domain.Media;
@@ -48,19 +48,19 @@ public class MediaService {
 
     private final UserWatchStatusResolver userWatchStatusResolver;
 
-    private final TmdbService tmdbService;
+    private final PublicMediaDetailBaseCacheService publicMediaDetailBaseCacheService;
 
     @Transactional
     public MovieDetailsDTO getMovieDetails(Long tmdbId, Users userParam){
         Media media = userParam == null
-            ? mediaRepository.findByTmdbIdAndType(tmdbId, MediaType.MOVIE)
-                .orElseGet(() -> tmdbService.fetchMediaByTmdbId(tmdbId, MediaType.MOVIE))
+            ? mediaRepository.findByTmdbIdAndType(tmdbId, MediaType.MOVIE).orElse(null)
             : mediaResolutionService.resolveMediaByTmdbId(tmdbId, MediaType.MOVIE);
 
-        List<Review> reviews = media.getId() == null ? List.of() : reviewRepository.findByMedia(media);
+        PublicMovieDetailBaseDTO publicBase = publicMediaDetailBaseCacheService.getMovieBase(tmdbId, MediaType.MOVIE);
+        List<Review> reviews = media == null || media.getId() == null ? List.of() : reviewRepository.findByMedia(media);
         UserContext userContext = resolveUserContext(userParam, media);
 
-        return watchMateMapper.mapToMovieDetailsDTO(media, reviews, userContext.isFavourited(), userContext.watchStatus());
+        return toMovieDetailsDTO(publicBase, reviews, userContext.isFavourited(), userContext.watchStatus());
     }
 
     public Page<Media> getMoviesWatchedPage(Users user){
@@ -94,6 +94,28 @@ public class MediaService {
         WatchStatus watchStatus = userWatchStatusResolver.resolveWatchStatus(user, media);
 
         return new UserContext(isFavourited, watchStatus);
+    }
+
+    private MovieDetailsDTO toMovieDetailsDTO(
+        PublicMovieDetailBaseDTO publicBase,
+        List<Review> reviews,
+        Boolean isFavourited,
+        WatchStatus watchStatus
+    ) {
+        return MovieDetailsDTO.builder()
+            .tmdbId(publicBase.getTmdbId())
+            .title(publicBase.getTitle())
+            .posterPath(publicBase.getPosterPath())
+            .backdropPath(publicBase.getBackdropPath())
+            .overview(publicBase.getOverview())
+            .releaseDate(publicBase.getReleaseDate())
+            .rating(publicBase.getRating())
+            .type(publicBase.getType())
+            .genres(publicBase.getGenres())
+            .reviews(reviews.stream().map(watchMateMapper::mapToReviewDTO).toList())
+            .isFavourited(isFavourited)
+            .watchStatus(watchStatus)
+            .build();
     }
 
     private record UserContext(boolean isFavourited, WatchStatus watchStatus) {

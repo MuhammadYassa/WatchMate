@@ -22,6 +22,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.review.dto.CreateReviewRequestDTO;
 import com.project.watchmate.review.dto.ReviewResponseDTO;
 import com.project.watchmate.review.dto.UpdateReviewRequestDTO;
@@ -46,6 +47,9 @@ class ReviewServiceTest {
 
     @Mock
     private WatchMateMapper watchMateMapper;
+
+    @Mock
+    private WatchMateCacheEvictionService cacheEvictionService;
 
     @InjectMocks
     private ReviewService reviewService;
@@ -83,6 +87,7 @@ class ReviewServiceTest {
 
             assertEquals(REVIEW_ID, result.getReviewId());
             verify(reviewRepository).save(any(Review.class));
+            verify(cacheEvictionService).evictWatchlistSummaryPages();
         }
 
         @Test
@@ -115,6 +120,7 @@ class ReviewServiceTest {
             assertEquals(4, review.getRating());
             assertEquals("Updated", review.getComment());
             verify(reviewRepository).save(review);
+            verify(cacheEvictionService).evictWatchlistSummaryPages();
         }
 
         @Test
@@ -150,6 +156,7 @@ class ReviewServiceTest {
             reviewService.deleteReview(user, REVIEW_ID);
 
             verify(reviewRepository).delete(review);
+            verify(cacheEvictionService).evictWatchlistSummaryPages();
         }
 
         @Test

@@ -37,6 +37,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
+import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.media.tmdb.client.TmdbClient;
 import com.project.watchmate.media.tmdb.dto.TmdbGenreDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbMovieDTO;
@@ -70,6 +71,9 @@ class CuratedContentSyncServiceTest {
 
     @Mock
     private PlatformTransactionManager transactionManager;
+
+    @Mock
+    private WatchMateCacheEvictionService cacheEvictionService;
 
     @Captor
     private ArgumentCaptor<List<Genre>> genreBatchCaptor;
@@ -122,6 +126,7 @@ class CuratedContentSyncServiceTest {
         verify(curatedContentRepository, times(1)).deleteByCategoryKey(CuratedContentCategory.AIRING_TODAY);
         verify(curatedContentRepository, times(1)).deleteByCategoryKey(CuratedContentCategory.UPCOMING);
         verify(curatedContentRepository, times(1)).deleteByCategoryKey(CuratedContentCategory.RECOMMENDED_LATER);
+        verify(cacheEvictionService).evictDiscoveryContentCaches();
     }
 
     @Test

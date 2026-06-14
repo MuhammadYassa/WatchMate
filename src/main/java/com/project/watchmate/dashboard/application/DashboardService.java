@@ -1,23 +1,18 @@
 package com.project.watchmate.dashboard.application;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.project.watchmate.dashboard.dto.CalendarResponseDTO;
 import com.project.watchmate.dashboard.dto.ContinueWatchingResponseDTO;
 import com.project.watchmate.dashboard.dto.UpcomingEpisodesResponseDTO;
-import com.project.watchmate.dashboard.dto.ContinueWatchingItemDTO;
 import com.project.watchmate.dashboard.mapper.DashboardMapper;
-import com.project.watchmate.movie.tracking.domain.UserMediaStatus;
 import com.project.watchmate.show.tracking.domain.UserShowTracking;
 import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.media.catalog.domain.WatchStatus;
-import com.project.watchmate.movie.tracking.persistence.UserMediaStatusRepository;
 import com.project.watchmate.show.tracking.persistence.UserShowTrackingRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -30,49 +25,24 @@ public class DashboardService {
 
     private static final int MAX_LIMIT = 50;
 
-    private static final List<WatchStatus> CONTINUE_WATCHING_STATUSES = List.of(WatchStatus.WATCHING);
-
     private static final List<WatchStatus> UPCOMING_EPISODE_TRACKING_STATUSES = List.of(
         WatchStatus.WATCHING,
         WatchStatus.UP_TO_DATE,
         WatchStatus.TO_WATCH
     );
 
-    private final UserMediaStatusRepository userMediaStatusRepository;
-
     private final UserShowTrackingRepository userShowTrackingRepository;
 
     private final DashboardMapper dashboardMapper;
 
+    private final ContinueWatchingCacheService continueWatchingCacheService;
+
     @Transactional(readOnly = true)
     public ContinueWatchingResponseDTO getContinueWatching(Users user, Integer limit) {
         int resolvedLimit = normalizeLimit(limit);
-        List<UserMediaStatus> movieStatuses = userMediaStatusRepository.findContinueWatchingMoviesByUser(
-            user,
-            CONTINUE_WATCHING_STATUSES,
-            PageRequest.of(0, resolvedLimit)
-        );
-        List<UserShowTracking> trackings = userShowTrackingRepository.findContinueWatchingByUser(
-            user,
-            CONTINUE_WATCHING_STATUSES,
-            PageRequest.of(0, resolvedLimit)
-        );
-
-        List<ContinueWatchingItemDTO> items = new ArrayList<>();
-        items.addAll(movieStatuses.stream().map(dashboardMapper::mapToContinueWatchingItem).toList());
-        items.addAll(trackings.stream().map(dashboardMapper::mapToContinueWatchingItem).toList());
-        items.sort((left, right) -> {
-            java.time.LocalDateTime leftSort = left.getLastWatchedAt() != null ? left.getLastWatchedAt() : left.getUpdatedAt();
-            java.time.LocalDateTime rightSort = right.getLastWatchedAt() != null ? right.getLastWatchedAt() : right.getUpdatedAt();
-            int byTimestamp = java.util.Comparator.nullsLast(java.time.LocalDateTime::compareTo).compare(rightSort, leftSort);
-            if (byTimestamp != 0) {
-                return byTimestamp;
-            }
-            return java.util.Comparator.nullsLast(Long::compareTo).compare(right.getTmdbId(), left.getTmdbId());
-        });
 
         return ContinueWatchingResponseDTO.builder()
-            .items(items.stream()
+            .items(continueWatchingCacheService.getContinueWatchingItems(user, MAX_LIMIT).stream()
                 .limit(resolvedLimit)
                 .toList())
             .build();
@@ -125,8 +95,6 @@ public class DashboardService {
         }
     }
 }
-
-
 
 
 

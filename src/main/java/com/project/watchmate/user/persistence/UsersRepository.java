@@ -45,6 +45,9 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
     @Query("select favorite.id from Users u join u.favorites favorite where u.id = :userId and favorite.id in :mediaIds")
     List<Long> findFavoriteMediaIds(@Param("userId") Long userId, @Param("mediaIds") Collection<Long> mediaIds);
 
+    @Query("select favorite.id from Users u join u.favorites favorite where u.id = :userId")
+    List<Long> findFavoriteMediaIds(@Param("userId") Long userId);
+
     @Query("SELECT COUNT(f) > 0 FROM Users u JOIN u.following f WHERE u.id = :followerId AND f.id = :targetId")
     boolean isFollowing(@Param("followerId") Long followerId, @Param("targetId") Long targetId);
     

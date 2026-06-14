@@ -1,10 +1,14 @@
 package com.project.watchmate.discovery.application;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.project.watchmate.common.cache.WatchMateCacheNames;
 import com.project.watchmate.discovery.dto.HomeResponseDTO;
 import com.project.watchmate.discovery.dto.HomeStatusDTO;
 import com.project.watchmate.discovery.domain.ContentSyncResult;
@@ -27,6 +31,11 @@ public class HomeService {
     private final ContentSyncStatusRepository contentSyncStatusRepository;
 
     @Transactional(readOnly = true)
+    @Cacheable(
+        cacheNames = WatchMateCacheNames.DISCOVERY_HOMEPAGE_SECTIONS,
+        key = "T(com.project.watchmate.common.cache.WatchMateCacheKeys).HOME_DEFAULT",
+        unless = "#result == null"
+    )
     public HomeResponseDTO getHome() {
         return HomeResponseDTO.builder()
             .trendingMovies(discoverService.getTrendingMovies())
@@ -72,7 +81,7 @@ public class HomeService {
     private List<String> genreNamesFor(MediaType mediaType) {
         return genreRepository.findCurrentByMediaTypeOrderByNameAsc(mediaType).stream()
             .map(Genre::getName)
-            .toList();
+            .collect(Collectors.toCollection(ArrayList::new));
     }
 }
 

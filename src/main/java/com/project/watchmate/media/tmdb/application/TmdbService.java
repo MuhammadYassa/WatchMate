@@ -10,6 +10,7 @@ import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.media.tmdb.client.TmdbClient;
 import com.project.watchmate.media.tmdb.dto.TmdbGenreDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbMovieDTO;
@@ -36,6 +37,8 @@ public class TmdbService {
 
     private final GenreRepository genreRepository;
 
+    private final WatchMateCacheEvictionService cacheEvictionService;
+
     @Transactional
     public List<Media> upsertMediaFromTmdb(List<TmdbMovieDTO> tmdbResults, MediaType mediaType) {
         List<Media> mediaList = tmdbResults.stream()
@@ -56,9 +59,21 @@ public class TmdbService {
                     existing.setReleaseDate(media.getReleaseDate());
                     existing.setRating(media.getRating());
                     syncGenres(existing, media.getGenres());
-                    return mediaRepository.save(existing);
+                    Media saved = mediaRepository.save(existing);
+                    cacheEvictionService.evictPublicMediaDetailBase(saved.getType(), saved.getTmdbId());
+                    if (saved.getType() == MediaType.SHOW) {
+                        cacheEvictionService.evictPublicShowMetadata(saved.getTmdbId());
+                    }
+                    return saved;
                 })
-                .orElseGet(() -> mediaRepository.save(media)))
+                .orElseGet(() -> {
+                    Media saved = mediaRepository.save(media);
+                    cacheEvictionService.evictPublicMediaDetailBase(saved.getType(), saved.getTmdbId());
+                    if (saved.getType() == MediaType.SHOW) {
+                        cacheEvictionService.evictPublicShowMetadata(saved.getTmdbId());
+                    }
+                    return saved;
+                }))
             .toList();
     }
 
@@ -115,7 +130,10 @@ public class TmdbService {
         media.setTmdbShowStatus(tvDetails.getStatus());
         media.setNextAiringSyncedAt(now);
         media.setLastTmdbSyncAt(now);
-        return mediaRepository.save(media);
+        Media saved = mediaRepository.save(media);
+        cacheEvictionService.evictPublicMediaDetailBase(saved.getType(), saved.getTmdbId());
+        cacheEvictionService.evictPublicShowMetadata(saved.getTmdbId());
+        return saved;
     }
 
     @Transactional

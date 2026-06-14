@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.review.dto.CreateReviewRequestDTO;
 import com.project.watchmate.review.dto.ReviewResponseDTO;
 import com.project.watchmate.review.dto.UpdateReviewRequestDTO;
@@ -39,6 +40,8 @@ public class ReviewService {
 
     private final WatchMateMapper watchMateMapper;
 
+    private final WatchMateCacheEvictionService cacheEvictionService;
+
     public ReviewResponseDTO createReview(Users user, CreateReviewRequestDTO createReviewRequest) {
         Media media = mediaResolutionService.resolveMediaByTmdbId(createReviewRequest.getTmdbId(), createReviewRequest.getType());
         if (reviewRepository.existsByUserAndMedia(user, media)) {
@@ -52,6 +55,7 @@ public class ReviewService {
         .datePosted(LocalDateTime.now())
         .dateLastModified(LocalDateTime.now())
         .build()));
+        cacheEvictionService.evictWatchlistSummaryPages();
         return watchMateMapper.mapToReviewResponseDTO(review);
     }
 
@@ -64,6 +68,7 @@ public class ReviewService {
         review.setComment(updateReviewRequest.getComment());
         review.setDateLastModified(LocalDateTime.now());
         reviewRepository.save(review);
+        cacheEvictionService.evictWatchlistSummaryPages();
         return watchMateMapper.mapToReviewResponseDTO(review);
     }
 
@@ -73,6 +78,7 @@ public class ReviewService {
             throw new UnauthorizedReviewAccessException("You do not own this review");
         }
         reviewRepository.delete(review);
+        cacheEvictionService.evictWatchlistSummaryPages();
         return;
     }
 

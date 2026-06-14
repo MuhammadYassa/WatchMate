@@ -25,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.quality.Strictness;
 
+import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.show.catalog.application.ShowCatalogService;
 import com.project.watchmate.show.catalog.application.ShowHydrationProperties;
 import com.project.watchmate.show.jobs.application.ShowTrackingJobProperties;
@@ -69,6 +70,9 @@ class ShowTrackingServiceTest {
     @Mock
     private ShowTrackingJobProperties showTrackingJobProperties;
 
+    @Mock
+    private WatchMateCacheEvictionService cacheEvictionService;
+
     private final ShowStatusCalculator showStatusCalculator = new ShowStatusCalculator();
 
     private ShowTrackingWriteSupport showTrackingWriteSupport;
@@ -87,7 +91,8 @@ class ShowTrackingServiceTest {
         showTrackingWriteSupport = new ShowTrackingWriteSupport(
             showStatusCalculator,
             userMediaStatusRepository,
-            userShowTrackingRepository
+            userShowTrackingRepository,
+            cacheEvictionService
         );
         showTrackingService = new ShowTrackingService(
             showCatalogService,
@@ -195,6 +200,7 @@ class ShowTrackingServiceTest {
         assertEquals(WatchStatus.WATCHING, persistedTracking.get().getStatus());
         assertTrue(persistedTracking.get().getEpisodeWatches().isEmpty());
         assertEquals(0, persistedTracking.get().getEpisodesWatchedCount());
+        verify(cacheEvictionService).evictUserProgressCaches(user.getId());
     }
 
     @Test

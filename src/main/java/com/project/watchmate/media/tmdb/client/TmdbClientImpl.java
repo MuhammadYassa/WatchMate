@@ -4,6 +4,7 @@ import java.net.ConnectException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
@@ -51,7 +52,7 @@ public class TmdbClientImpl implements TmdbClient {
                 .bodyToMono(TmdbGenreResponseDTO.class)
                 .block();
 
-            return response != null ? response.getGenres() : List.of();
+            return response != null && response.getGenres() != null ? new ArrayList<>(response.getGenres()) : new ArrayList<>();
         } catch (WebClientResponseException ex) {
             throw handleWebClientResponseException(ex, "genre fetch", "type=" + type);
         } catch (Exception ex) {
@@ -97,7 +98,8 @@ public class TmdbClientImpl implements TmdbClient {
                 .bodyToMono(TmdbResponseDTO.class)
                 .blockOptional()
                 .map(TmdbResponseDTO::getResults)
-                .orElse(List.of());
+                .map(ArrayList::new)
+                .orElseGet(ArrayList::new);
         } catch (WebClientResponseException ex) {
             throw handleWebClientResponseException(ex, "list fetch", "label=" + label);
         } catch (Exception ex) {
@@ -259,5 +261,4 @@ public class TmdbClientImpl implements TmdbClient {
         return false;
     }
 }
-
 

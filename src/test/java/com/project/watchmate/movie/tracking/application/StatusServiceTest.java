@@ -19,6 +19,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.common.dto.UpdateWatchStatusRequestDTO;
 import com.project.watchmate.movie.tracking.dto.UserMediaStatusDTO;
 import com.project.watchmate.common.error.InvalidWatchStatusException;
@@ -37,6 +38,9 @@ class StatusServiceTest {
 
     @Mock
     private UserMediaStatusRepository userMediaStatusRepository;
+
+    @Mock
+    private WatchMateCacheEvictionService cacheEvictionService;
 
     @InjectMocks
     private StatusService statusService;
@@ -64,6 +68,7 @@ class StatusServiceTest {
         assertEquals(TMDB_ID, result.getTmdbId());
         assertEquals(WatchStatus.WATCHED, result.getStatus());
         verify(userMediaStatusRepository).save(status);
+        verify(cacheEvictionService).evictUserProgressCaches(user.getId());
     }
 
     @Test

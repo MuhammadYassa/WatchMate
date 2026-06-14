@@ -9,6 +9,7 @@ import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.favourite.dto.FavouriteStatusDTO;
 import com.project.watchmate.favourite.dto.UserFavouritesDTO;
 import com.project.watchmate.media.catalog.dto.MediaDetailsDTO;
@@ -34,6 +35,8 @@ public class FavouriteService {
 
     private final UserWatchStatusResolver userWatchStatusResolver;
 
+    private final WatchMateCacheEvictionService cacheEvictionService;
+
     @Transactional
     public FavouriteStatusDTO addToFavourites (Long tmdbId, String type, Users user){
         Users managedUser = loadUserWithFavorites(user);
@@ -44,6 +47,7 @@ public class FavouriteService {
         }
 
         managedUser.getFavorites().add(media);
+        cacheEvictionService.evictFavoriteCaches(managedUser.getId());
         return FavouriteStatusDTO.builder().tmdbId(tmdbId).isFavourited(managedUser.getFavorites().contains(media)).build();
     }
 
@@ -54,6 +58,7 @@ public class FavouriteService {
         if (managedUser.getFavorites().contains(media)){
             managedUser.getFavorites().remove(media);
         }
+        cacheEvictionService.evictFavoriteCaches(managedUser.getId());
         return FavouriteStatusDTO.builder().tmdbId(tmdbId).isFavourited(managedUser.getFavorites().contains(media)).build();
     }
 

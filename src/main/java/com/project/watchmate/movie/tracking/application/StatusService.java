@@ -4,6 +4,7 @@ import com.project.watchmate.media.catalog.application.MediaResolutionService;
 
 import org.springframework.stereotype.Service;
 
+import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.common.dto.UpdateWatchStatusRequestDTO;
 import com.project.watchmate.movie.tracking.dto.UserMediaStatusDTO;
 import com.project.watchmate.common.error.InvalidWatchStatusException;
@@ -24,6 +25,8 @@ public class StatusService {
 
 	private final UserMediaStatusRepository userMediaStatusRepository;
 
+	private final WatchMateCacheEvictionService cacheEvictionService;
+
 	public UserMediaStatusDTO updateWatchStatus(Users user, Long tmdbId, MediaType mediaType, UpdateWatchStatusRequestDTO request) {
 		if (mediaType != MediaType.MOVIE) {
 			throw new IllegalArgumentException("StatusService only handles movie watch status updates.");
@@ -41,6 +44,7 @@ public class StatusService {
 
 		userMediaStatus.setStatus(desiredStatus);
 		userMediaStatusRepository.save(userMediaStatus);
+		cacheEvictionService.evictUserProgressCaches(user.getId());
 
 		return UserMediaStatusDTO.builder()
 				.tmdbId(media.getTmdbId())

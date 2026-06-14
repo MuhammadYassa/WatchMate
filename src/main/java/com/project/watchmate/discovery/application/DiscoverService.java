@@ -1,10 +1,14 @@
 package com.project.watchmate.discovery.application;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.project.watchmate.common.cache.WatchMateCacheNames;
 import com.project.watchmate.discovery.dto.DiscoveryMediaItemDTO;
 import com.project.watchmate.common.mapper.WatchMateMapper;
 import com.project.watchmate.discovery.domain.CuratedContentCategory;
@@ -21,31 +25,61 @@ public class DiscoverService {
     private final WatchMateMapper watchMateMapper;
 
     @Transactional(readOnly = true)
+    @Cacheable(
+        cacheNames = WatchMateCacheNames.CURATED_CONTENT_LISTS,
+        key = "T(com.project.watchmate.common.cache.WatchMateCacheKeys).curatedCategory(T(com.project.watchmate.discovery.domain.CuratedContentCategory).TRENDING_MOVIES)",
+        unless = "#result == null"
+    )
     public List<DiscoveryMediaItemDTO> getTrendingMovies() {
         return getBucket(CuratedContentCategory.TRENDING_MOVIES);
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(
+        cacheNames = WatchMateCacheNames.CURATED_CONTENT_LISTS,
+        key = "T(com.project.watchmate.common.cache.WatchMateCacheKeys).curatedCategory(T(com.project.watchmate.discovery.domain.CuratedContentCategory).TRENDING_SHOWS)",
+        unless = "#result == null"
+    )
     public List<DiscoveryMediaItemDTO> getTrendingShows() {
         return getBucket(CuratedContentCategory.TRENDING_SHOWS);
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(
+        cacheNames = WatchMateCacheNames.CURATED_CONTENT_LISTS,
+        key = "T(com.project.watchmate.common.cache.WatchMateCacheKeys).curatedCategory(T(com.project.watchmate.discovery.domain.CuratedContentCategory).POPULAR_NOW)",
+        unless = "#result == null"
+    )
     public List<DiscoveryMediaItemDTO> getPopularNow() {
         return getBucket(CuratedContentCategory.POPULAR_NOW);
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(
+        cacheNames = WatchMateCacheNames.CURATED_CONTENT_LISTS,
+        key = "T(com.project.watchmate.common.cache.WatchMateCacheKeys).curatedCategory(T(com.project.watchmate.discovery.domain.CuratedContentCategory).AIRING_TODAY)",
+        unless = "#result == null"
+    )
     public List<DiscoveryMediaItemDTO> getAiringToday() {
         return getBucket(CuratedContentCategory.AIRING_TODAY);
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(
+        cacheNames = WatchMateCacheNames.CURATED_CONTENT_LISTS,
+        key = "T(com.project.watchmate.common.cache.WatchMateCacheKeys).curatedCategory(T(com.project.watchmate.discovery.domain.CuratedContentCategory).UPCOMING)",
+        unless = "#result == null"
+    )
     public List<DiscoveryMediaItemDTO> getUpcoming() {
         return getBucket(CuratedContentCategory.UPCOMING);
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(
+        cacheNames = WatchMateCacheNames.CURATED_CONTENT_LISTS,
+        key = "T(com.project.watchmate.common.cache.WatchMateCacheKeys).curatedCategory(T(com.project.watchmate.discovery.domain.CuratedContentCategory).RECOMMENDED_LATER)",
+        unless = "#result == null"
+    )
     public List<DiscoveryMediaItemDTO> getRecommendedLater() {
         return getBucket(CuratedContentCategory.RECOMMENDED_LATER);
     }
@@ -54,7 +88,7 @@ public class DiscoverService {
     public List<DiscoveryMediaItemDTO> getBucket(CuratedContentCategory category) {
         return curatedContentRepository.findByCategoryKeyWithMediaOrderByRankPositionAsc(category).stream()
             .map(curatedContent -> watchMateMapper.mapToDiscoveryMediaItemDTO(curatedContent.getMedia()))
-            .toList();
+            .collect(Collectors.toCollection(ArrayList::new));
     }
 }
 

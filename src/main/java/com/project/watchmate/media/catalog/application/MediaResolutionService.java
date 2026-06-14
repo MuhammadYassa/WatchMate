@@ -9,6 +9,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.common.error.MediaNotFoundException;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.media.catalog.domain.MediaType;
@@ -23,6 +24,8 @@ public class MediaResolutionService {
     private final MediaRepository mediaRepository;
 
     private final TmdbService tmdbService;
+
+    private final WatchMateCacheEvictionService cacheEvictionService;
 
     @Transactional
     public Media resolveMediaByTmdbId(Long tmdbId, String typeStr) {
@@ -55,7 +58,9 @@ public class MediaResolutionService {
         }
 
         try {
-            return mediaRepository.save(importedMedia);
+            Media saved = mediaRepository.save(importedMedia);
+            cacheEvictionService.evictPublicMediaDetailBase(saved.getType(), saved.getTmdbId());
+            return saved;
         } catch (DataIntegrityViolationException ex) {
             Media existingMedia = mediaRepository.findByTmdbIdAndType(resolvedTmdbId, type).orElseThrow(() -> ex);
             return existingMedia;

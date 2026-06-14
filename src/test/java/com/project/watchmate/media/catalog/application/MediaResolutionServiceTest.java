@@ -22,6 +22,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.common.error.MediaNotFoundException;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.media.catalog.domain.MediaType;
@@ -37,6 +38,9 @@ class MediaResolutionServiceTest {
 
     @Mock
     private TmdbService tmdbService;
+
+    @Mock
+    private WatchMateCacheEvictionService cacheEvictionService;
 
     @InjectMocks
     private MediaResolutionService mediaResolutionService;

@@ -43,7 +43,12 @@ class DashboardServiceTest {
 
     @BeforeEach
     void setUp() {
-        dashboardService = new DashboardService(userMediaStatusRepository, userShowTrackingRepository, dashboardMapper);
+        ContinueWatchingCacheService continueWatchingCacheService = new ContinueWatchingCacheService(
+            userMediaStatusRepository,
+            userShowTrackingRepository,
+            dashboardMapper
+        );
+        dashboardService = new DashboardService(userShowTrackingRepository, dashboardMapper, continueWatchingCacheService);
     }
 
     @Test

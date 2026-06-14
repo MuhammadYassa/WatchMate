@@ -8,6 +8,7 @@ import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.media.catalog.domain.ShowEpisode;
 import com.project.watchmate.show.tracking.domain.ShowTrackingCalculationResult;
@@ -30,6 +31,8 @@ public class ShowTrackingWriteSupport {
 
     private final UserShowTrackingRepository userShowTrackingRepository;
 
+    private final WatchMateCacheEvictionService cacheEvictionService;
+
     @Transactional
     public UserShowTracking loadOrCreateTracking(Users user, Media media) {
         return userShowTrackingRepository.findWithEpisodeWatchesByUserAndMedia(user, media)
@@ -48,6 +51,7 @@ public class ShowTrackingWriteSupport {
         userShowTrackingRepository.findWithEpisodeWatchesByUserAndMedia(user, media)
             .ifPresent(userShowTrackingRepository::delete);
         deleteLegacyShowStatusProjection(user, media);
+        cacheEvictionService.evictUserProgressCaches(user.getId());
     }
 
     public void resetToWatch(UserShowTracking tracking) {
@@ -124,6 +128,7 @@ public class ShowTrackingWriteSupport {
         tracking.setLastWatchedAt(result.lastWatchedAt());
         userShowTrackingRepository.save(tracking);
         deleteLegacyShowStatusProjection(tracking.getUser(), media);
+        cacheEvictionService.evictUserProgressCaches(tracking.getUser().getId());
         return result;
     }
 
@@ -131,6 +136,7 @@ public class ShowTrackingWriteSupport {
     public void persistTrackingAndCleanupProjection(UserShowTracking tracking) {
         userShowTrackingRepository.save(tracking);
         deleteLegacyShowStatusProjection(tracking.getUser(), tracking.getMedia());
+        cacheEvictionService.evictUserProgressCaches(tracking.getUser().getId());
     }
 
     private void deleteLegacyShowStatusProjection(Users user, Media media) {

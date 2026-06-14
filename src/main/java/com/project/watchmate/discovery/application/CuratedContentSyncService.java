@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.media.tmdb.client.TmdbClient;
 import com.project.watchmate.media.tmdb.dto.TmdbGenreDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbMovieDTO;
@@ -57,6 +58,8 @@ public class CuratedContentSyncService {
 
     private final PlatformTransactionManager transactionManager;
 
+    private final WatchMateCacheEvictionService cacheEvictionService;
+
     private final AtomicBoolean syncInProgress = new AtomicBoolean(false);
 
     public boolean hasCachedContent() {
@@ -82,6 +85,7 @@ public class CuratedContentSyncService {
             StoredDiscoveryData storedDiscoveryData = storeMediaAndBuildBuckets(fetchedData, attemptedAt);
             new TransactionTemplate(transactionManager).executeWithoutResult(status ->
                 persistSyncedContent(storedDiscoveryData, syncStatus, attemptedAt));
+            cacheEvictionService.evictDiscoveryContentCaches();
 
             log.info("Discovery content sync completed trigger={} buckets={}",
                 trigger,

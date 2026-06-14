@@ -2,14 +2,11 @@ package com.project.watchmate.movie.application;
 
 import com.project.watchmate.media.catalog.application.MediaResolutionService;
 import com.project.watchmate.media.catalog.application.UserWatchStatusResolver;
-import com.project.watchmate.media.tmdb.application.TmdbService;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,6 +28,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import com.project.watchmate.movie.dto.MovieDetailsDTO;
+import com.project.watchmate.movie.dto.PublicMovieDetailBaseDTO;
 import com.project.watchmate.common.error.UserNotFoundException;
 import com.project.watchmate.common.mapper.WatchMateMapper;
 import com.project.watchmate.media.catalog.domain.Media;
@@ -71,7 +69,7 @@ class MediaServiceTest {
     private UserWatchStatusResolver userWatchStatusResolver;
 
     @Mock
-    private TmdbService tmdbService;
+    private PublicMediaDetailBaseCacheService publicMediaDetailBaseCacheService;
 
     @InjectMocks
     private MediaService mediaService;
@@ -79,20 +77,11 @@ class MediaServiceTest {
     private static final Long TMDB_ID = 100L;
     private Users user;
     private Media media;
-    private MovieDetailsDTO expectedDto;
 
     @BeforeEach
     void setUp() {
         user = Users.builder().id(1L).username("user").favorites(new ArrayList<>()).build();
         media = Media.builder().id(1L).tmdbId(TMDB_ID).title("Test Movie").type(MediaType.MOVIE).reviews(new ArrayList<>()).build();
-        expectedDto = MovieDetailsDTO.builder()
-            .tmdbId(TMDB_ID)
-            .type(MediaType.MOVIE)
-            .watchStatus(WatchStatus.NONE)
-            .isFavourited(Boolean.FALSE)
-            .reviews(List.of())
-            .title("Test Movie")
-            .build();
     }
 
     @Nested
@@ -103,9 +92,9 @@ class MediaServiceTest {
         void getMovieDetails_WhenAuthenticatedMovieResolves_ReturnsMappedDto() {
             when(usersRepository.findByIdWithFavorites(1L)).thenReturn(Optional.of(user));
             when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, MediaType.MOVIE)).thenReturn(media);
+            when(publicMediaDetailBaseCacheService.getMovieBase(TMDB_ID, MediaType.MOVIE)).thenReturn(publicBase("Test Movie"));
             when(reviewRepository.findByMedia(media)).thenReturn(List.of());
             when(userWatchStatusResolver.resolveWatchStatus(user, media)).thenReturn(WatchStatus.NONE);
-            when(watchMateMapper.mapToMovieDetailsDTO(media, List.of(), Boolean.FALSE, WatchStatus.NONE)).thenReturn(expectedDto);
 
             MovieDetailsDTO result = mediaService.getMovieDetails(TMDB_ID, user);
 
@@ -116,29 +105,29 @@ class MediaServiceTest {
             assertEquals(WatchStatus.NONE, result.getWatchStatus());
             assertEquals(List.of(), result.getReviews());
             assertEquals(Boolean.FALSE, result.getIsFavourited());
-            verify(watchMateMapper).mapToMovieDetailsDTO(any(Media.class), anyList(), anyBoolean(), any(WatchStatus.class));
         }
 
         @Test
         void getMovieDetails_WhenMovieIsPublic_ReturnsDtoWithNullUserFields() {
             Media publicMovie = Media.builder().tmdbId(TMDB_ID).title("Public Movie").type(MediaType.MOVIE).build();
-            MovieDetailsDTO publicDto = MovieDetailsDTO.builder().tmdbId(TMDB_ID).title("Public Movie").type(MediaType.MOVIE).build();
 
-            when(mediaRepository.findByTmdbIdAndType(TMDB_ID, MediaType.MOVIE)).thenReturn(Optional.empty());
-            when(tmdbService.fetchMediaByTmdbId(TMDB_ID, MediaType.MOVIE)).thenReturn(publicMovie);
-            when(watchMateMapper.mapToMovieDetailsDTO(publicMovie, List.of(), false, WatchStatus.NONE)).thenReturn(publicDto);
+            when(mediaRepository.findByTmdbIdAndType(TMDB_ID, MediaType.MOVIE)).thenReturn(Optional.of(publicMovie));
+            when(publicMediaDetailBaseCacheService.getMovieBase(TMDB_ID, MediaType.MOVIE)).thenReturn(publicBase("Public Movie"));
 
             MovieDetailsDTO result = mediaService.getMovieDetails(TMDB_ID, null);
 
             assertNotNull(result);
             assertEquals(TMDB_ID, result.getTmdbId());
-            verify(watchMateMapper).mapToMovieDetailsDTO(any(Media.class), anyList(), anyBoolean(), any(WatchStatus.class));
+            assertEquals("Public Movie", result.getTitle());
+            assertEquals(Boolean.FALSE, result.getIsFavourited());
+            assertEquals(WatchStatus.NONE, result.getWatchStatus());
         }
 
         @Test
         void getMovieDetails_WhenUserNotFound_ThrowsUserNotFoundException() {
             when(usersRepository.findByIdWithFavorites(1L)).thenReturn(Optional.empty());
             when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, MediaType.MOVIE)).thenReturn(media);
+            when(publicMediaDetailBaseCacheService.getMovieBase(TMDB_ID, MediaType.MOVIE)).thenReturn(publicBase("Test Movie"));
 
             UserNotFoundException exception = assertThrows(UserNotFoundException.class,
                 () -> mediaService.getMovieDetails(TMDB_ID, user));
@@ -177,6 +166,15 @@ class MediaServiceTest {
             assertEquals(media, result.getContent().get(0));
             verify(userShowTrackingRepository).findWatchedShowsByUser(eq(user), any(Pageable.class));
         }
+    }
+
+    private PublicMovieDetailBaseDTO publicBase(String title) {
+        return PublicMovieDetailBaseDTO.builder()
+            .tmdbId(TMDB_ID)
+            .title(title)
+            .type(MediaType.MOVIE)
+            .genres(List.of())
+            .build();
     }
 }
 

@@ -24,6 +24,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.favourite.dto.FavouriteStatusDTO;
 import com.project.watchmate.media.catalog.dto.MediaDetailsDTO;
 import com.project.watchmate.favourite.dto.UserFavouritesDTO;
@@ -48,6 +49,9 @@ class FavouriteServiceTest {
 
     @Mock
     private UserWatchStatusResolver userWatchStatusResolver;
+
+    @Mock
+    private WatchMateCacheEvictionService cacheEvictionService;
 
     @InjectMocks
     private FavouriteService favouriteService;
@@ -93,6 +97,7 @@ class FavouriteServiceTest {
             assertTrue(result.isFavourited());
             assertTrue(managedUser.getFavorites().contains(media));
             verify(usersRepository).findByIdWithFavorites(user.getId());
+            verify(cacheEvictionService).evictFavoriteCaches(user.getId());
         }
 
         @Test
@@ -125,6 +130,7 @@ class FavouriteServiceTest {
             assertEquals(TMDB_ID, result.getTmdbId());
             assertFalse(result.isFavourited());
             assertFalse(managedUser.getFavorites().contains(media));
+            verify(cacheEvictionService).evictFavoriteCaches(user.getId());
         }
 
         @Test

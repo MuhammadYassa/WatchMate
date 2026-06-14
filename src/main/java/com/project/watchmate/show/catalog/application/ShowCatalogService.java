@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.media.tmdb.dto.TmdbMovieDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbTvDetailsDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbTvEpisodeDTO;
@@ -54,6 +55,8 @@ public class ShowCatalogService {
     private final ShowEpisodeRepository showEpisodeRepository;
 
     private final PlatformTransactionManager transactionManager;
+
+    private final WatchMateCacheEvictionService cacheEvictionService;
 
     public MediaType validateShowType(MediaType mediaType) {
         if (mediaType == null) {
@@ -378,7 +381,7 @@ public class ShowCatalogService {
                 .toList();
 
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
-        return transactionTemplate.execute(status -> {
+        CachedSeasonData saved = transactionTemplate.execute(status -> {
             ShowSeason season = showSeasonRepository.findByMediaIdAndSeasonNumber(media.getId(), seasonNumber)
                 .orElse(ShowSeason.builder()
                     .media(media)
@@ -403,6 +406,8 @@ public class ShowCatalogService {
 
             return new CachedSeasonData(savedSeason, savedEpisodes);
         });
+        cacheEvictionService.evictPublicSeasonMetadata(media.getTmdbId(), seasonNumber);
+        return saved;
     }
 
     private int compareEpisodeOrder(Integer leftSeason, Integer leftEpisode, Integer rightSeason, Integer rightEpisode) {
