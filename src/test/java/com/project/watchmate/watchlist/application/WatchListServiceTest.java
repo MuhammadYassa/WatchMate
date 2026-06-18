@@ -121,6 +121,18 @@ class WatchListServiceTest {
         verify(watchListPageCacheService).getAllWatchLists(user, 0, 20);
     }
 
+    @Test
+    void mapWatchListsForViewer_delegatesToViewerAwareAssemblerMethod() {
+        WatchListDTO dto = WatchListDTO.builder().id(WATCHLIST_ID).name("My List").media(List.of()).build();
+        when(watchListDtoAssembler.mapWatchListsForViewer(List.of(watchList), otherUser)).thenReturn(List.of(dto));
+
+        List<WatchListDTO> result = watchListService.mapWatchListsForViewer(List.of(watchList), otherUser);
+
+        assertEquals(1, result.size());
+        assertEquals(WATCHLIST_ID, result.get(0).getId());
+        verify(watchListDtoAssembler).mapWatchListsForViewer(List.of(watchList), otherUser);
+    }
+
     @Nested
     @DisplayName("Create WatchList Tests")
     class CreateWatchListTests {
@@ -353,7 +365,6 @@ class WatchListServiceTest {
         }
     }
 }
-
 
 
 

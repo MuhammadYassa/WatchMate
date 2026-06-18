@@ -22,6 +22,9 @@ import lombok.NoArgsConstructor;
 @Schema(name = "UserProfile", description = "Profile data visible to the authenticated user.")
 public class UserProfileDTO {
 
+    @Schema(description = "Identifier of the profile owner.", example = "42")
+    private Long userId;
+
     @Schema(description = "Username of the profile owner.", example = "cinephile42")
     private String username;
 

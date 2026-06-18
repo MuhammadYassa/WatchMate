@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -44,6 +45,8 @@ import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.social.persistence.FollowRequestRepository;
 import com.project.watchmate.user.persistence.UsersRepository;
 import com.project.watchmate.watchlist.application.WatchListService;
+import com.project.watchmate.watchlist.domain.WatchList;
+import com.project.watchmate.watchlist.dto.WatchListDTO;
 
 @ExtendWith(MockitoExtension.class)
 class SocialServiceTest {
@@ -305,9 +308,11 @@ class SocialServiceTest {
             when(mediaService.countMoviesWatched(targetUser)).thenReturn(0L);
             when(mediaService.countShowsWatched(targetUser)).thenReturn(0L);
             when(watchListService.getWatchListPage(targetUser)).thenReturn(Page.empty());
+            when(watchListService.mapWatchListsForViewer(List.of(), user)).thenReturn(List.of());
 
             UserProfileDTO result = socialService.getUserProfile("target", user);
 
+            assertEquals(TARGET_ID, result.getUserId());
             assertEquals("target", result.getUsername());
             assertEquals(PrivacyStatuses.PUBLIC, result.getPrivacyStatus());
             assertEquals(FollowStatuses.NOT_FOLLOWING, result.getFollowStatus());
@@ -324,6 +329,7 @@ class SocialServiceTest {
             when(mediaService.countMoviesWatched(targetUser)).thenReturn(0L);
             when(mediaService.countShowsWatched(targetUser)).thenReturn(0L);
             when(watchListService.getWatchListPage(targetUser)).thenReturn(Page.empty());
+            when(watchListService.mapWatchListsForViewer(List.of(), user)).thenReturn(List.of());
 
             UserProfileDTO result = socialService.getUserProfile("target", user);
 
@@ -344,7 +350,55 @@ class SocialServiceTest {
 
             UserProfileDTO result = socialService.getUserProfile("target", user);
 
+            assertEquals(TARGET_ID, result.getUserId());
             assertEquals(FollowStatuses.REQUESTED, result.getFollowStatus());
+        }
+
+        @Test
+        void getUserProfileByUsername_WhenVisibleTarget_MapsWatchlistsUsingViewer() {
+            WatchList watchList = WatchList.builder().id(15L).name("Owner List").user(targetUser).build();
+            WatchListDTO dto = WatchListDTO.builder().id(15L).name("Owner List").media(List.of()).build();
+            Page<WatchList> watchListPage = new PageImpl<>(List.of(watchList));
+
+            when(usersRepository.findByUsernameIgnoreCaseAndEmailVerifiedTrue("target")).thenReturn(Optional.of(targetUser));
+            when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
+            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
+            when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
+            when(usersRepository.countFollowersByUserId(TARGET_ID)).thenReturn(0L);
+            when(usersRepository.countFollowingByUserId(TARGET_ID)).thenReturn(0L);
+            when(mediaService.countMoviesWatched(targetUser)).thenReturn(0L);
+            when(mediaService.countShowsWatched(targetUser)).thenReturn(0L);
+            when(watchListService.getWatchListPage(targetUser)).thenReturn(watchListPage);
+            when(watchListService.mapWatchListsForViewer(List.of(watchList), user)).thenReturn(List.of(dto));
+
+            UserProfileDTO result = socialService.getUserProfile("target", user);
+
+            assertEquals(1, result.getWatchlists().getContent().size());
+            verify(watchListService).mapWatchListsForViewer(List.of(watchList), user);
+        }
+
+        @Test
+        void getUserProfileByUsername_WhenSelf_MapsWatchlistsUsingSelfAsViewer() {
+            WatchList watchList = WatchList.builder().id(22L).name("Self List").user(user).build();
+            WatchListDTO dto = WatchListDTO.builder().id(22L).name("Self List").media(List.of()).build();
+            Page<WatchList> watchListPage = new PageImpl<>(List.of(watchList));
+
+            when(usersRepository.findByUsernameIgnoreCaseAndEmailVerifiedTrue("user")).thenReturn(Optional.of(user));
+            when(usersRepository.countFollowersByUserId(USER_ID)).thenReturn(0L);
+            when(usersRepository.countFollowingByUserId(USER_ID)).thenReturn(0L);
+            when(mediaService.countMoviesWatched(user)).thenReturn(0L);
+            when(mediaService.countShowsWatched(user)).thenReturn(0L);
+            when(reviewService.getReviewPage(user)).thenReturn(Page.empty());
+            when(mediaService.getMoviesWatchedPage(user)).thenReturn(Page.empty());
+            when(mediaService.getShowsWatchedPage(user)).thenReturn(Page.empty());
+            when(watchListService.getWatchListPage(user)).thenReturn(watchListPage);
+            when(watchListService.mapWatchListsForViewer(List.of(watchList), user)).thenReturn(List.of(dto));
+
+            UserProfileDTO result = socialService.getUserProfile("user", user);
+
+            assertEquals(USER_ID, result.getUserId());
+            assertEquals(1, result.getWatchlists().getContent().size());
+            verify(watchListService).mapWatchListsForViewer(List.of(watchList), user);
         }
     }
 }

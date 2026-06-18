@@ -16,6 +16,7 @@ import com.project.watchmate.movie.tracking.domain.UserMediaStatus;
 import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.media.catalog.domain.WatchStatus;
 import com.project.watchmate.watchlist.domain.WatchList;
+import com.project.watchmate.watchlist.domain.WatchListItem;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -131,6 +132,7 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 		mockMvc.perform(get("/api/v1/social/profile/{username}", target.getUsername())
 			.header("Authorization", bearerToken(viewer)))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.userId").value(target.getId().intValue()))
 			.andExpect(jsonPath("$.username").value(target.getUsername()))
 			.andExpect(jsonPath("$.followStatus").value("BLOCKED"))
 			.andExpect(jsonPath("$.followersCount").value(0))
@@ -148,6 +150,7 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 		mockMvc.perform(get("/api/v1/social/profile/{username}", target.getUsername())
 			.header("Authorization", bearerToken(viewer)))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.userId").value(target.getId().intValue()))
 			.andExpect(jsonPath("$.username").value(target.getUsername()))
 			.andExpect(jsonPath("$.privacyStatus").value("PRIVATE"))
 			.andExpect(jsonPath("$.watchlists").doesNotExist());
@@ -157,15 +160,22 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 	void userProfile_forPrivateUser_returnsSensitiveSectionsToModerator() throws Exception {
 		Users moderator = saveUser("social-private-profile-moderator", true, Role.MODERATOR);
 		Users target = savePrivateUser("social-private-profile-mod-target");
-		saveWatchList(target, "Moderator Visible Watchlist");
+		Media media = saveMedia(9801L, "Moderator Visible Movie", MediaType.MOVIE);
+		WatchList watchList = saveWatchList(target, "Moderator Visible Watchlist");
+		saveWatchListItem(watchList, media);
+		saveFavorite(target, media);
+		saveMovieStatus(target, media, WatchStatus.WATCHED);
 
 		mockMvc.perform(get("/api/v1/social/profile/{username}", target.getUsername())
 			.header("Authorization", bearerToken(moderator)))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.userId").value(target.getId().intValue()))
 			.andExpect(jsonPath("$.username").value(target.getUsername()))
 			.andExpect(jsonPath("$.privacyStatus").value("PRIVATE"))
 			.andExpect(jsonPath("$.watchlists.content.length()").value(1))
-			.andExpect(jsonPath("$.watchlists.content[0].name").value("Moderator Visible Watchlist"));
+			.andExpect(jsonPath("$.watchlists.content[0].name").value("Moderator Visible Watchlist"))
+			.andExpect(jsonPath("$.watchlists.content[0].media[0].isFavourited").value(false))
+			.andExpect(jsonPath("$.watchlists.content[0].media[0].watchStatus").value("NONE"));
 	}
 
 	@Test
@@ -177,6 +187,7 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 		mockMvc.perform(get("/api/v1/social/profile/{username}", target.getUsername())
 			.header("Authorization", bearerToken(admin)))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.userId").value(target.getId().intValue()))
 			.andExpect(jsonPath("$.username").value(target.getUsername()))
 			.andExpect(jsonPath("$.privacyStatus").value("PRIVATE"))
 			.andExpect(jsonPath("$.watchlists.content.length()").value(1))
@@ -195,7 +206,11 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 			.header("Authorization", bearerToken(target)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.content.length()").value(1))
+			.andExpect(jsonPath("$.content[0].requestId").isNumber())
+			.andExpect(jsonPath("$.content[0].requesterUserId").value(pendingRequester.getId().intValue()))
+			.andExpect(jsonPath("$.content[0].targetUserId").value(target.getId().intValue()))
 			.andExpect(jsonPath("$.content[*].requesterUsername", contains(pendingRequester.getUsername())))
+			.andExpect(jsonPath("$.content[*].targetUsername", contains(target.getUsername())))
 			.andExpect(jsonPath("$.content[0].status").value("PENDING"));
 	}
 
@@ -225,13 +240,18 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 			.header("Authorization", bearerToken(viewer)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$", hasSize(4)))
+			.andExpect(jsonPath("$[0].userId").value(exact.getId().intValue()))
 			.andExpect(jsonPath("$[*].username", contains("muh", "muha", "muhb", "amuh")))
 			.andExpect(jsonPath("$[0].isFollowing").value(false))
 			.andExpect(jsonPath("$[1].isFollowing").value(true))
 			.andExpect(jsonPath("$[2].isFollowing").value(false))
 			.andExpect(jsonPath("$[3].isFollowing").value(true))
 			.andExpect(jsonPath("$[0].isSelf").value(false))
-			.andExpect(jsonPath("$[0].privacyStatus").value(exact.getPrivacyStatus().name()));
+			.andExpect(jsonPath("$[0].privacyStatus").value(exact.getPrivacyStatus().name()))
+			.andExpect(jsonPath("$[0].email").doesNotExist())
+			.andExpect(jsonPath("$[0].password").doesNotExist())
+			.andExpect(jsonPath("$[0].emailVerified").doesNotExist())
+			.andExpect(jsonPath("$[0].token").doesNotExist());
 	}
 
 	@Test
@@ -254,6 +274,7 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 		mockMvc.perform(get("/api/v1/social/profile/{username}", "casetarget")
 			.header("Authorization", bearerToken(viewer)))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.userId").value(target.getId().intValue()))
 			.andExpect(jsonPath("$.username").value("CaseTarget"))
 			.andExpect(jsonPath("$.watchlists.content.length()").value(1))
 			.andExpect(jsonPath("$.watchlists.content[0].name").value("Visible Watchlist"));
@@ -274,6 +295,7 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 		mockMvc.perform(get("/api/v1/social/profile/{username}", user.getUsername())
 			.header("Authorization", bearerToken(user)))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.userId").value(user.getId().intValue()))
 			.andExpect(jsonPath("$.username").value(user.getUsername()))
 			.andExpect(jsonPath("$.moviesWatchedCount").value(1))
 			.andExpect(jsonPath("$.moviesWatched.content.length()").value(1))
@@ -291,9 +313,88 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 		mockMvc.perform(get("/api/v1/social/profile/{username}", target.getUsername())
 			.header("Authorization", bearerToken(viewer)))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.userId").value(target.getId().intValue()))
 			.andExpect(jsonPath("$.username").value(target.getUsername()))
 			.andExpect(jsonPath("$.privacyStatus").value("PRIVATE"))
 			.andExpect(jsonPath("$.watchlists").doesNotExist());
+	}
+
+	@Test
+	void userProfile_forPublicUser_usesViewerOverlayInsteadOfOwnerOverlay() throws Exception {
+		Users owner = saveUser("overlay-owner-a", true);
+		Users viewer = saveUser("overlay-viewer-a", true);
+		Media media = saveMedia(9811L, "Overlay Movie A", MediaType.MOVIE);
+		WatchList watchList = saveWatchList(owner, "Owner Overlay List");
+		saveWatchListItem(watchList, media);
+		saveFavorite(owner, media);
+		saveMovieStatus(owner, media, WatchStatus.WATCHED);
+
+		mockMvc.perform(get("/api/v1/social/profile/{username}", owner.getUsername())
+			.header("Authorization", bearerToken(viewer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.userId").value(owner.getId().intValue()))
+			.andExpect(jsonPath("$.watchlists.content[0].media[0].isFavourited").value(false))
+			.andExpect(jsonPath("$.watchlists.content[0].media[0].watchStatus").value("NONE"));
+	}
+
+	@Test
+	void userProfile_forPublicUser_usesViewersOwnOverlayStateWhenPresent() throws Exception {
+		Users owner = saveUser("overlay-owner-b", true);
+		Users viewer = saveUser("overlay-viewer-b", true);
+		Media media = saveMedia(9812L, "Overlay Movie B", MediaType.MOVIE);
+		WatchList watchList = saveWatchList(owner, "Owner Overlay List B");
+		saveWatchListItem(watchList, media);
+		saveFavorite(owner, media);
+		saveMovieStatus(owner, media, WatchStatus.WATCHED);
+		saveFavorite(viewer, media);
+		saveMovieStatus(viewer, media, WatchStatus.TO_WATCH);
+
+		mockMvc.perform(get("/api/v1/social/profile/{username}", owner.getUsername())
+			.header("Authorization", bearerToken(viewer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.userId").value(owner.getId().intValue()))
+			.andExpect(jsonPath("$.watchlists.content[0].media[0].isFavourited").value(true))
+			.andExpect(jsonPath("$.watchlists.content[0].media[0].watchStatus").value("TO_WATCH"));
+	}
+
+	@Test
+	void userProfile_forSelf_keepsOwnersOwnOverlayState() throws Exception {
+		Users owner = saveUser("overlay-owner-self", true);
+		Media media = saveMedia(9813L, "Overlay Movie Self", MediaType.MOVIE);
+		WatchList watchList = saveWatchList(owner, "Self Overlay List");
+		saveWatchListItem(watchList, media);
+		saveFavorite(owner, media);
+		saveMovieStatus(owner, media, WatchStatus.WATCHED);
+
+		mockMvc.perform(get("/api/v1/social/profile/{username}", owner.getUsername())
+			.header("Authorization", bearerToken(owner)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.userId").value(owner.getId().intValue()))
+			.andExpect(jsonPath("$.watchlists.content[0].media[0].isFavourited").value(true))
+			.andExpect(jsonPath("$.watchlists.content[0].media[0].watchStatus").value("WATCHED"));
+	}
+
+	@Test
+	void followersAndFollowingLists_includeUserIdAndUsername() throws Exception {
+		Users user = saveUser("social-list-owner", true);
+		Users follower = saveUser("social-list-follower", true);
+		Users following = saveUser("social-list-following", true);
+		follow(follower, user);
+		follow(user, following);
+
+		mockMvc.perform(get("/api/v1/social/followers-list")
+			.header("Authorization", bearerToken(user)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content.length()").value(1))
+			.andExpect(jsonPath("$.content[0].userId").value(follower.getId().intValue()))
+			.andExpect(jsonPath("$.content[0].username").value(follower.getUsername()));
+
+		mockMvc.perform(get("/api/v1/social/following-list")
+			.header("Authorization", bearerToken(user)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content.length()").value(1))
+			.andExpect(jsonPath("$.content[0].userId").value(following.getId().intValue()))
+			.andExpect(jsonPath("$.content[0].username").value(following.getUsername()));
 	}
 
 	@Test
@@ -325,6 +426,30 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 		return watchListRepository.save(WatchList.builder()
 			.name(name)
 			.user(user)
+			.build());
+	}
+
+	private void saveWatchListItem(WatchList watchList, Media media) {
+		watchList.getItems().add(WatchListItem.builder()
+			.watchList(watchList)
+			.media(media)
+			.addedAt(LocalDateTime.now())
+			.build());
+		watchListRepository.save(watchList);
+	}
+
+	private void saveFavorite(Users user, Media media) {
+		jdbcTemplate.update(
+			"insert into user_favorites (users_id, favorites_id) values (?, ?)",
+			user.getId(),
+			media.getId());
+	}
+
+	private void saveMovieStatus(Users user, Media media, WatchStatus status) {
+		userMediaStatusRepository.save(UserMediaStatus.builder()
+			.user(user)
+			.media(media)
+			.status(status)
 			.build());
 	}
 

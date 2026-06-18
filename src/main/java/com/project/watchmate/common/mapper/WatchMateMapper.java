@@ -116,6 +116,7 @@ public class WatchMateMapper {
 
     public FollowListUserDetailsDTO mapToFollowListUserDetailsDTO(Users user) {
         return FollowListUserDetailsDTO.builder()
+            .userId(user.getId())
             .username(user.getUsername())
             .build();
     }

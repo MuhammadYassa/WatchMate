@@ -14,6 +14,9 @@ import lombok.NoArgsConstructor;
 @Schema(name = "FollowListUserDetails", description = "User summary returned in follower and following lists.")
 public class FollowListUserDetailsDTO {
 
+    @Schema(description = "Identifier of the listed user.", example = "42")
+    private Long userId;
+
     @NotBlank
     @Schema(description = "Username of the listed user.", example = "cinephile42")
     private String username;

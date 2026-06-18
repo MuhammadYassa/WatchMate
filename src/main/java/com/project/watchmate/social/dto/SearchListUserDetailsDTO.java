@@ -15,6 +15,9 @@ import lombok.NoArgsConstructor;
 @Schema(name = "SearchListUserDetails", description = "User summary returned in username search results.")
 public class SearchListUserDetailsDTO {
 
+    @Schema(description = "Identifier of the matched user.", example = "42")
+    private Long userId;
+
     @Schema(description = "Username of the matched user.", example = "cinephile42")
     private String username;
 

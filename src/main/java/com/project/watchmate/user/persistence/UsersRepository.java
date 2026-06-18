@@ -59,6 +59,7 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
 
     @Query("""
         SELECT new com.project.watchmate.social.dto.SearchListUserDetailsDTO(
+            u.id,
             u.username,
             CASE WHEN follower.id IS NOT NULL THEN true ELSE false END,
             CASE WHEN u.id = :viewerId THEN true ELSE false END,

@@ -50,7 +50,12 @@ public class WatchListDtoAssembler {
 
     @Transactional
     public WatchListDTO mapToWatchListDTO(WatchList watchList) {
-        List<WatchListDTO> mapped = mapWatchLists(watchList.getUser(), List.of(watchList));
+        return mapToWatchListDTOForViewer(watchList, watchList == null ? null : watchList.getUser());
+    }
+
+    @Transactional
+    public WatchListDTO mapToWatchListDTOForViewer(WatchList watchList, Users viewer) {
+        List<WatchListDTO> mapped = mapWatchListsForViewer(List.of(watchList), viewer);
         return mapped.isEmpty()
             ? watchMateMapper.mapToWatchListDTO(watchList, List.of())
             : mapped.get(0);
@@ -58,11 +63,16 @@ public class WatchListDtoAssembler {
 
     @Transactional(readOnly = true)
     public List<WatchListDTO> mapWatchLists(Users user, List<WatchList> watchLists) {
+        return mapWatchListsForViewer(watchLists, user);
+    }
+
+    @Transactional(readOnly = true)
+    public List<WatchListDTO> mapWatchListsForViewer(List<WatchList> watchLists, Users viewer) {
         if (watchLists == null || watchLists.isEmpty()) {
             return List.of();
         }
 
-        BatchWatchListMappingData mappingData = loadBatchMappingData(user, watchLists);
+        BatchWatchListMappingData mappingData = loadBatchMappingData(viewer, watchLists);
 
         return watchLists.stream()
             .map(watchList -> {

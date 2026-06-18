@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -36,6 +37,8 @@ import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.social.persistence.FollowRequestRepository;
 import com.project.watchmate.user.persistence.UsersRepository;
 import com.project.watchmate.watchlist.application.WatchListService;
+import com.project.watchmate.watchlist.domain.WatchList;
+import com.project.watchmate.watchlist.dto.WatchListDTO;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -302,6 +305,7 @@ public class SocialService {
         if(usersRepository.isBlockingUser(targetUser.getId(), user.getId()) 
     || usersRepository.isBlockingUser(user.getId(), targetUser.getId())){
             return UserProfileDTO.builder()
+            .userId(targetUser.getId())
             .username(targetUser.getUsername())
             .followersCount(0L)
             .followingCount(0L)
@@ -314,12 +318,13 @@ public class SocialService {
     
     private UserProfileDTO retrieveSelfUserProfile(Users user){
         return UserProfileDTO.builder()
+            .userId(user.getId())
             .username(user.getUsername())
             .privacyStatus(user.getPrivacyStatus())
             .followStatus(FollowStatuses.NOT_FOLLOWING)
             .followersCount(usersRepository.countFollowersByUserId(user.getId()))
             .followingCount(usersRepository.countFollowingByUserId(user.getId()))
-            .watchlists((watchListService.getWatchListPage(user)).map(watchList -> watchListService.mapToWatchListDTO(watchList)))
+            .watchlists(getProfileWatchLists(user, user))
             .reviews(reviewService.getReviewPage(user).map(review -> watchMateMapper.mapToReviewDTO(review)))
             .moviesWatchedCount(mediaService.countMoviesWatched(user))
             .showsWatchedCount(mediaService.countShowsWatched(user))
@@ -332,17 +337,19 @@ public class SocialService {
         boolean isFollowing = usersRepository.isFollowing(user.getId(), targetUser.getId());
         if (isFollowing || targetUser.getPrivacyStatus() == PrivacyStatuses.PUBLIC || canViewPrivateProfile(user)){
             return UserProfileDTO.builder()
+                .userId(targetUser.getId())
                 .username(targetUser.getUsername())
                 .privacyStatus(targetUser.getPrivacyStatus())
                 .followStatus(isFollowing ? FollowStatuses.FOLLOWING : FollowStatuses.NOT_FOLLOWING)
                 .followersCount(usersRepository.countFollowersByUserId(targetUser.getId()))
                 .followingCount(usersRepository.countFollowingByUserId(targetUser.getId()))
-                .watchlists((watchListService.getWatchListPage(targetUser)).map(watchList -> watchListService.mapToWatchListDTO(watchList)))
+                .watchlists(getProfileWatchLists(targetUser, user))
                 .moviesWatchedCount(mediaService.countMoviesWatched(targetUser))
                 .showsWatchedCount(mediaService.countShowsWatched(targetUser))
                 .build();
         } else {
             return UserProfileDTO.builder()
+                .userId(targetUser.getId())
                 .username(targetUser.getUsername())
                 .privacyStatus(targetUser.getPrivacyStatus())
                 .followStatus(followRequestRepository.existsByRequestUserAndTargetUserAndStatus(user, targetUser, FollowRequestStatuses.PENDING)? FollowStatuses.REQUESTED : FollowStatuses.NOT_FOLLOWING)
@@ -354,6 +361,15 @@ public class SocialService {
 
     private boolean canViewPrivateProfile(Users user) {
         return user.getRole() == Role.MODERATOR || user.getRole() == Role.ADMIN;
+    }
+
+    private Page<WatchListDTO> getProfileWatchLists(Users profileOwner, Users viewer) {
+        Page<WatchList> watchListPage = watchListService.getWatchListPage(profileOwner);
+        return new PageImpl<>(
+            watchListService.mapWatchListsForViewer(watchListPage.getContent(), viewer),
+            watchListPage.getPageable(),
+            watchListPage.getTotalElements()
+        );
     }
 }
 

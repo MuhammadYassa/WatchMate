@@ -3,6 +3,7 @@ package com.project.watchmate.watchlist.application;
 import com.project.watchmate.media.catalog.application.MediaResolutionService;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
 
 import org.springframework.data.domain.Page;
@@ -163,6 +164,11 @@ public class WatchListService {
     @Transactional
     public WatchListDTO mapToWatchListDTO(WatchList watchList){
         return watchListDtoAssembler.mapToWatchListDTO(watchList);
+    }
+
+    @Transactional(readOnly = true)
+    public List<WatchListDTO> mapWatchListsForViewer(List<WatchList> watchLists, Users viewer) {
+        return watchListDtoAssembler.mapWatchListsForViewer(watchLists, viewer);
     }
 }
 
