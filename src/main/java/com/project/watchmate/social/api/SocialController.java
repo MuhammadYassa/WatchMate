@@ -94,6 +94,7 @@ public class SocialController {
         @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "403", description = "Authenticated user cannot act on this request", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "404", description = "Follow request not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "409", description = "Follow request is no longer pending", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<FollowRequestResponseDTO> acceptFollowRequest(@PathVariable @Min(1) Long requestId, @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -110,6 +111,7 @@ public class SocialController {
         @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "403", description = "Authenticated user cannot act on this request", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "404", description = "Follow request not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "409", description = "Follow request is no longer pending", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<FollowRequestResponseDTO> rejectFollowRequest(@PathVariable @Min(1) Long requestId, @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -126,6 +128,7 @@ public class SocialController {
         @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "403", description = "Authenticated user cannot act on this request", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "404", description = "Follow request not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "409", description = "Follow request is no longer pending", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<FollowRequestResponseDTO> cancelFollowRequest(@PathVariable @Min(1) Long requestId, @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal) {

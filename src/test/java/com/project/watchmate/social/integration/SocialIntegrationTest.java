@@ -50,12 +50,24 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 		mockMvc.perform(post("/api/v1/social/follow/{userId}", target.getId())
 			.header("Authorization", bearerToken(user)))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.followStatus").value("NOT_FOLLOWING"));
+			.andExpect(jsonPath("$.followStatus").value("REQUESTED"));
 
 		FollowRequest request = followRequestRepository.findByRequestUserAndTargetUser(user, target).orElseThrow();
 
 		assertThat(request.getStatus()).isEqualTo(FollowRequestStatuses.PENDING);
 		assertThat(usersRepository.isFollowing(user.getId(), target.getId())).isFalse();
+	}
+
+	@Test
+	void followStatus_whenPendingFollowRequestExists_returnsRequested() throws Exception {
+		Users requester = saveUser("social-follow-status-requester", true);
+		Users target = savePrivateUser("social-follow-status-target");
+		saveFollowRequest(requester, target, FollowRequestStatuses.PENDING);
+
+		mockMvc.perform(get("/api/v1/social/follow-status/{userId}", target.getId())
+			.header("Authorization", bearerToken(requester)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.followStatus").value("REQUESTED"));
 	}
 
 	@Test
@@ -72,6 +84,27 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 		assertThat(followRequestRepository.findById(request.getId()).orElseThrow().getStatus())
 			.isEqualTo(FollowRequestStatuses.ACCEPTED);
 		assertThat(usersRepository.isFollowing(requester.getId(), target.getId())).isTrue();
+	}
+
+	@Test
+	void acceptFollowRequest_whenRequestAlreadyAccepted_returns409WithoutDuplicateFollow() throws Exception {
+		Users requester = saveUser("social-reaccept-requester", true);
+		Users target = savePrivateUser("social-reaccept-target");
+		FollowRequest request = saveFollowRequest(requester, target, FollowRequestStatuses.PENDING);
+
+		mockMvc.perform(post("/api/v1/social/follow-request/{requestId}/accept", request.getId())
+			.header("Authorization", bearerToken(target)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.newStatus").value("ACCEPTED"));
+
+		mockMvc.perform(post("/api/v1/social/follow-request/{requestId}/accept", request.getId())
+			.header("Authorization", bearerToken(target)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("FOLLOW_REQUEST_STATE_CONFLICT"));
+
+		assertThat(usersRepository.isFollowing(requester.getId(), target.getId())).isTrue();
+		assertThat(followRequestRepository.findById(request.getId()).orElseThrow().getStatus())
+			.isEqualTo(FollowRequestStatuses.ACCEPTED);
 	}
 
 	@Test
@@ -101,6 +134,84 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 			.andExpect(jsonPath("$.newStatus").value("CANCELED"));
 
 		assertThat(followRequestRepository.findById(request.getId())).isEmpty();
+	}
+
+	@Test
+	void cancelFollowRequest_updatesFollowStatusToNotFollowing() throws Exception {
+		Users requester = saveUser("social-cancel-status-requester", true);
+		Users target = savePrivateUser("social-cancel-status-target");
+		FollowRequest request = saveFollowRequest(requester, target, FollowRequestStatuses.PENDING);
+
+		mockMvc.perform(delete("/api/v1/social/follow-request/{requestId}/cancel", request.getId())
+			.header("Authorization", bearerToken(requester)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.newStatus").value("CANCELED"));
+
+		mockMvc.perform(get("/api/v1/social/follow-status/{userId}", target.getId())
+			.header("Authorization", bearerToken(requester)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.followStatus").value("NOT_FOLLOWING"));
+	}
+
+	@Test
+	void rejectFollowRequest_whenRequestAlreadyAccepted_returns409() throws Exception {
+		Users requester = saveUser("social-reject-conflict-requester", true);
+		Users target = savePrivateUser("social-reject-conflict-target");
+		FollowRequest request = saveFollowRequest(requester, target, FollowRequestStatuses.ACCEPTED);
+
+		mockMvc.perform(post("/api/v1/social/follow-request/{requestId}/reject", request.getId())
+			.header("Authorization", bearerToken(target)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("FOLLOW_REQUEST_STATE_CONFLICT"));
+	}
+
+	@Test
+	void cancelFollowRequest_whenRequestAlreadyAccepted_returns409() throws Exception {
+		Users requester = saveUser("social-cancel-conflict-requester", true);
+		Users target = savePrivateUser("social-cancel-conflict-target");
+		FollowRequest request = saveFollowRequest(requester, target, FollowRequestStatuses.ACCEPTED);
+
+		mockMvc.perform(delete("/api/v1/social/follow-request/{requestId}/cancel", request.getId())
+			.header("Authorization", bearerToken(requester)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("FOLLOW_REQUEST_STATE_CONFLICT"));
+	}
+
+	@Test
+	void acceptFollowRequest_whenRequesterIsNotTarget_returns403() throws Exception {
+		Users requester = saveUser("social-accept-auth-requester", true);
+		Users target = savePrivateUser("social-accept-auth-target");
+		FollowRequest request = saveFollowRequest(requester, target, FollowRequestStatuses.PENDING);
+
+		mockMvc.perform(post("/api/v1/social/follow-request/{requestId}/accept", request.getId())
+			.header("Authorization", bearerToken(requester)))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("UNAUTHORIZED_FOLLOW_REQUEST_ACCESS"));
+	}
+
+	@Test
+	void rejectFollowRequest_whenRequesterIsNotTarget_returns403() throws Exception {
+		Users requester = saveUser("social-reject-auth-requester", true);
+		Users target = savePrivateUser("social-reject-auth-target");
+		FollowRequest request = saveFollowRequest(requester, target, FollowRequestStatuses.PENDING);
+
+		mockMvc.perform(post("/api/v1/social/follow-request/{requestId}/reject", request.getId())
+			.header("Authorization", bearerToken(requester)))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("UNAUTHORIZED_FOLLOW_REQUEST_ACCESS"));
+	}
+
+	@Test
+	void cancelFollowRequest_whenUserIsNotRequester_returns403() throws Exception {
+		Users requester = saveUser("social-cancel-auth-requester", true);
+		Users target = savePrivateUser("social-cancel-auth-target");
+		Users other = saveUser("social-cancel-auth-other", true);
+		FollowRequest request = saveFollowRequest(requester, target, FollowRequestStatuses.PENDING);
+
+		mockMvc.perform(delete("/api/v1/social/follow-request/{requestId}/cancel", request.getId())
+			.header("Authorization", bearerToken(other)))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("UNAUTHORIZED_FOLLOW_REQUEST_ACCESS"));
 	}
 
 	@Test
@@ -154,6 +265,19 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 			.andExpect(jsonPath("$.username").value(target.getUsername()))
 			.andExpect(jsonPath("$.privacyStatus").value("PRIVATE"))
 			.andExpect(jsonPath("$.watchlists").doesNotExist());
+	}
+
+	@Test
+	void userProfile_forPrivateUser_withPendingRequest_returnsRequestedFollowStatus() throws Exception {
+		Users viewer = saveUser("social-private-profile-requested-viewer", true);
+		Users target = savePrivateUser("social-private-profile-requested-target");
+		saveFollowRequest(viewer, target, FollowRequestStatuses.PENDING);
+
+		mockMvc.perform(get("/api/v1/social/profile/{username}", target.getUsername())
+			.header("Authorization", bearerToken(viewer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.userId").value(target.getId().intValue()))
+			.andExpect(jsonPath("$.followStatus").value("REQUESTED"));
 	}
 
 	@Test

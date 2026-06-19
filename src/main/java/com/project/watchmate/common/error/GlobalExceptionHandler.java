@@ -184,6 +184,11 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), "FOLLOW_REQUEST_NOT_FOUND", null, ex, request);
     }
 
+    @ExceptionHandler(FollowRequestStateConflictException.class)
+    public ResponseEntity<ApiError> handleFollowRequestStateConflict(FollowRequestStateConflictException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), "FOLLOW_REQUEST_STATE_CONFLICT", null, ex, request);
+    }
+
     @ExceptionHandler(BlockedUserException.class)
     public ResponseEntity<ApiError> handleBlocked(BlockedUserException ex, HttpServletRequest request) {
         return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage(), "USER_BLOCKED", null, ex, request);

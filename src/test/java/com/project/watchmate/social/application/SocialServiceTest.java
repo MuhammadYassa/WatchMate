@@ -30,6 +30,7 @@ import com.project.watchmate.social.dto.SearchListUserDetailsDTO;
 import com.project.watchmate.social.dto.UserProfileDTO;
 import com.project.watchmate.common.error.AlreadyFollowingException;
 import com.project.watchmate.common.error.FollowRequestNotFoundException;
+import com.project.watchmate.common.error.FollowRequestStateConflictException;
 import com.project.watchmate.common.error.NotFollowingException;
 import com.project.watchmate.common.error.SelfFollowException;
 import com.project.watchmate.common.error.UnauthorizedFollowRequestAccessException;
@@ -130,6 +131,22 @@ class SocialServiceTest {
             assertEquals("User already following!", e.getMessage());
             verify(usersRepository, never()).save(any(Users.class));
         }
+
+        @Test
+        void followUser_WhenPrivateTarget_ReturnsRequested() {
+            targetUser.setPrivacyStatus(PrivacyStatuses.PRIVATE);
+            when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.of(targetUser));
+            when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
+            when(usersRepository.isBlockedByUser(TARGET_ID, USER_ID)).thenReturn(false);
+            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
+            when(followRequestRepository.existsByRequestUserAndTargetUserAndStatus(user, targetUser, FollowRequestStatuses.PENDING))
+                .thenReturn(false);
+
+            FollowStatusDTO result = socialService.followUser(TARGET_ID, user);
+
+            assertEquals(FollowStatuses.REQUESTED, result.getFollowStatus());
+            verify(followRequestRepository).save(any(FollowRequest.class));
+        }
     }
 
     @Nested
@@ -183,6 +200,79 @@ class SocialServiceTest {
         }
 
         @Test
+        void respondToFollowRequest_WhenAcceptingNonPendingRequest_ThrowsConflictWithoutFollowingInsert() {
+            Long requestId = 10L;
+            FollowRequest request = FollowRequest.builder()
+                .id(requestId)
+                .requestUser(user)
+                .targetUser(targetUser)
+                .status(FollowRequestStatuses.ACCEPTED)
+                .build();
+            when(followRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
+
+            FollowRequestStateConflictException e = assertThrows(FollowRequestStateConflictException.class,
+                () -> socialService.respondToFollowRequest(requestId, targetUser, FollowRequestStatuses.ACCEPTED));
+
+            assertEquals("Follow request is already accepted", e.getMessage());
+            verify(usersRepository, never()).insertFollowRelation(any(), any());
+            verify(followRequestRepository, never()).save(any(FollowRequest.class));
+        }
+
+        @Test
+        void respondToFollowRequest_WhenRejectingNonPendingRequest_ThrowsConflict() {
+            Long requestId = 10L;
+            FollowRequest request = FollowRequest.builder()
+                .id(requestId)
+                .requestUser(user)
+                .targetUser(targetUser)
+                .status(FollowRequestStatuses.REJECTED)
+                .build();
+            when(followRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
+
+            FollowRequestStateConflictException e = assertThrows(FollowRequestStateConflictException.class,
+                () -> socialService.respondToFollowRequest(requestId, targetUser, FollowRequestStatuses.REJECTED));
+
+            assertEquals("Follow request is already rejected", e.getMessage());
+            verify(followRequestRepository, never()).save(any(FollowRequest.class));
+        }
+
+        @Test
+        void respondToFollowRequest_WhenRequesterCancelsPendingRequest_DeletesIt() {
+            Long requestId = 10L;
+            FollowRequest request = FollowRequest.builder()
+                .id(requestId)
+                .requestUser(user)
+                .targetUser(targetUser)
+                .status(FollowRequestStatuses.PENDING)
+                .build();
+            when(followRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
+
+            FollowRequestResponseDTO result = socialService.respondToFollowRequest(requestId, user, FollowRequestStatuses.CANCELED);
+
+            assertEquals(FollowRequestStatuses.CANCELED, result.getNewStatus());
+            verify(followRequestRepository).delete(request);
+            verify(followRequestRepository, never()).save(any(FollowRequest.class));
+        }
+
+        @Test
+        void respondToFollowRequest_WhenCancelingNonPendingRequest_ThrowsConflict() {
+            Long requestId = 10L;
+            FollowRequest request = FollowRequest.builder()
+                .id(requestId)
+                .requestUser(user)
+                .targetUser(targetUser)
+                .status(FollowRequestStatuses.ACCEPTED)
+                .build();
+            when(followRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
+
+            FollowRequestStateConflictException e = assertThrows(FollowRequestStateConflictException.class,
+                () -> socialService.respondToFollowRequest(requestId, user, FollowRequestStatuses.CANCELED));
+
+            assertEquals("Follow request is already accepted", e.getMessage());
+            verify(followRequestRepository, never()).delete(any(FollowRequest.class));
+        }
+
+        @Test
         void respondToFollowRequest_WhenNotTargetUser_ThrowsUnauthorized() {
             Long requestId = 10L;
             Users other = Users.builder().id(99L).username("other").build();
@@ -192,6 +282,18 @@ class SocialServiceTest {
             UnauthorizedFollowRequestAccessException e = assertThrows(UnauthorizedFollowRequestAccessException.class,
                 () -> socialService.respondToFollowRequest(requestId, other, FollowRequestStatuses.ACCEPTED));
             assertEquals("Not your request", e.getMessage());
+        }
+
+        @Test
+        void respondToFollowRequest_WhenCancelingAnotherUsersRequest_ThrowsUnauthorized() {
+            Long requestId = 10L;
+            Users other = Users.builder().id(99L).username("other").build();
+            FollowRequest request = FollowRequest.builder().id(requestId).requestUser(user).targetUser(targetUser).status(FollowRequestStatuses.PENDING).build();
+            when(followRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
+
+            UnauthorizedFollowRequestAccessException e = assertThrows(UnauthorizedFollowRequestAccessException.class,
+                () -> socialService.respondToFollowRequest(requestId, other, FollowRequestStatuses.CANCELED));
+            assertEquals("You can only cancel your own requests", e.getMessage());
         }
 
         @Test
@@ -253,6 +355,21 @@ class SocialServiceTest {
             FollowStatusDTO result = socialService.getFollowStatus(TARGET_ID, user);
 
             assertEquals(FollowStatuses.FOLLOWING, result.getFollowStatus());
+        }
+
+        @Test
+        void getFollowStatus_WhenPendingRequestExists_ReturnsRequested() {
+            targetUser.setPrivacyStatus(PrivacyStatuses.PRIVATE);
+            when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.of(targetUser));
+            when(usersRepository.isBlockedByUser(USER_ID, TARGET_ID)).thenReturn(false);
+            when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
+            when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
+            when(followRequestRepository.existsByRequestUserAndTargetUserAndStatus(user, targetUser, FollowRequestStatuses.PENDING))
+                .thenReturn(true);
+
+            FollowStatusDTO result = socialService.getFollowStatus(TARGET_ID, user);
+
+            assertEquals(FollowStatuses.REQUESTED, result.getFollowStatus());
         }
 
         @Test

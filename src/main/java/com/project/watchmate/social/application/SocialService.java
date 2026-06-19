@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -21,6 +22,7 @@ import com.project.watchmate.social.dto.UserProfileDTO;
 import com.project.watchmate.common.error.AlreadyFollowingException;
 import com.project.watchmate.common.error.BlockedUserException;
 import com.project.watchmate.common.error.FollowRequestNotFoundException;
+import com.project.watchmate.common.error.FollowRequestStateConflictException;
 import com.project.watchmate.common.error.NotFollowingException;
 import com.project.watchmate.common.error.SelfFollowException;
 import com.project.watchmate.common.error.UnauthorizedFollowRequestAccessException;
@@ -123,8 +125,17 @@ public class SocialService {
         .build();
     }
 
+    private void insertFollowRelation(Long followerId, Long followingId, RuntimeException conflictException) {
+        try {
+            usersRepository.insertFollowRelation(followerId, followingId);
+        } catch (DataIntegrityViolationException ex) {
+            throw conflictException;
+        }
+    }
+
     private FollowStatusDTO performDirectFollow(Users user, Users targetUser){
-        usersRepository.insertFollowRelation(user.getId(), targetUser.getId());
+        insertFollowRelation(user.getId(), targetUser.getId(),
+            new AlreadyFollowingException("User already following!"));
 
         log.info("User followed target username={} targetUsername={}", user.getUsername(), targetUser.getUsername());
 
@@ -133,8 +144,12 @@ public class SocialService {
         .build();
     }
 
+    private boolean hasPendingFollowRequest(Users user, Users targetUser) {
+        return followRequestRepository.existsByRequestUserAndTargetUserAndStatus(user, targetUser, FollowRequestStatuses.PENDING);
+    }
+
     private FollowStatusDTO createFollowRequest(Users user, Users targetUser){
-        if (followRequestRepository.existsByRequestUserAndTargetUserAndStatus(user, targetUser, FollowRequestStatuses.PENDING)) {
+        if (hasPendingFollowRequest(user, targetUser)) {
             throw new AlreadyFollowingException("Follow request already pending");
         }
         followRequestRepository.save(Objects.requireNonNull(FollowRequest.builder()
@@ -145,19 +160,37 @@ public class SocialService {
         .build()));
         log.info("Follow request created username={} targetUsername={}", user.getUsername(), targetUser.getUsername());
         return FollowStatusDTO.builder()
-        .followStatus(FollowStatuses.NOT_FOLLOWING)
+        .followStatus(FollowStatuses.REQUESTED)
         .build();
+    }
+
+    private void validatePendingFollowRequestState(FollowRequest request) {
+        if (request.getStatus() != FollowRequestStatuses.PENDING) {
+            throw new FollowRequestStateConflictException(
+                "Follow request is already " + request.getStatus().name().toLowerCase());
+        }
+    }
+
+    private FollowStatuses determineRelationshipStatus(Users viewer, Users targetUser) {
+        if (usersRepository.isFollowing(viewer.getId(), targetUser.getId())) {
+            return FollowStatuses.FOLLOWING;
+        }
+        if (hasPendingFollowRequest(viewer, targetUser)) {
+            return FollowStatuses.REQUESTED;
+        }
+        return FollowStatuses.NOT_FOLLOWING;
     }
 
     @Transactional
     public FollowRequestResponseDTO respondToFollowRequest(Long requestId, Users user, FollowRequestStatuses response) {
         FollowRequest request = followRequestRepository.findById(Objects.requireNonNull(requestId, "requestId"))
             .orElseThrow(() -> new FollowRequestNotFoundException("Request not found"));
-        
+
         if (response == FollowRequestStatuses.CANCELED) {
             if (!request.getRequestUser().getId().equals(user.getId())) {
                 throw new UnauthorizedFollowRequestAccessException("You can only cancel your own requests");
             }
+            validatePendingFollowRequestState(request);
             followRequestRepository.delete(request);
             log.info("Follow request canceled requestId={} username={} targetUsername={}",
                 requestId,
@@ -166,18 +199,23 @@ public class SocialService {
             return FollowRequestResponseDTO.builder()
             .newStatus(FollowRequestStatuses.CANCELED)
             .requestId(Objects.requireNonNull(requestId, "requestId"))
-            .build();           
+            .build();
         } else {
             if (!request.getTargetUser().getId().equals(user.getId())) {
                 throw new UnauthorizedFollowRequestAccessException("Not your request");
             }
+            validatePendingFollowRequestState(request);
             request.setStatus(response);
             request.setRespondedAt(LocalDateTime.now());
-            
+
             if (response == FollowRequestStatuses.ACCEPTED) {
-                performDirectFollow(request.getRequestUser(), request.getTargetUser());
+                insertFollowRelation(
+                    request.getRequestUser().getId(),
+                    request.getTargetUser().getId(),
+                    new FollowRequestStateConflictException(
+                        "Follow request cannot be accepted because the users are already following"));
             }
-            
+
             followRequestRepository.save(request);
             log.info("Follow request responded requestId={} response={} requestUsername={} targetUsername={}",
                 requestId,
@@ -185,16 +223,17 @@ public class SocialService {
                 request.getRequestUser().getUsername(),
                 request.getTargetUser().getUsername());
             return FollowRequestResponseDTO.builder()
+                .requestId(requestId)
                 .newStatus(response)
                 .build();
         }
     }
-    
+
     @Transactional
     public FollowStatusDTO followUser(Long userId, Users user) {
         Users targetUser = findAndValidateTargetUser(userId);
         validateFollowEligibility(user, targetUser);
-        
+
         return handleFollowBasedOnPrivacy(user, targetUser);
     }
 
@@ -227,13 +266,8 @@ public class SocialService {
             .followStatus(FollowStatuses.BLOCKED)
             .build();
         }
-        if (usersRepository.isFollowing(user.getId(), targetUser.getId())){
-            return FollowStatusDTO.builder()
-            .followStatus(FollowStatuses.FOLLOWING)
-            .build();
-        }
         return FollowStatusDTO.builder()
-        .followStatus(FollowStatuses.NOT_FOLLOWING)
+        .followStatus(determineRelationshipStatus(user, targetUser))
         .build();
     }
 
@@ -302,7 +336,7 @@ public class SocialService {
         if(user.getId().equals(targetUser.getId())){
             return retrieveSelfUserProfile(targetUser);
         }
-        if(usersRepository.isBlockingUser(targetUser.getId(), user.getId()) 
+        if(usersRepository.isBlockingUser(targetUser.getId(), user.getId())
     || usersRepository.isBlockingUser(user.getId(), targetUser.getId())){
             return UserProfileDTO.builder()
             .userId(targetUser.getId())
@@ -315,7 +349,7 @@ public class SocialService {
         }
         return retrieveTargetUserProfile(user, targetUser);
     }
-    
+
     private UserProfileDTO retrieveSelfUserProfile(Users user){
         return UserProfileDTO.builder()
             .userId(user.getId())
@@ -334,13 +368,15 @@ public class SocialService {
     }
 
     private UserProfileDTO retrieveTargetUserProfile(Users user, Users targetUser){
-        boolean isFollowing = usersRepository.isFollowing(user.getId(), targetUser.getId());
-        if (isFollowing || targetUser.getPrivacyStatus() == PrivacyStatuses.PUBLIC || canViewPrivateProfile(user)){
+        FollowStatuses relationshipStatus = determineRelationshipStatus(user, targetUser);
+        if (relationshipStatus == FollowStatuses.FOLLOWING
+                || targetUser.getPrivacyStatus() == PrivacyStatuses.PUBLIC
+                || canViewPrivateProfile(user)){
             return UserProfileDTO.builder()
                 .userId(targetUser.getId())
                 .username(targetUser.getUsername())
                 .privacyStatus(targetUser.getPrivacyStatus())
-                .followStatus(isFollowing ? FollowStatuses.FOLLOWING : FollowStatuses.NOT_FOLLOWING)
+                .followStatus(relationshipStatus)
                 .followersCount(usersRepository.countFollowersByUserId(targetUser.getId()))
                 .followingCount(usersRepository.countFollowingByUserId(targetUser.getId()))
                 .watchlists(getProfileWatchLists(targetUser, user))
@@ -352,7 +388,7 @@ public class SocialService {
                 .userId(targetUser.getId())
                 .username(targetUser.getUsername())
                 .privacyStatus(targetUser.getPrivacyStatus())
-                .followStatus(followRequestRepository.existsByRequestUserAndTargetUserAndStatus(user, targetUser, FollowRequestStatuses.PENDING)? FollowStatuses.REQUESTED : FollowStatuses.NOT_FOLLOWING)
+                .followStatus(relationshipStatus)
                 .followersCount(usersRepository.countFollowersByUserId(targetUser.getId()))
                 .followingCount(usersRepository.countFollowingByUserId(targetUser.getId()))
                 .build();
@@ -372,8 +408,3 @@ public class SocialService {
         );
     }
 }
-
-
-
-
-
