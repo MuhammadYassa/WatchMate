@@ -88,6 +88,7 @@ public class ShowMetadataMapper {
             .media(media)
             .seasonNumber(episode.getSeasonNumber() == null ? seasonNumber : episode.getSeasonNumber())
             .episodeNumber(episode.getEpisodeNumber())
+            .tmdbEpisodeId(episode.getId())
             .title(episode.getName())
             .overview(episode.getOverview())
             .stillPath(episode.getStillPath())
@@ -139,7 +140,7 @@ public class ShowMetadataMapper {
     private ShowEpisodeDetailsDTO mapCachedEpisode(ShowEpisode episode, Set<String> watchedEpisodeKeys) {
         LocalDate airDate = episode.getAirDate();
         return ShowEpisodeDetailsDTO.builder()
-            .tmdbEpisodeId(null)
+            .tmdbEpisodeId(episode.getTmdbEpisodeId())
             .seasonNumber(episode.getSeasonNumber())
             .episodeNumber(episode.getEpisodeNumber())
             .name(episode.getTitle())

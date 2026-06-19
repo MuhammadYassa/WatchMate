@@ -201,6 +201,7 @@ class PublicDetailOverlayCacheBehaviorTest {
             .media(show)
             .seasonNumber(1)
             .episodeNumber(1)
+            .tmdbEpisodeId(501L)
             .title("Episode 1")
             .airDate(LocalDate.of(2020, 1, 1))
             .build();
@@ -232,12 +233,16 @@ class PublicDetailOverlayCacheBehaviorTest {
 
         assertEquals(Boolean.TRUE, first.getEpisodes().get(0).getWatched());
         assertEquals(Boolean.FALSE, second.getEpisodes().get(0).getWatched());
+        assertEquals(501L, first.getEpisodes().get(0).getTmdbEpisodeId());
+        assertEquals(501L, second.getEpisodes().get(0).getTmdbEpisodeId());
         verify(showCatalogService, times(1)).ensureSeasonCached(show, 200L, 1);
 
         Object cachedValue = cacheManager.getCache(WatchMateCacheNames.PUBLIC_SEASON_METADATA)
             .get(WatchMateCacheKeys.season(200L, 1))
             .get();
         assertInstanceOf(PublicShowSeasonMetadataDTO.class, cachedValue);
+        PublicShowSeasonMetadataDTO cachedSeason = (PublicShowSeasonMetadataDTO) cachedValue;
+        assertEquals(501L, cachedSeason.getEpisodes().get(0).getTmdbEpisodeId());
     }
 
     @Configuration

@@ -103,7 +103,7 @@ public class PublicShowMetadataCacheService {
     private PublicShowEpisodeMetadataDTO toPublicEpisodeMetadata(ShowEpisode episode) {
         LocalDate airDate = episode.getAirDate();
         return PublicShowEpisodeMetadataDTO.builder()
-            .tmdbEpisodeId(null)
+            .tmdbEpisodeId(episode.getTmdbEpisodeId())
             .seasonNumber(episode.getSeasonNumber())
             .episodeNumber(episode.getEpisodeNumber())
             .name(episode.getTitle())

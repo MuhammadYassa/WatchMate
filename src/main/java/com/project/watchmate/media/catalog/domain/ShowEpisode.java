@@ -54,6 +54,9 @@ public class ShowEpisode {
     @Column(nullable = false)
     private Integer episodeNumber;
 
+    @Column(name = "tmdb_episode_id")
+    private Long tmdbEpisodeId;
+
     private String title;
 
     @Lob

@@ -3,8 +3,12 @@ package com.project.watchmate.common.cache;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -12,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -34,6 +39,8 @@ import com.project.watchmate.media.tmdb.client.TmdbClient;
 import com.project.watchmate.media.tmdb.client.TmdbClientImpl;
 import com.project.watchmate.media.tmdb.dto.TmdbMovieDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbResponseDTO;
+import com.project.watchmate.show.metadata.dto.PublicShowEpisodeMetadataDTO;
+import com.project.watchmate.show.metadata.dto.PublicShowSeasonMetadataDTO;
 
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
@@ -59,9 +66,13 @@ class RedisCacheRoundTripTest {
     @Autowired
     private CacheManager cacheManager;
 
+    @Autowired
+    private SeasonMetadataCacheProbe seasonMetadataCacheProbe;
+
     @BeforeEach
     void setUp() {
         exchangeFunction.reset();
+        seasonMetadataCacheProbe.reset();
         flushRedis();
     }
 
@@ -82,6 +93,32 @@ class RedisCacheRoundTripTest {
         assertInstanceOf(TmdbResponseDTO.class, second);
         assertInstanceOf(TmdbMovieDTO.class, second.getResults().get(0));
         assertEquals("The Matrix", second.getResults().get(0).getTitle());
+    }
+
+    @Test
+    void publicSeasonMetadata_whenRedisRoundTrips_preservesTmdbEpisodeIds() {
+        PublicShowSeasonMetadataDTO first = seasonMetadataCacheProbe.getSeasonMetadata(200L, 1);
+        PublicShowSeasonMetadataDTO second = seasonMetadataCacheProbe.getSeasonMetadata(200L, 1);
+        Set<String> cacheKeys = stringRedisTemplate.keys("watchmate::*");
+        String cacheKey = cacheKeys == null
+            ? null
+            : cacheKeys.stream()
+                .filter(key -> key.contains(WatchMateCacheNames.PUBLIC_SEASON_METADATA))
+                .filter(key -> key.endsWith(WatchMateCacheKeys.season(200L, 1)))
+                .findFirst()
+                .orElse(null);
+        String rawValue = cacheKey == null ? null : stringRedisTemplate.opsForValue().get(cacheKey);
+
+        assertNotNull(first);
+        assertNotNull(second);
+        assertNotNull(cacheKeys);
+        assertNotNull(cacheKey);
+        assertNotNull(rawValue);
+        assertEquals(1, seasonMetadataCacheProbe.invocationCount());
+        assertTrue(cacheKeys.stream().anyMatch(key -> key.contains(WatchMateCacheNames.PUBLIC_SEASON_METADATA)));
+        assertEquals(2101L, second.getEpisodes().get(0).getTmdbEpisodeId());
+        assertNull(second.getEpisodes().get(1).getTmdbEpisodeId());
+        assertTrue(rawValue.contains("\"tmdbEpisodeId\":2101"));
     }
 
     private void flushRedis() {
@@ -129,6 +166,11 @@ class RedisCacheRoundTripTest {
         TmdbClientImpl tmdbClient(WebClient tmdbWebClient) {
             return new TmdbClientImpl(tmdbWebClient);
         }
+
+        @Bean
+        SeasonMetadataCacheProbe seasonMetadataCacheProbe() {
+            return new SeasonMetadataCacheProbe();
+        }
     }
 
     static class CountingExchangeFunction implements ExchangeFunction {
@@ -161,6 +203,50 @@ class RedisCacheRoundTripTest {
             return """
                 {"results":[{"id":1,"media_type":"movie","title":"Cached Result"}],"page":1,"total_pages":1,"total_results":1}
                 """;
+        }
+    }
+
+    static class SeasonMetadataCacheProbe {
+
+        private final AtomicInteger invocationCount = new AtomicInteger();
+
+        @Cacheable(
+            cacheNames = WatchMateCacheNames.PUBLIC_SEASON_METADATA,
+            key = "T(com.project.watchmate.common.cache.WatchMateCacheKeys).season(#tmdbId, #seasonNumber)"
+        )
+        public PublicShowSeasonMetadataDTO getSeasonMetadata(Long tmdbId, Integer seasonNumber) {
+            invocationCount.incrementAndGet();
+            return PublicShowSeasonMetadataDTO.builder()
+                .tmdbId(tmdbId)
+                .seasonNumber(seasonNumber)
+                .name("Season " + seasonNumber)
+                .airDate(LocalDate.of(2020, 1, 1))
+                .episodeCount(2)
+                .episodes(List.of(
+                    PublicShowEpisodeMetadataDTO.builder()
+                        .tmdbEpisodeId(2101L)
+                        .seasonNumber(seasonNumber)
+                        .episodeNumber(1)
+                        .name("Departure")
+                        .isAired(Boolean.TRUE)
+                        .build(),
+                    PublicShowEpisodeMetadataDTO.builder()
+                        .tmdbEpisodeId(null)
+                        .seasonNumber(seasonNumber)
+                        .episodeNumber(2)
+                        .name("Arrival")
+                        .isAired(Boolean.TRUE)
+                        .build()
+                ))
+                .build();
+        }
+
+        int invocationCount() {
+            return invocationCount.get();
+        }
+
+        void reset() {
+            invocationCount.set(0);
         }
     }
 }

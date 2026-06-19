@@ -4,6 +4,7 @@ import com.project.watchmate.media.tmdb.application.TmdbService;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
@@ -21,8 +22,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.project.watchmate.show.catalog.application.ShowCatalogService;
+import com.project.watchmate.show.metadata.dto.PublicShowEpisodeMetadataDTO;
 import com.project.watchmate.show.metadata.dto.PublicShowMetadataDTO;
+import com.project.watchmate.show.metadata.dto.PublicShowSeasonMetadataDTO;
 import com.project.watchmate.show.metadata.dto.ShowDetailsDTO;
+import com.project.watchmate.show.metadata.dto.ShowSeasonsDetailsDTO;
 import com.project.watchmate.common.error.UserNotFoundException;
 import com.project.watchmate.common.mapper.WatchMateMapper;
 import com.project.watchmate.show.metadata.mapper.ShowMetadataMapper;
@@ -140,6 +144,47 @@ class ShowMetadataServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("Get Show Season Details Tests")
+    class GetShowSeasonDetailsTests {
+
+        @Test
+        void getShowSeasonDetails_PreservesTmdbEpisodeIdIncludingLegacyNulls() {
+            when(showCatalogService.validateShowType(MediaType.SHOW)).thenReturn(MediaType.SHOW);
+            when(publicShowMetadataCacheService.getSeasonMetadata(TMDB_ID, 1)).thenReturn(
+                PublicShowSeasonMetadataDTO.builder()
+                    .tmdbId(TMDB_ID)
+                    .seasonNumber(1)
+                    .name("Season 1")
+                    .episodeCount(2)
+                    .episodes(List.of(
+                        PublicShowEpisodeMetadataDTO.builder()
+                            .tmdbEpisodeId(4101L)
+                            .seasonNumber(1)
+                            .episodeNumber(1)
+                            .name("Episode 1")
+                            .isAired(Boolean.TRUE)
+                            .build(),
+                        PublicShowEpisodeMetadataDTO.builder()
+                            .tmdbEpisodeId(null)
+                            .seasonNumber(1)
+                            .episodeNumber(2)
+                            .name("Episode 2")
+                            .isAired(Boolean.TRUE)
+                            .build()
+                    ))
+                    .build()
+            );
+
+            ShowSeasonsDetailsDTO result = showMetadataService.getShowSeasonDetails(TMDB_ID, 1, MediaType.SHOW, null);
+
+            assertNotNull(result);
+            assertEquals(2, result.getEpisodes().size());
+            assertEquals(4101L, result.getEpisodes().get(0).getTmdbEpisodeId());
+            assertNull(result.getEpisodes().get(1).getTmdbEpisodeId());
+        }
+    }
+
     private PublicShowMetadataDTO publicShowMetadata(String title) {
         return PublicShowMetadataDTO.builder()
             .tmdbId(TMDB_ID)
@@ -150,8 +195,6 @@ class ShowMetadataServiceTest {
             .build();
     }
 }
-
-
 
 
 

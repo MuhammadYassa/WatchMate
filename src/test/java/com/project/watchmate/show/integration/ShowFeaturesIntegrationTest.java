@@ -2,6 +2,7 @@ package com.project.watchmate.show.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -101,15 +102,19 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
             .andExpect(jsonPath("$.name").value("Season 21"))
             .andExpect(jsonPath("$.episodeCount").value(2))
             .andExpect(jsonPath("$.episodes", hasSize(2)))
+            .andExpect(jsonPath("$.episodes[0].tmdbEpisodeId").value(2101))
             .andExpect(jsonPath("$.episodes[0].seasonNumber").value(21))
             .andExpect(jsonPath("$.episodes[0].episodeNumber").value(1))
             .andExpect(jsonPath("$.episodes[0].name").value("Departure"))
+            .andExpect(jsonPath("$.episodes[1].tmdbEpisodeId").value(2102))
             .andExpect(jsonPath("$.episodes[1].episodeNumber").value(2))
             .andExpect(jsonPath("$.episodes[1].name").value("Arrival"));
 
         Media imported = mediaRepository.findByTmdbIdAndType(37854L, MediaType.SHOW).orElseThrow();
         assertThat(showSeasonRepository.findByMediaIdAndSeasonNumber(imported.getId(), 21)).isPresent();
-        assertThat(showEpisodeRepository.findAllByMediaIdAndSeasonNumberOrderByEpisodeNumberAsc(imported.getId(), 21)).hasSize(2);
+        assertThat(showEpisodeRepository.findAllByMediaIdAndSeasonNumberOrderByEpisodeNumberAsc(imported.getId(), 21))
+            .extracting(ShowEpisode::getTmdbEpisodeId)
+            .containsExactly(2101L, 2102L);
         assertThat(showSeasonRepository.findAllByMediaIdOrderBySeasonNumberAsc(imported.getId()))
             .extracting(ShowSeason::getSeasonNumber)
             .containsExactly(21);
@@ -142,6 +147,7 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/shows/{tmdbId}/seasons/{seasonNumber}/episodes", 37854L, 21))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.episodes", hasSize(2)))
+            .andExpect(jsonPath("$.episodes[0].tmdbEpisodeId").value(2101))
             .andExpect(jsonPath("$.episodes[0].name").value("Departure"));
 
         verify(tmdbClient, never()).fetchTvSeasonDetails(eq(37854L), eq(21));
@@ -179,7 +185,40 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
         assertThat(refreshedSeason.getName()).isEqualTo("Season 21");
         assertThat(refreshedEpisodes).hasSize(2);
         assertThat(refreshedEpisodes).extracting(ShowEpisode::getTitle).containsExactly("Departure", "Arrival");
+        assertThat(refreshedEpisodes).extracting(ShowEpisode::getTmdbEpisodeId).containsExactly(2101L, 2102L);
         verify(tmdbClient).fetchTvSeasonDetails(eq(37854L), eq(21));
+    }
+
+    @Test
+    void publicShowSeasonEpisodes_legacyNullTmdbEpisodeIdStillReturns200() throws Exception {
+        Media importedShow = saveMedia(37855L, "Legacy Show", MediaType.SHOW);
+        showSeasonRepository.save(ShowSeason.builder()
+            .media(importedShow)
+            .seasonNumber(3)
+            .name("Season 3")
+            .episodeCount(1)
+            .lastTmdbSyncAt(java.time.LocalDateTime.now())
+            .build());
+        showEpisodeRepository.save(ShowEpisode.builder()
+            .media(importedShow)
+            .seasonNumber(3)
+            .episodeNumber(1)
+            .tmdbEpisodeId(null)
+            .title("Legacy Episode")
+            .overview("Old cached row without TMDB episode id")
+            .airDate(java.time.LocalDate.of(2020, 1, 1))
+            .lastTmdbSyncAt(java.time.LocalDateTime.now())
+            .build());
+
+        mockMvc.perform(get("/api/v1/shows/{tmdbId}/seasons/{seasonNumber}/episodes", 37855L, 3))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tmdbId").value(37855))
+            .andExpect(jsonPath("$.seasonNumber").value(3))
+            .andExpect(jsonPath("$.episodes", hasSize(1)))
+            .andExpect(jsonPath("$.episodes[0].tmdbEpisodeId").value(nullValue()))
+            .andExpect(jsonPath("$.episodes[0].name").value("Legacy Episode"));
+
+        verify(tmdbClient, never()).fetchTvSeasonDetails(eq(37855L), eq(3));
     }
 
     @Test
@@ -929,6 +968,5 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
             .containsExactly(expected);
     }
 }
-
 
 
