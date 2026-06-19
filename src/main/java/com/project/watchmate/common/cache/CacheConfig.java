@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.cache.RedisCacheWriter;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
@@ -50,6 +51,7 @@ public class CacheConfig implements CachingConfigurer {
             .enableDefaultTyping(cachePolymorphicTypeValidator())
             .typePropertyName(TYPE_HINT_PROPERTY)
             .build();
+        RedisCacheWriter cacheWriter = RedisCacheWriter.create(redisConnectionFactory, config -> config.immediateWrites(true));
         RedisCacheConfiguration defaultConfig = redisCacheConfiguration(DEFAULT_TTL, valueSerializer);
 
         Map<String, RedisCacheConfiguration> cacheConfigurations = Map.ofEntries(
@@ -74,7 +76,7 @@ public class CacheConfig implements CachingConfigurer {
             Map.entry(WatchMateCacheNames.USER_FAVORITE_MEDIA_IDS, redisCacheConfiguration(USER_FAVORITE_MEDIA_IDS_TTL, valueSerializer))
         );
 
-        return RedisCacheManager.builder(redisConnectionFactory)
+        return RedisCacheManager.builder(cacheWriter)
             .cacheDefaults(defaultConfig)
             .withInitialCacheConfigurations(cacheConfigurations)
             .build();
