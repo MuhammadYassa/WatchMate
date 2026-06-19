@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -59,7 +60,7 @@ class StatusServiceTest {
     void updateWatchStatus_whenMovieStatusValid_savesAndReturnsDto() {
         UpdateWatchStatusRequestDTO request = UpdateWatchStatusRequestDTO.builder().status("WATCHED").build();
         when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, MediaType.MOVIE)).thenReturn(movie);
-        UserMediaStatus status = UserMediaStatus.builder().user(user).media(movie).status(WatchStatus.NONE).build();
+        UserMediaStatus status = UserMediaStatus.builder().user(user).media(movie).status(WatchStatus.WATCHING).build();
         when(userMediaStatusRepository.findByUserAndMedia(user, movie)).thenReturn(Optional.of(status));
         when(userMediaStatusRepository.save(any(UserMediaStatus.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -68,6 +69,52 @@ class StatusServiceTest {
         assertEquals(TMDB_ID, result.getTmdbId());
         assertEquals(WatchStatus.WATCHED, result.getStatus());
         verify(userMediaStatusRepository).save(status);
+        verify(cacheEvictionService).evictUserProgressCaches(user.getId());
+    }
+
+    @Test
+    void updateWatchStatus_whenMovieStatusNone_deletesExistingRowAndReturnsDto() {
+        UpdateWatchStatusRequestDTO request = UpdateWatchStatusRequestDTO.builder().status("NONE").build();
+        when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, MediaType.MOVIE)).thenReturn(movie);
+        UserMediaStatus status = UserMediaStatus.builder().user(user).media(movie).status(WatchStatus.WATCHED).build();
+        when(userMediaStatusRepository.findByUserAndMedia(user, movie)).thenReturn(Optional.of(status));
+
+        UserMediaStatusDTO result = statusService.updateWatchStatus(user, TMDB_ID, MediaType.MOVIE, request);
+
+        assertEquals(TMDB_ID, result.getTmdbId());
+        assertEquals(WatchStatus.NONE, result.getStatus());
+        verify(userMediaStatusRepository).delete(status);
+        verify(userMediaStatusRepository, never()).save(any(UserMediaStatus.class));
+        verify(cacheEvictionService).evictUserProgressCaches(user.getId());
+    }
+
+    @Test
+    void updateWatchStatus_whenMovieStatusNoneAndNoRowExists_isIdempotent() {
+        UpdateWatchStatusRequestDTO request = UpdateWatchStatusRequestDTO.builder().status("NONE").build();
+        when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, MediaType.MOVIE)).thenReturn(movie);
+        when(userMediaStatusRepository.findByUserAndMedia(user, movie)).thenReturn(Optional.empty());
+
+        UserMediaStatusDTO result = statusService.updateWatchStatus(user, TMDB_ID, MediaType.MOVIE, request);
+
+        assertEquals(TMDB_ID, result.getTmdbId());
+        assertEquals(WatchStatus.NONE, result.getStatus());
+        verify(userMediaStatusRepository, never()).delete(any(UserMediaStatus.class));
+        verify(userMediaStatusRepository, never()).save(any(UserMediaStatus.class));
+        verify(cacheEvictionService).evictUserProgressCaches(user.getId());
+    }
+
+    @Test
+    void updateWatchStatus_whenRealStatusAndNoRowExists_createsRow() {
+        UpdateWatchStatusRequestDTO request = UpdateWatchStatusRequestDTO.builder().status("TO_WATCH").build();
+        when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, MediaType.MOVIE)).thenReturn(movie);
+        when(userMediaStatusRepository.findByUserAndMedia(user, movie)).thenReturn(Optional.empty());
+        when(userMediaStatusRepository.save(any(UserMediaStatus.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserMediaStatusDTO result = statusService.updateWatchStatus(user, TMDB_ID, MediaType.MOVIE, request);
+
+        assertEquals(TMDB_ID, result.getTmdbId());
+        assertEquals(WatchStatus.TO_WATCH, result.getStatus());
+        verify(userMediaStatusRepository, times(1)).save(any(UserMediaStatus.class));
         verify(cacheEvictionService).evictUserProgressCaches(user.getId());
     }
 

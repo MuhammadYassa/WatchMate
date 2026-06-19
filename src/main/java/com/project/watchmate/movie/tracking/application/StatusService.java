@@ -35,11 +35,22 @@ public class StatusService {
 		WatchStatus desiredStatus = parseMovieWatchStatus(request.getStatus());
 		Media media = mediaResolutionService.resolveMediaByTmdbId(tmdbId, mediaType);
 
+		if (desiredStatus == WatchStatus.NONE) {
+			userMediaStatusRepository.findByUserAndMedia(user, media)
+				.ifPresent(userMediaStatusRepository::delete);
+			cacheEvictionService.evictUserProgressCaches(user.getId());
+
+			return UserMediaStatusDTO.builder()
+				.tmdbId(media.getTmdbId())
+				.status(WatchStatus.NONE)
+				.build();
+		}
+
 		UserMediaStatus userMediaStatus = userMediaStatusRepository.findByUserAndMedia(user, media)
 				.orElse(UserMediaStatus.builder()
 						.user(user)
 						.media(media)
-						.status(WatchStatus.NONE)
+						.status(desiredStatus)
 						.build());
 
 		userMediaStatus.setStatus(desiredStatus);

@@ -130,6 +130,32 @@ class UserSpecificCacheBehaviorTest {
     }
 
     @Test
+    void continueWatching_whenUserProgressCachesEvicted_reloadsOnlyThatUsersEntry() {
+        Media firstMovie = media(303L, "First Cached Movie");
+        Media refreshedMovie = media(404L, "Refreshed Cached Movie");
+        Media secondUsersMovie = media(505L, "Second Users Movie");
+        when(userMediaStatusRepository.findContinueWatchingMoviesByUser(eq(userOne), eq(List.of(WatchStatus.WATCHING)), any(Pageable.class)))
+            .thenReturn(List.of(UserMediaStatus.builder().user(userOne).media(firstMovie).status(WatchStatus.WATCHING).build()))
+            .thenReturn(List.of(UserMediaStatus.builder().user(userOne).media(refreshedMovie).status(WatchStatus.WATCHING).build()));
+        when(userMediaStatusRepository.findContinueWatchingMoviesByUser(eq(userTwo), eq(List.of(WatchStatus.WATCHING)), any(Pageable.class)))
+            .thenReturn(List.of(UserMediaStatus.builder().user(userTwo).media(secondUsersMovie).status(WatchStatus.WATCHING).build()));
+        when(userShowTrackingRepository.findContinueWatchingByUser(any(), eq(List.of(WatchStatus.WATCHING)), any(Pageable.class)))
+            .thenReturn(List.of());
+
+        assertEquals(303L, continueWatchingCacheService.getContinueWatchingItems(userOne, 50).get(0).getTmdbId());
+        assertEquals(505L, continueWatchingCacheService.getContinueWatchingItems(userTwo, 50).get(0).getTmdbId());
+
+        cacheEvictionService.evictUserProgressCaches(1L);
+
+        assertEquals(404L, continueWatchingCacheService.getContinueWatchingItems(userOne, 50).get(0).getTmdbId());
+        assertEquals(505L, continueWatchingCacheService.getContinueWatchingItems(userTwo, 50).get(0).getTmdbId());
+        verify(userMediaStatusRepository, times(2))
+            .findContinueWatchingMoviesByUser(eq(userOne), eq(List.of(WatchStatus.WATCHING)), any(Pageable.class));
+        verify(userMediaStatusRepository, times(1))
+            .findContinueWatchingMoviesByUser(eq(userTwo), eq(List.of(WatchStatus.WATCHING)), any(Pageable.class));
+    }
+
+    @Test
     void watchlistPages_whenSamePageRepeated_useWrapperCacheAndEvictOnlyWatchlistPages() {
         WatchList watchList = WatchList.builder().id(1L).name("List").user(userOne).items(new ArrayList<>()).build();
         WatchListDTO dto = WatchListDTO.builder().id(1L).name("List").media(List.of()).build();

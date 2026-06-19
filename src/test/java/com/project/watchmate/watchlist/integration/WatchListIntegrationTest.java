@@ -205,6 +205,24 @@ class WatchListIntegrationTest extends AbstractIntegrationTest {
 	}
 
 	@Test
+	void getWatchlists_whenMovieHasNoStatusRow_returnsNoneOverlay() throws Exception {
+		Users owner = saveUser("watchlist-none-overlay-owner", true);
+		WatchList movieList = saveWatchList(owner, "Movies");
+		Media movie = saveMedia(9103L, "Untracked Movie", com.project.watchmate.media.catalog.domain.MediaType.MOVIE);
+		saveWatchListItem(movieList, movie);
+
+		mockMvc.perform(get("/api/v1/watchlists")
+			.header("Authorization", bearerToken(owner))
+			.param("page", "0")
+			.param("size", "10"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content", hasSize(1)))
+			.andExpect(jsonPath("$.content[0].media", hasSize(1)))
+			.andExpect(jsonPath("$.content[0].media[0].tmdbId").value(movie.getTmdbId().intValue()))
+			.andExpect(jsonPath("$.content[0].media[0].watchStatus").value("NONE"));
+	}
+
+	@Test
 	void renameWatchlist_returns200_forOwner() throws Exception {
 		Users owner = saveUser("watchlist-rename-owner", true);
 		WatchList watchList = saveWatchList(owner, "Before Rename");

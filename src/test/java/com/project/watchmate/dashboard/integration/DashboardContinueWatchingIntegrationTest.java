@@ -110,6 +110,38 @@ class DashboardContinueWatchingIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void continueWatching_removesMovieAfterStatusIsSetToNone() throws Exception {
+        Users user = saveUser("dashboard-none-user", true);
+        Media movie = saveMedia(7100L, "Dashboard None Movie", MediaType.MOVIE);
+
+        saveStatus(user, movie, WatchStatus.WATCHING, null, null,
+            null,
+            LocalDateTime.of(2026, 5, 13, 9, 0));
+
+        mockMvc.perform(get("/api/v1/dashboard/continue-watching")
+            .header("Authorization", bearerToken(user)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].tmdbId").value(7100))
+            .andExpect(jsonPath("$.items[0].watchStatus").value("WATCHING"));
+
+        mockMvc.perform(put("/api/v1/movies/{tmdbId}/status", movie.getTmdbId())
+            .header("Authorization", bearerToken(user))
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .content("""
+                {"status":"NONE"}
+                """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tmdbId").value(7100))
+            .andExpect(jsonPath("$.status").value("NONE"));
+
+        mockMvc.perform(get("/api/v1/dashboard/continue-watching")
+            .header("Authorization", bearerToken(user)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(0));
+    }
+
+    @Test
     void continueWatching_sortsByLastWatchedOrUpdatedAt_descending() throws Exception {
         Users user = saveUser("dashboard-sort-user", true);
 

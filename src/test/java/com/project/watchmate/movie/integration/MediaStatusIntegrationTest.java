@@ -33,6 +33,67 @@ class MediaStatusIntegrationTest extends AbstractIntegrationTest {
 	}
 
 	@Test
+	void updateWatchStatus_whenSetToNone_deletesExistingRow() throws Exception {
+		Users user = saveUser("status-none-user", true);
+		Media media = saveMedia(8004L, "Status None Movie", com.project.watchmate.media.catalog.domain.MediaType.MOVIE);
+		userMediaStatusRepository.save(com.project.watchmate.movie.tracking.domain.UserMediaStatus.builder()
+			.user(user)
+			.media(media)
+			.status(WatchStatus.WATCHING)
+			.build());
+
+		mockMvc.perform(put("/api/v1/movies/{tmdbId}/status", media.getTmdbId())
+			.header("Authorization", bearerToken(user))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(watchStatusBody("NONE")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.tmdbId").value(media.getTmdbId().intValue()))
+			.andExpect(jsonPath("$.status").value("NONE"));
+
+		assertThat(userMediaStatusRepository.findByUserAndMedia(user, media)).isEmpty();
+	}
+
+	@Test
+	void updateWatchStatus_whenSetToNoneWithoutExistingRow_isIdempotent() throws Exception {
+		Users user = saveUser("status-none-idempotent-user", true);
+		Media media = saveMedia(8005L, "Status None Idempotent Movie", com.project.watchmate.media.catalog.domain.MediaType.MOVIE);
+
+		mockMvc.perform(put("/api/v1/movies/{tmdbId}/status", media.getTmdbId())
+			.header("Authorization", bearerToken(user))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(watchStatusBody("NONE")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.tmdbId").value(media.getTmdbId().intValue()))
+			.andExpect(jsonPath("$.status").value("NONE"));
+
+		assertThat(userMediaStatusRepository.findByUserAndMedia(user, media)).isEmpty();
+	}
+
+	@Test
+	void updateWatchStatus_whenSwitchingFromNoneToRealStatus_createsRow() throws Exception {
+		Users user = saveUser("status-none-to-real-user", true);
+		Media media = saveMedia(8006L, "Status None To Real Movie", com.project.watchmate.media.catalog.domain.MediaType.MOVIE);
+
+		mockMvc.perform(put("/api/v1/movies/{tmdbId}/status", media.getTmdbId())
+			.header("Authorization", bearerToken(user))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(watchStatusBody("NONE")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("NONE"));
+
+		mockMvc.perform(put("/api/v1/movies/{tmdbId}/status", media.getTmdbId())
+			.header("Authorization", bearerToken(user))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(watchStatusBody("WATCHED")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.tmdbId").value(media.getTmdbId().intValue()))
+			.andExpect(jsonPath("$.status").value("WATCHED"));
+
+		assertThat(userMediaStatusRepository.findByUserAndMedia(user, media).orElseThrow().getStatus())
+			.isEqualTo(WatchStatus.WATCHED);
+	}
+
+	@Test
 	void invalidWatchStatus_returns400() throws Exception {
 		Users user = saveUser("invalid-status-user", true);
 		Media media = saveMedia(8002L, "Invalid Status Movie", com.project.watchmate.media.catalog.domain.MediaType.MOVIE);
