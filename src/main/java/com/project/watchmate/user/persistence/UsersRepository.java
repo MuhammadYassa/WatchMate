@@ -51,9 +51,6 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
     @Query("SELECT COUNT(f) > 0 FROM Users u JOIN u.following f WHERE u.id = :followerId AND f.id = :targetId")
     boolean isFollowing(@Param("followerId") Long followerId, @Param("targetId") Long targetId);
     
-    @Query("SELECT COUNT(b) > 0 FROM Users u JOIN u.blockedUsers b WHERE u.id = :userId AND b.id = :blockedUserId")
-    boolean isBlockedByUser(@Param("userId") Long userId, @Param("blockedUserId") Long blockedUserId);
-    
     @Query("SELECT COUNT(b) > 0 FROM Users u JOIN u.blockedUsers b WHERE u.id = :blockerId AND b.id = :targetId")
     boolean isBlockingUser(@Param("blockerId") Long blockerId, @Param("targetId") Long targetId);
 

@@ -82,13 +82,13 @@ public class ReviewService {
         return;
     }
 
-    public List<ReviewResponseDTO> getReviews(Users user, Long tmdbId, MediaType mediaType) {
+    public List<ReviewResponseDTO> getReviews(Long tmdbId, MediaType mediaType) {
         Media media = mediaResolutionService.resolveMediaByTmdbId(tmdbId, mediaType);
         List<Review> reviews = reviewRepository.findByMedia(media);
         return reviews.stream().map(review -> watchMateMapper.mapToReviewResponseDTO(review)).collect(Collectors.toList());
     }
 
-    public ReviewResponseDTO getReview(Users user, Long reviewId) {
+    public ReviewResponseDTO getReview(Long reviewId) {
         Review review = reviewRepository.findById(Objects.requireNonNull(reviewId, "reviewId")).orElseThrow(() -> new ReviewNotFoundException("Review not found"));
         return watchMateMapper.mapToReviewResponseDTO(review);
     }

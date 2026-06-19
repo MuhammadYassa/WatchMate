@@ -192,7 +192,7 @@ class ReviewServiceTest {
             ReviewResponseDTO dto = ReviewResponseDTO.builder().reviewId(REVIEW_ID).build();
             when(watchMateMapper.mapToReviewResponseDTO(any(Review.class))).thenReturn(dto);
 
-            List<ReviewResponseDTO> result = reviewService.getReviews(user, TMDB_ID, MediaType.MOVIE);
+            List<ReviewResponseDTO> result = reviewService.getReviews(TMDB_ID, MediaType.MOVIE);
 
             assertEquals(1, result.size());
             assertEquals(REVIEW_ID, result.get(0).getReviewId());
@@ -210,7 +210,7 @@ class ReviewServiceTest {
             ReviewResponseDTO dto = ReviewResponseDTO.builder().reviewId(REVIEW_ID).build();
             when(watchMateMapper.mapToReviewResponseDTO(review)).thenReturn(dto);
 
-            ReviewResponseDTO result = reviewService.getReview(user, REVIEW_ID);
+            ReviewResponseDTO result = reviewService.getReview(REVIEW_ID);
 
             assertNotNull(result);
             assertEquals(REVIEW_ID, result.getReviewId());
@@ -220,7 +220,7 @@ class ReviewServiceTest {
         void getReview_WhenNotFound_ThrowsReviewNotFoundException() {
             when(reviewRepository.findById(REVIEW_ID)).thenReturn(Optional.empty());
 
-            assertThrows(ReviewNotFoundException.class, () -> reviewService.getReview(user, REVIEW_ID));
+            assertThrows(ReviewNotFoundException.class, () -> reviewService.getReview(REVIEW_ID));
         }
     }
 }

@@ -81,7 +81,7 @@ public class SocialService {
             throw new AlreadyFollowingException("User already following!");
         }
 
-        if (usersRepository.isBlockedByUser(targetUser.getId(), user.getId())){
+        if (usersRepository.isBlockingUser(targetUser.getId(), user.getId())){
             throw new BlockedUserException("User is blocked by Target User!");
         }
 
@@ -99,7 +99,7 @@ public class SocialService {
             throw new NotFollowingException("Not following target user!");
         }
 
-        if (usersRepository.isBlockedByUser(targetUser.getId(), user.getId())){
+        if (usersRepository.isBlockingUser(targetUser.getId(), user.getId())){
             throw new BlockedUserException("User is blocked by Target User!");
         }
 
@@ -261,7 +261,7 @@ public class SocialService {
            .build();
         }
         Users targetUser = findAndValidateTargetUser(userId);
-        if (usersRepository.isBlockedByUser(user.getId(), targetUser.getId()) || usersRepository.isBlockingUser(targetUser.getId(), user.getId())){
+        if (usersRepository.isBlockingUser(user.getId(), targetUser.getId()) || usersRepository.isBlockingUser(targetUser.getId(), user.getId())){
             return FollowStatusDTO.builder()
             .followStatus(FollowStatuses.BLOCKED)
             .build();

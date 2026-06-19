@@ -101,11 +101,9 @@ public class MovieController {
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<List<ReviewResponseDTO>> getReviews(
-        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
         @PathVariable @Min(1) Long tmdbId
     ) {
-        Users user = userPrincipal.getUser();
-        List<ReviewResponseDTO> reviewResponses = reviewService.getReviews(user, tmdbId, MEDIA_TYPE);
+        List<ReviewResponseDTO> reviewResponses = reviewService.getReviews(tmdbId, MEDIA_TYPE);
         return ResponseEntity.ok(reviewResponses);
     }
 }

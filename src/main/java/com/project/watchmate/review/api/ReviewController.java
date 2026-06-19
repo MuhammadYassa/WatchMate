@@ -111,11 +111,9 @@ public class ReviewController {
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<ReviewResponseDTO> getReview(
-        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
         @PathVariable @Min(1) Long reviewId
     ) {
-        Users user = userPrincipal.getUser();
-        ReviewResponseDTO reviewResponse = reviewService.getReview(user, reviewId);
+        ReviewResponseDTO reviewResponse = reviewService.getReview(reviewId);
         return ResponseEntity.ok(reviewResponse);
     }
     

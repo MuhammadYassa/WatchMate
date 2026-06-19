@@ -93,9 +93,9 @@ class SocialServiceTest {
         void followUser_WhenPublicTarget_PerformsDirectFollowAndSaves() {
             when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.of(targetUser));
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
-            when(usersRepository.isBlockedByUser(TARGET_ID, USER_ID)).thenReturn(false);
+            when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
             when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
-            
+
             FollowStatusDTO result = socialService.followUser(TARGET_ID, user);
 
             assertEquals(FollowStatuses.FOLLOWING, result.getFollowStatus());
@@ -137,7 +137,7 @@ class SocialServiceTest {
             targetUser.setPrivacyStatus(PrivacyStatuses.PRIVATE);
             when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.of(targetUser));
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
-            when(usersRepository.isBlockedByUser(TARGET_ID, USER_ID)).thenReturn(false);
+            when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
             when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
             when(followRequestRepository.existsByRequestUserAndTargetUserAndStatus(user, targetUser, FollowRequestStatuses.PENDING))
                 .thenReturn(false);
@@ -157,7 +157,7 @@ class SocialServiceTest {
         void unfollowUser_WhenFollowing_RemovesAndSaves() {
             when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.of(targetUser));
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(true);
-            when(usersRepository.isBlockedByUser(TARGET_ID, USER_ID)).thenReturn(false);
+            when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
             when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
 
             FollowStatusDTO result = socialService.unfollowUser(TARGET_ID, user);
@@ -348,7 +348,7 @@ class SocialServiceTest {
         @Test
         void getFollowStatus_WhenFollowing_ReturnsFollowing() {
             when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.of(targetUser));
-            when(usersRepository.isBlockedByUser(USER_ID, TARGET_ID)).thenReturn(false);
+            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
             when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(true);
 
@@ -361,7 +361,7 @@ class SocialServiceTest {
         void getFollowStatus_WhenPendingRequestExists_ReturnsRequested() {
             targetUser.setPrivacyStatus(PrivacyStatuses.PRIVATE);
             when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.of(targetUser));
-            when(usersRepository.isBlockedByUser(USER_ID, TARGET_ID)).thenReturn(false);
+            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
             when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
             when(followRequestRepository.existsByRequestUserAndTargetUserAndStatus(user, targetUser, FollowRequestStatuses.PENDING))

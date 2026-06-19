@@ -1,342 +1,277 @@
-WatchMate – Movie & TV Watchlist & Social Backend
-=================================================
+# WatchMate Backend
 
-WatchMate is a Spring Boot REST API that powers a movie / TV tracking experience similar to Letterboxd.  
-It lets users discover media, maintain watchlists and favourites, write reviews, and follow other users – all backed by JWT authentication, MySQL, and TMDB data.
+WatchMate is a Spring Boot backend for movie and TV tracking. It supports movie and show status tracking, contiguous show progress, watchlists, favourites, reviews, dashboard views, a social graph, and TMDB-backed catalog/discovery data.
 
-### Tech Stack
+## Overview
 
-- **Language**: Java 21  
-- **Framework**: Spring Boot 4 (Web, Security, Data JPA, Validation, Actuator, WebFlux)  
-- **Database**: MySQL  
-- **Auth**: JWT (access + refresh tokens), Spring Security, BCrypt  
-- **Messaging / Email**: AWS SES for email verification  
-- **External API**: TMDB (The Movie Database) for media data  
-- **Build Tool**: Maven  
+- Java 21, Spring Boot 4, Maven
+- MySQL + Flyway for persistence
+- Redis-backed caching for public metadata and user-specific summaries
+- JWT access/refresh token authentication
+- TMDB integration with local catalog caching and show metadata hydration
+- Background show-tracking jobs for asynchronous show hydration and progress/status completion
+- Docker Compose for local app/MySQL/Redis setup
+- Testcontainers-based integration tests
 
----
+## Architecture
 
-## Features
+The backend follows a layered structure:
 
-- **User authentication & security**
-  - Registration with **email verification** (verification tokens via email).
-  - Login with **JWT-based authentication** and refresh tokens.
-  - Logout and refresh token revocation.
-  - Stateless security configuration using Spring Security and custom JWT filter.
+- Controllers expose REST endpoints and OpenAPI annotations.
+- Services own business logic, validation, TMDB orchestration, caching, and async fallback decisions.
+- Repositories provide Spring Data JPA persistence access.
+- Entities and DTOs model database state and request/response payloads.
 
-- **Media discovery**
-  - Search movies/TV by query via TMDB (`/api/v1/media/search`).
-  - Fetch media details by TMDB ID and type (`/api/v1/media/{tmdbId}?type=...`).
-  - Retrieve **popular media** list from a pre-populated table (`/api/v1/media/popular`).
-  - Fetch the cached homepage discovery payload (`/api/v1/home`), including `movieGenres` and `showGenres` for type-aware genre browsing.
+Current backend areas include:
 
-- **Watchlists**
-  - Create / rename / delete user-specific watchlists.
-  - Add and remove media items from watchlists.
-  - Retrieve all watchlists for the authenticated user.
+- Auth and account verification
+- Discovery and genre browsing
+- Movie details and movie watch status
+- Show metadata, show tracking status, and canonical show progress
+- Watchlists, favourites, and reviews
+- Dashboard summaries
+- Social follow/block/follow-request flows
 
-- **Favourites**
-  - Add/remove favourites.
-  - Check if a media item is favourited.
-  - Get a consolidated view of a user’s favourites.
+## Local Setup
 
-- **Reviews**
-  - Create, update, delete, and fetch reviews for media.
-  - Get all reviews for a specific media item.
-  - Validation and ownership checks for review operations.
+### Requirements
 
-- **Social graph**
-  - Follow / unfollow users.
-  - Follow request flow with **accept / reject / cancel**.
-  - Followers / following paginated lists.
-  - Block user support.
-  - Public **user profile** endpoint backed by social data.
+- Java 21
+- Docker Desktop or another local Docker runtime
+- Maven Wrapper (`.\mvnw.cmd`) or Maven
+- TMDB API bearer token
 
-- **Status tracking**
-  - Per-user media status (e.g. watched / watching / planned) via `/api/v1/media/update`.
+### Environment Variables
 
-- **Production-ready practices**
-  - Layered architecture (**Controller → Service → Repository → Model/DTO**).
-  - DTO-based request/response contracts with bean validation.
-  - Custom exceptions and centralized error handling.
-  - Unit tests for key services (JWT, user, search, TMDB, etc.).
-  - Actuator starter included for future health/metrics endpoints.
+The application reads configuration from environment variables in `src/main/resources/application.properties`.
 
----
+Core settings:
 
-## Project Structure (High Level)
+- `DB_URL`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `JWT_SECRET`
+- `TMDB_API_TOKEN`
+- `APP_DOMAIN`
+- `VERIFIED_SENDER`
 
-- `src/main/java/com/project/watchmate`
-  - `Controllers` – REST controllers (`UserController`, `MediaController`, `WatchListController`, `FavouriteController`, `ReviewController`, `SocialController`).
-  - `Services` – business logic (auth, JWT, social, favourites, reviews, search, TMDB integration, watchlists, status, email verification).
-  - `Repositories` – Spring Data JPA repositories for `Users`, `Media`, `PopularMedia`, `Genres`, `WatchList`, `Reviews`, etc.
-  - `Models` – JPA entities and supporting enums (`Users`, `Media`, `WatchListItem`, `Review`, `MediaType`, `WatchStatus`, etc.).
-  - `Dto` – request and response DTOs used by controllers.
-  - `Config` – security, AWS SES, WebClient configuration.
-  - `Exception` – custom exception types and auth entry point.
-- `src/main/resources/application.properties` – configuration via environment variables.
-- `src/test/java/com/project/watchmate` – unit tests for core services and integrations.
+Redis and cache settings:
 
----
+- `REDIS_HOST`
+- `REDIS_PORT`
+- `REDIS_PASSWORD`
+- `WATCHMATE_CACHE_ENABLED`
 
-## Getting Started
+Optional behavior toggles already supported by the backend:
 
-### Prerequisites
+- `WATCHMATE_DISCOVERY_SYNC_CRON`
+- `WATCHMATE_DISCOVERY_SYNC_STARTUP_ENABLED`
+- `WATCHMATE_SHOW_HYDRATION_MAX_SYNCHRONOUS_MISSING_SEASONS`
+- `WATCHMATE_SHOW_HYDRATION_MAX_SYNCHRONOUS_EPISODES`
+- `WATCHMATE_SHOW_HYDRATION_BATCH_SIZE`
+- `WATCHMATE_SHOW_JOBS_ENABLED`
+- `WATCHMATE_SHOW_JOBS_POLL_DELAY_MS`
+- `WATCHMATE_SHOW_JOBS_MAX_JOBS_PER_POLL`
+- `WATCHMATE_SHOW_JOBS_STALE_RUNNING_MINUTES`
+- `WATCHMATE_SHOW_JOBS_MAX_ATTEMPTS`
 
-- **JDK 21+**
-- **Maven 3.9+**
-- **MySQL 8+** (or compatible)
-- An **AWS SES** account with a verified sender email.
-- A **TMDB API token** (v4 Bearer token).
+AWS SES credentials are also required when running real email delivery for registration and verification flows.
 
-### 1. Clone the repository
+### Docker Compose
 
-```bash
-git clone <repo-url>
-cd watchmate
+The repo includes [docker-compose.yml](/C:/Users/forsu/OneDrive/Desktop/watchmate/docker-compose.yml), which starts:
+
+- the Spring Boot app
+- MySQL 8
+- Redis 7
+
+Typical flow:
+
+```powershell
+docker compose up --build
 ```
 
-### 2. Configure environment
+The API is exposed on `http://localhost:8080`.
 
-The app is configured via environment variables that are read in `application.properties`:
+## Current API Map
 
-```properties
-spring.datasource.url=${DB_URL}
-spring.datasource.username=${DB_USERNAME}
-spring.datasource.password=${DB_PASSWORD}
+This is a backend-oriented map of the current API groups. It is intentionally high level and should not be treated as a frontend contract beyond what the backend currently exposes.
 
-spring.jpa.hibernate.ddl-auto=${JPA_DDL_AUTO}
-spring.jpa.show-sql=${JPA_SHOW_SQL:false}
+### Auth
 
-jwt.secret=${JWT_SECRET}
+Base path: `/api/v1/auth`
 
-tmdb.api.token=${TMDB_API_TOKEN}
+- `POST /register`
+- `GET /verify?token=...`
+- `POST /verify/resend`
+- `POST /login`
+- `POST /refresh`
+- `POST /logout`
 
-app.domain=${APP_DOMAIN}
-verified.sender=${VERIFIED_SENDER}
+Notes:
+
+- Login and refresh return a token DTO with `accessToken`, `refreshToken`, `accessTokenExpiry`, and `tokenType`.
+- Some auth endpoints still return plain string bodies, including register, verify, resend verification, and logout.
+
+### Public Discovery and Media
+
+- `GET /api/v1/home`
+- `GET /api/v1/home/status` (admin only)
+- `GET /api/v1/discover/trending-movies`
+- `GET /api/v1/discover/trending-shows`
+- `GET /api/v1/discover/popular-now`
+- `GET /api/v1/discover/airing-today`
+- `GET /api/v1/discover/upcoming`
+- `GET /api/v1/discover/recommended-later`
+- `GET /api/v1/genre/{genre}/movies`
+- `GET /api/v1/genre/{genre}/shows`
+- `GET /api/v1/media/search`
+- `GET /api/v1/movies/{tmdbId}`
+- `GET /api/v1/shows/{tmdbId}`
+- `GET /api/v1/shows/{tmdbId}/next-episode`
+- `GET /api/v1/shows/{tmdbId}/seasons/{seasonNumber}/episodes`
+
+Notes:
+
+- Movie and show detail endpoints are public. When authenticated, they may include user-specific fields such as favourite or watch status.
+- Show season episode responses now include nullable `tmdbEpisodeId` when hydrated.
+
+### Tracking
+
+Movie tracking:
+
+- `PUT /api/v1/movies/{tmdbId}/status`
+
+Show tracking:
+
+- `PUT /api/v1/shows/{tmdbId}/status`
+- `GET /api/v1/shows/{tmdbId}/progress`
+- `PUT /api/v1/shows/{tmdbId}/progress`
+- `GET /api/v1/shows/{tmdbId}/episodes/watched`
+- `GET /api/v1/show-tracking-jobs/{jobId}`
+
+Important show-progress notes:
+
+- `PUT /api/v1/shows/{tmdbId}/progress` is the canonical manual show-progress endpoint.
+- The backend replaces watched-episode rows with the exact contiguous prefix from episode `1x1` through the requested season/episode pointer.
+- The endpoint can return `200 OK` when the update completes immediately.
+- The endpoint can return `202 Accepted` when metadata hydration or completion continues in the background.
+- On `202`, poll the URL in the `Location` header and respect the `Retry-After` header.
+
+Removed and not current:
+
+- No `PUT /api/v1/shows/{tmdbId}/episodes/{seasonNumber}/{episodeNumber}`
+- No `PUT /api/v1/shows/{tmdbId}/seasons/{seasonNumber}/watched`
+
+### Watchlists, Favourites, Reviews
+
+Watchlists:
+
+- `GET /api/v1/watchlists`
+- `POST /api/v1/watchlists`
+- `PATCH /api/v1/watchlists/{id}`
+- `DELETE /api/v1/watchlists/{id}`
+- `POST /api/v1/watchlists/{watchListId}/items/{tmdbId}`
+- `DELETE /api/v1/watchlists/{watchListId}/items/{tmdbId}`
+
+Favourites:
+
+- `POST /api/v1/favourites/add/{tmdbId}`
+- `DELETE /api/v1/favourites/remove/{tmdbId}`
+- `GET /api/v1/favourites/all`
+- `GET /api/v1/favourites/check/{tmdbId}`
+
+Reviews:
+
+- `POST /api/v1/reviews/create`
+- `PATCH /api/v1/reviews/{reviewId}`
+- `DELETE /api/v1/reviews/{reviewId}`
+- `GET /api/v1/reviews/{reviewId}`
+- `GET /api/v1/movies/{tmdbId}/reviews`
+- `GET /api/v1/shows/{tmdbId}/reviews`
+
+Notes:
+
+- Watchlist and favourite item endpoints accept an optional `type` query parameter when a TMDB ID may be ambiguous or needs importing first.
+
+### Dashboard
+
+Base path: `/api/v1/dashboard`
+
+- `GET /continue-watching`
+- `GET /upcoming-episodes`
+- `GET /calendar`
+
+### Social
+
+Base path: `/api/v1/social`
+
+- `POST /follow/{userId}`
+- `DELETE /unfollow/{userId}`
+- `POST /follow-request/{requestId}/accept`
+- `POST /follow-request/{requestId}/reject`
+- `DELETE /follow-request/{requestId}/cancel`
+- `GET /follow-requests/received`
+- `GET /follow-status/{userId}`
+- `POST /block/{userId}`
+- `GET /followers-list`
+- `GET /following-list`
+- `GET /search`
+- `GET /profile/{username}`
+
+Notes:
+
+- Private-user follow requests use `REQUESTED` as the lightweight follow status while the request is pending.
+- Follow-request transitions are guarded by `PENDING`.
+- Stale accept, reject, or cancel attempts return `409` with code `FOLLOW_REQUEST_STATE_CONFLICT`.
+- Lightweight follow status priority is `BLOCKED` > `FOLLOWING` > `REQUESTED` > `NOT_FOLLOWING`.
+
+## Response Conventions
+
+- Login and refresh return a token DTO, not a generic envelope.
+- Some endpoints return plain strings.
+- Errors use the shape:
+
+```json
+{
+  "message": "Human-readable message",
+  "code": "STABLE_ERROR_CODE",
+  "fields": []
+}
 ```
 
-Set these in your shell or IDE run configuration, for example:
+- Pagination is not globally wrapped in one custom envelope. Some endpoints return Spring `Page<T>`, some return arrays, and some return dedicated DTOs like `ContinueWatchingResponseDTO` or `HomeResponseDTO`.
 
-```bash
-setx DB_URL "jdbc:mysql://localhost:3306/watchmate"
-setx DB_USERNAME "watchmate_user"
-setx DB_PASSWORD "strong-password"
-setx JPA_DDL_AUTO "update"
-setx JWT_SECRET "a-strong-random-secret"
-setx TMDB_API_TOKEN "<your-tmdb-bearer-token>"
-setx APP_DOMAIN "http://localhost:8080"
-setx VERIFIED_SENDER "no-reply@yourdomain.com"
+## Testing
+
+Compile without tests:
+
+```powershell
+.\mvnw.cmd -q -DskipTests compile
 ```
 
-For non-Windows environments, use `export` instead of `setx`.
+Run the focused cleanup-related suite:
 
-> **Note**: For local development you can use `JPA_DDL_AUTO=update` or `create-drop`. In production, prefer managed migrations (e.g. Flyway) and set this to `none`.
-
-### 3. Create the database
-
-In MySQL:
-
-```sql
-CREATE DATABASE watchmate CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'watchmate_user'@'%' IDENTIFIED BY 'strong-password';
-GRANT ALL PRIVILEGES ON watchmate.* TO 'watchmate_user'@'%';
-FLUSH PRIVILEGES;
+```powershell
+.\mvnw.cmd -q "-Dtest=ReviewServiceTest,ReviewIntegrationTest,SocialServiceTest,SocialIntegrationTest,ShowTrackingServiceTest,ShowFeaturesIntegrationTest" test
 ```
 
-### 4. Run the application
+Run the full suite:
 
-```bash
-mvn spring-boot:run
+```powershell
+.\mvnw.cmd -q test
 ```
 
-The API will be available at `http://localhost:8080`.
+Notes:
 
-### 5. Run tests
+- Integration tests use Testcontainers for MySQL.
+- Some cache-specific tests also use Testcontainers-backed Redis.
+- Docker must be available for the full integration suite to pass locally.
 
-```bash
-mvn test
-```
+## Stale Endpoints Removed From This README
 
----
+The following old references are intentionally no longer documented here because they are not current backend endpoints:
 
-## API Overview (High Level)
-
-This is a high-level summary; see controllers and DTOs for full details.
-
-- **Auth (`/api/v1/auth`)**
-  - `POST /register` – register a new user and send verification email.
-  - `GET /verify?token=...` – verify email.
-  - `POST /verify/resend` – resend verification email.
-  - `POST /login` – authenticate and receive access/refresh tokens.
-  - `POST /refresh` – exchange refresh token for new access token.
-  - `POST /logout` – revoke refresh token.
-
-- **Media (`/api/v1/media`)**
-  - `GET /{tmdbId}?type=...` – media details for a given TMDB ID and type.
-  - `GET /search?query=...&page=...` – search movies/TV.
-  - `GET /popular` – list popular media from `PopularMedia`.
-  - `POST /update` – update current user’s watch status for a media item.
-  - `GET /{mediaId}/reviews` – get reviews for a given media.
-
-- **Home (`/api/v1/home`)**
-  - `GET /` – cached homepage discovery buckets plus `movieGenres` and `showGenres`.
-  - `GET /status` – admin-only discovery sync status and cached bucket counts.
-
-- **Genre (`/api/v1/genre`)**
-  - `GET /{genre}/movies?page=...&size=...` – browse cached movie genres through TMDB discover.
-  - `GET /{genre}/shows?page=...&size=...` – browse cached show genres through TMDB discover.
-
-- **Watchlists (`/api/v1/watchlists`)**
-  - `GET /` – all watchlists for current user.
-  - `POST /` – create a new watchlist.
-  - `PATCH /{id}` – rename a watchlist.
-  - `DELETE /{id}` – delete a watchlist.
-  - `POST /{watchListId}/items/{tmdbId}` – add media to watchlist.
-  - `DELETE /{watchListId}/items/{tmdbId}` – remove media from watchlist.
-
-- **Favourites (`/api/v1/favourites`)**
-  - `POST /add/{tmdbId}` – add favourite.
-  - `DELETE /remove/{tmdbId}` – remove favourite.
-  - `GET /all` – list favourites for user.
-  - `GET /check/{tmdbId}` – check if a media is favourited.
-
-- **Reviews (`/api/v1/reviews`)**
-  - `POST /create` – create review.
-  - `PATCH /{reviewId}` – update review.
-  - `DELETE /{reviewId}` – delete review.
-  - `GET /{reviewId}` – get single review.
-
-- **Social (`/api/v1/social`)**
-  - `POST /follow/{userId}` / `DELETE /unfollow/{userId}` – follow/unfollow.
-  - `POST /follow-request/{requestId}/accept|reject` – handle incoming follow requests.
-  - `DELETE /follow-request/{requestId}/cancel` – cancel outgoing follow request.
-  - `GET /follow-requests/received` – paginated list of received requests.
-  - `GET /follow-status/{userId}` – current follow/block status vs another user.
-  - `POST /block/{userId}` – block a user.
-  - `GET /followers-list` / `GET /following-list` – paginated followers/following lists.
-  - `GET /user-profile/{userId}` – public profile view.
-
-All non-auth endpoints require a valid JWT in the `Authorization: Bearer <token>` header as configured in `SecurityConfig`.
-
----
-
-## Design & Implementation Notes
-
-- **Security**
-  - Stateless, JWT-based auth with a custom `JwtFilter` added before `UsernamePasswordAuthenticationFilter`.
-  - `BCryptPasswordEncoder` with strength 12 for password hashing.
-  - Custom `AuthenticationEntryPoint` for clean 401 responses.
-  - Only auth endpoints (`/api/v1/auth/...`) are publicly accessible; everything else requires authentication.
-
-- **Persistence**
-  - Spring Data JPA repositories for all aggregates.
-  - Entities model media, users, watchlists, favourites, reviews, follow requests, and user-media status.
-
-- **External integrations**
-  - **TMDB** via a dedicated `TmdbClient` built on Spring WebClient.
-  - **AWS SES** with dedicated config for sending verification emails.
-
-- **Testing**
-  - Unit tests for critical services such as:
-    - `JwtService`
-    - `UserService`
-    - `SearchService`
-    - `TmdbService`
-    - `EmailVerificationTokenService`
-    - `RefreshTokenService`
-
----
-
-## Deployment Notes (High Level)
-
-- Package as an executable JAR:
-
-```bash
-mvn clean package
-```
-
-- Provide all required environment variables (`DB_*`, `JWT_SECRET`, `TMDB_API_TOKEN`, `APP_DOMAIN`, `VERIFIED_SENDER`) on the target environment.
-- Behind a reverse proxy (Nginx/Apache/API gateway), expose port `8080` and terminate TLS at the proxy or your cloud provider.
-- For production, configure:
-  - A dedicated MySQL instance.
-  - Proper AWS IAM permissions for SES.
-  - Application logging, monitoring (via Actuator), and backups.
-
----
-
-## Possible Future Improvements
-
-- API documentation via **OpenAPI/Swagger**.
-- Integration tests with Testcontainers for MySQL and TMDB stubs.
-- Rate limiting and abuse protection.
-- More granular privacy controls on watchlists / profiles.
-- Frontend client (web or mobile) consuming this API.
-
----
-
-## License
-
-This project does not currently declare a license.  
-If you plan to open source or share it publicly, consider adding a license (e.g. MIT, Apache 2.0) to clarify usage rights.
-
-# WatchMate
-
-**WatchMate** is a comprehensive web application designed to help users effortlessly track, rate, and review movies and TV shows. Whether you’re planning what to watch next, keeping tabs on what you’ve watched, or discovering new favorites, WatchMate makes managing your entertainment simple and personalized.
-
----
-
-## Key Features
-
-- User registration and secure login with JWT-based authentication  
-- Manage personalized watchlists for movies and TV shows  
-- Track viewing progress, mark titles as watched or currently watching  
-- Rate and review your favorite content  
-- Personalized recommendations based on your watch history and preferences  
-- Responsive frontend interface for an intuitive user experience
-
----
-
-## Technology Stack
-
-### Backend
-- Spring Boot framework with RESTful API  
-- Spring Security for authentication and authorization  
-- JWT (JSON Web Tokens) for stateless, secure sessions  
-- MySQL relational database for data persistence  
-- Hibernate (JPA) for ORM and database interactions
-
----
-
-## Getting Started
-
-### Prerequisites
-- Java 17 or later    
-- MySQL installed and running locally or accessible remotely  
-- Maven for backend build  
-
-### Setup Instructions
-
-1. **Clone the repository:**  
-   `git clone https://github.com/YourUsername/WatchMate.git`
-
-2. **Configure backend:**  
-   - Edit the `application-template.properties` file with your MySQL database credentials and JWT secret key and rename to `application.properties`. 
-   - Build and run the backend server:  
-     `./mvnw spring-boot:run`  
-
-3. **Setup frontend**  
-
-4. **Access the application**  
-
----
-
-## License
-
-This project is licensed under the MIT License.
-
----
-
-## Author
-
-Muhammad Yassa
+- `/api/v1/media/popular`
+- `/api/v1/media/update`
+- removed manual show episode/season mutation endpoints

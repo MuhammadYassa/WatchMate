@@ -14,8 +14,6 @@ public interface MediaRepository extends JpaRepository<Media, Long>{
 
     Optional<Media> findByTmdbIdAndType(Long tmdbId, MediaType type);
 
-    boolean existsByTmdbIdAndType(Long tmdbId, MediaType type);
-
 }
 
 

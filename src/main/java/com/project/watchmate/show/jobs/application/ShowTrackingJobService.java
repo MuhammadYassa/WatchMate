@@ -47,18 +47,6 @@ public class ShowTrackingJobService {
 
     private final PlatformTransactionManager transactionManager;
 
-    public ShowTrackingJobDTO createOrReuseHydrateCatalogJob(Users user, Media media, Integer totalSeasons) {
-        return createOrReuseJob(
-            user,
-            media,
-            ShowTrackingJobType.HYDRATE_SHOW_CATALOG,
-            null,
-            null,
-            null,
-            totalSeasons
-        );
-    }
-
     public ShowTrackingJobDTO createOrReuseMarkWatchedJob(Users user, Media media, Integer totalSeasons) {
         return createOrReuseJob(
             user,
