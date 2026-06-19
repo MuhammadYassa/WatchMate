@@ -258,8 +258,8 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void updateWatchPosition_autoImportsShowAndPersistsTracking() throws Exception {
-        Users user = saveUser("show-progress-user", true);
+    void updateWatchPosition_setsContiguousForwardProgress() throws Exception {
+        Users user = saveUser("show-progress-forward-user", true);
         when(tmdbClient.fetchMediaById(eq(9200L), eq(MediaType.SHOW)))
             .thenReturn(TmdbMovieDTO.builder()
                 .id(9200L)
@@ -269,62 +269,188 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
                 .releaseDate("2020-01-01")
                 .genres(List.of())
                 .build());
-        when(tmdbClient.fetchTvDetailsById(eq(9200L))).thenReturn(tmdbTvDetailsWithId(9200L));
-        when(tmdbClient.fetchTvSeasonDetails(eq(9200L), eq(2))).thenReturn(seasonTwo());
+        when(tmdbClient.fetchTvDetailsById(eq(9200L))).thenReturn(contiguousProgressShowDetailsWithId(9200L));
+        when(tmdbClient.fetchTvSeasonDetails(eq(9200L), eq(1))).thenReturn(contiguousSeasonOne());
 
         mockMvc.perform(put("/api/v1/shows/{tmdbId}/progress", 9200L)
             .header("Authorization", bearerToken(user))
             .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
             .content("""
-                {"watchPositionSeason":2,"watchPositionEpisode":1,"markPreviousEpisodesWatched":false}
+                {"watchPositionSeason":1,"watchPositionEpisode":5}
                 """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.tmdbId").value(9200))
             .andExpect(jsonPath("$.status").value("WATCHING"))
-            .andExpect(jsonPath("$.latestWatchedSeason").doesNotExist())
-            .andExpect(jsonPath("$.latestWatchedEpisode").doesNotExist())
-            .andExpect(jsonPath("$.watchPositionSeason").value(2))
-            .andExpect(jsonPath("$.watchPositionEpisode").value(1))
-            .andExpect(jsonPath("$.episodesWatchedCount").value(0))
-            .andExpect(jsonPath("$.seasonsCompletedCount").value(0));
+            .andExpect(jsonPath("$.latestWatchedSeason").value(1))
+            .andExpect(jsonPath("$.latestWatchedEpisode").value(5))
+            .andExpect(jsonPath("$.watchPositionSeason").value(1))
+            .andExpect(jsonPath("$.watchPositionEpisode").value(5))
+            .andExpect(jsonPath("$.episodesWatchedCount").value(5))
+            .andExpect(jsonPath("$.seasonsCompletedCount").value(1));
 
         Media imported = mediaRepository.findByTmdbIdAndType(9200L, MediaType.SHOW).orElseThrow();
         UserShowTracking persistedTracking = userShowTrackingRepository.findByUserAndMedia(user, imported).orElseThrow();
         assertThat(imported.getNextEpisodeName()).isEqualTo("Next Episode");
         assertThat(userMediaStatusRepository.findByUserAndMedia(user, imported)).isEmpty();
         assertThat(persistedTracking.getStatus()).isEqualTo(WatchStatus.WATCHING);
-        assertThat(persistedTracking.getWatchPositionSeason()).isEqualTo(2);
-        assertThat(persistedTracking.getWatchPositionEpisode()).isEqualTo(1);
-        assertThat(persistedTracking.getEpisodesWatchedCount()).isZero();
+        assertThat(persistedTracking.getWatchPositionSeason()).isEqualTo(1);
+        assertThat(persistedTracking.getWatchPositionEpisode()).isEqualTo(5);
+        assertThat(persistedTracking.getEpisodesWatchedCount()).isEqualTo(5);
+        assertThat(persistedTracking.getSeasonsCompletedCount()).isEqualTo(1);
+        assertWatchedRows(persistedTracking, "1x1", "1x2", "1x3", "1x4", "1x5");
         assertThat(showSeasonRepository.findAllByMediaIdOrderBySeasonNumberAsc(imported.getId()))
             .extracting(ShowSeason::getSeasonNumber)
-            .containsExactly(2);
-        assertThat(showEpisodeRepository.findAllByMediaIdAndSeasonNumberOrderByEpisodeNumberAsc(imported.getId(), 2)).hasSize(3);
-        verify(tmdbClient, never()).fetchTvSeasonDetails(eq(9200L), eq(1));
+            .containsExactly(1);
+        assertThat(showEpisodeRepository.findAllByMediaIdAndSeasonNumberOrderByEpisodeNumberAsc(imported.getId(), 1)).hasSize(5);
     }
 
     @Test
-    void markEpisodeWatched_whenUnwatchingMissingEpisode_returns200NoOp() throws Exception {
-        Users user = saveUser("show-noop-user", true);
-        saveMedia(9300L, "Existing Show", MediaType.SHOW);
-        when(tmdbClient.fetchTvDetailsById(eq(9300L))).thenReturn(tmdbTvDetailsWithId(9300L));
-        when(tmdbClient.fetchTvSeasonDetails(eq(9300L), eq(1))).thenReturn(seasonOne());
-        when(tmdbClient.fetchTvSeasonDetails(eq(9300L), eq(2))).thenReturn(seasonTwo());
+    void updateWatchPosition_backtracksAndDeletesLaterRows() throws Exception {
+        Users user = saveUser("show-progress-backward-user", true);
+        Media show = saveMedia(9201L, "Backward Progress Show", MediaType.SHOW);
+        UserShowTracking tracking = UserShowTracking.builder()
+            .user(user)
+            .media(show)
+            .status(WatchStatus.WATCHING)
+            .watchPositionSeason(1)
+            .watchPositionEpisode(5)
+            .episodesWatchedCount(5)
+            .seasonsCompletedCount(1)
+            .episodeWatches(new java.util.ArrayList<>())
+            .build();
+        for (int episodeNumber = 1; episodeNumber <= 5; episodeNumber++) {
+            tracking.getEpisodeWatches().add(UserEpisodeWatch.builder()
+                .userShowTracking(tracking)
+                .seasonNumber(1)
+                .episodeNumber(episodeNumber)
+                .watchedAt(java.time.LocalDateTime.of(2026, 5, 1, episodeNumber, 0))
+                .build());
+        }
+        userShowTrackingRepository.saveAndFlush(tracking);
+        when(tmdbClient.fetchTvDetailsById(eq(9201L))).thenReturn(contiguousProgressShowDetailsWithId(9201L));
+        when(tmdbClient.fetchTvSeasonDetails(eq(9201L), eq(1))).thenReturn(contiguousSeasonOne());
 
-        mockMvc.perform(put("/api/v1/shows/{tmdbId}/episodes/{seasonNumber}/{episodeNumber}", 9300L, 1, 1)
+        mockMvc.perform(put("/api/v1/shows/{tmdbId}/progress", 9201L)
             .header("Authorization", bearerToken(user))
             .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
             .content("""
-                {"watched":false}
+                {"watchPositionSeason":1,"watchPositionEpisode":3}
                 """))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.status").value("NONE"))
-            .andExpect(jsonPath("$.episodesWatchedCount").value(0))
-            .andExpect(jsonPath("$.watchedEpisodes", hasSize(0)));
+            .andExpect(jsonPath("$.status").value("WATCHING"))
+            .andExpect(jsonPath("$.latestWatchedSeason").value(1))
+            .andExpect(jsonPath("$.latestWatchedEpisode").value(3))
+            .andExpect(jsonPath("$.watchPositionSeason").value(1))
+            .andExpect(jsonPath("$.watchPositionEpisode").value(3))
+            .andExpect(jsonPath("$.episodesWatchedCount").value(3));
 
-        Media media = mediaRepository.findByTmdbIdAndType(9300L, MediaType.SHOW).orElseThrow();
-        assertThat(userMediaStatusRepository.findByUserAndMedia(user, media)).isEmpty();
-        verify(tmdbClient, never()).fetchTvSeasonDetails(eq(9300L), eq(1));
+        UserShowTracking persistedTracking = userShowTrackingRepository.findByUserAndMedia(user, show).orElseThrow();
+        assertThat(persistedTracking.getWatchPositionSeason()).isEqualTo(1);
+        assertThat(persistedTracking.getWatchPositionEpisode()).isEqualTo(3);
+        assertThat(persistedTracking.getEpisodesWatchedCount()).isEqualTo(3);
+        assertWatchedRows(persistedTracking, "1x1", "1x2", "1x3");
+    }
+
+    @Test
+    void updateWatchPosition_setsCrossSeasonProgressContiguously() throws Exception {
+        Users user = saveUser("show-progress-cross-user", true);
+        when(tmdbClient.fetchMediaById(eq(9202L), eq(MediaType.SHOW)))
+            .thenReturn(TmdbMovieDTO.builder()
+                .id(9202L)
+                .title("Cross Season Show")
+                .overview("Cross season overview")
+                .posterPath("/cross.jpg")
+                .releaseDate("2020-01-01")
+                .genres(List.of())
+                .build());
+        when(tmdbClient.fetchTvDetailsById(eq(9202L))).thenReturn(contiguousProgressShowDetailsWithId(9202L));
+        when(tmdbClient.fetchTvSeasonDetails(eq(9202L), eq(1))).thenReturn(contiguousSeasonOne());
+        when(tmdbClient.fetchTvSeasonDetails(eq(9202L), eq(2))).thenReturn(contiguousSeasonTwo());
+
+        mockMvc.perform(put("/api/v1/shows/{tmdbId}/progress", 9202L)
+            .header("Authorization", bearerToken(user))
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .content("""
+                {"watchPositionSeason":2,"watchPositionEpisode":2}
+                """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("UP_TO_DATE"))
+            .andExpect(jsonPath("$.latestWatchedSeason").value(2))
+            .andExpect(jsonPath("$.latestWatchedEpisode").value(2))
+            .andExpect(jsonPath("$.watchPositionSeason").value(2))
+            .andExpect(jsonPath("$.watchPositionEpisode").value(2))
+            .andExpect(jsonPath("$.episodesWatchedCount").value(7))
+            .andExpect(jsonPath("$.seasonsCompletedCount").value(1));
+
+        Media imported = mediaRepository.findByTmdbIdAndType(9202L, MediaType.SHOW).orElseThrow();
+        UserShowTracking persistedTracking = userShowTrackingRepository.findByUserAndMedia(user, imported).orElseThrow();
+        assertThat(persistedTracking.getStatus()).isEqualTo(WatchStatus.UP_TO_DATE);
+        assertWatchedRows(persistedTracking, "1x1", "1x2", "1x3", "1x4", "1x5", "2x1", "2x2");
+    }
+
+
+    @Test
+    void updateWatchPosition_withLargeMissingMetadata_returnsAcceptedJobAndCompletesWithReplacement() throws Exception {
+        Users user = saveUser("show-progress-job-user", true);
+        Media show = saveMedia(9301L, "Async Progress Show", MediaType.SHOW);
+        UserShowTracking tracking = UserShowTracking.builder()
+            .user(user)
+            .media(show)
+            .status(WatchStatus.WATCHING)
+            .watchPositionSeason(6)
+            .watchPositionEpisode(1)
+            .episodesWatchedCount(3)
+            .episodeWatches(new java.util.ArrayList<>())
+            .build();
+        tracking.getEpisodeWatches().add(UserEpisodeWatch.builder()
+            .userShowTracking(tracking)
+            .seasonNumber(1)
+            .episodeNumber(1)
+            .watchedAt(java.time.LocalDateTime.of(2026, 5, 1, 10, 0))
+            .build());
+        tracking.getEpisodeWatches().add(UserEpisodeWatch.builder()
+            .userShowTracking(tracking)
+            .seasonNumber(2)
+            .episodeNumber(1)
+            .watchedAt(java.time.LocalDateTime.of(2026, 5, 2, 10, 0))
+            .build());
+        tracking.getEpisodeWatches().add(UserEpisodeWatch.builder()
+            .userShowTracking(tracking)
+            .seasonNumber(6)
+            .episodeNumber(1)
+            .watchedAt(java.time.LocalDateTime.of(2026, 5, 3, 10, 0))
+            .build());
+        userShowTrackingRepository.saveAndFlush(tracking);
+
+        when(tmdbClient.fetchTvDetailsById(eq(9301L))).thenReturn(largeProgressShowDetailsWithId(9301L));
+        when(tmdbClient.fetchTvSeasonDetails(eq(9301L), eq(5))).thenReturn(singleEpisodeSeason(5, "2020-02-05"));
+
+        MvcResult mvcResult = mockMvc.perform(put("/api/v1/shows/{tmdbId}/progress", 9301L)
+            .header("Authorization", bearerToken(user))
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .content("""
+                {"watchPositionSeason":5,"watchPositionEpisode":1}
+                """))
+            .andExpect(status().isAccepted())
+            .andExpect(jsonPath("$.jobType").value("SET_SHOW_PROGRESS"))
+            .andReturn();
+
+        ShowTrackingJobDTO job = objectMapper.readValue(mvcResult.getResponse().getContentAsString(), ShowTrackingJobDTO.class);
+        when(tmdbClient.fetchTvSeasonDetails(eq(9301L), eq(1))).thenReturn(singleEpisodeSeason(1, "2020-01-01"));
+        when(tmdbClient.fetchTvSeasonDetails(eq(9301L), eq(2))).thenReturn(singleEpisodeSeason(2, "2020-01-08"));
+        when(tmdbClient.fetchTvSeasonDetails(eq(9301L), eq(3))).thenReturn(singleEpisodeSeason(3, "2020-01-15"));
+        when(tmdbClient.fetchTvSeasonDetails(eq(9301L), eq(4))).thenReturn(singleEpisodeSeason(4, "2020-01-22"));
+
+        showTrackingJobService.pollPendingJobs();
+
+        assertThat(showTrackingJobRepository.findById(job.getJobId())).get()
+            .extracting(ShowTrackingJob::getStatus)
+            .isEqualTo(ShowTrackingJobStatus.COMPLETED);
+        UserShowTracking persistedTracking = userShowTrackingRepository.findByUserAndMedia(user, show).orElseThrow();
+        assertThat(persistedTracking.getWatchPositionSeason()).isEqualTo(5);
+        assertThat(persistedTracking.getWatchPositionEpisode()).isEqualTo(1);
+        assertThat(persistedTracking.getStatus()).isEqualTo(WatchStatus.WATCHING);
+        assertWatchedRows(persistedTracking, "1x1", "2x1", "3x1", "4x1", "5x1");
     }
 
     @Test
@@ -627,6 +753,64 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
             .build();
     }
 
+    private TmdbTvDetailsDTO contiguousProgressShowDetailsWithId(Long tmdbId) {
+        return TmdbTvDetailsDTO.builder()
+            .id(tmdbId)
+            .name("Contiguous Progress Show")
+            .overview("A show used for contiguous progress tests")
+            .posterPath("/contiguous.jpg")
+            .backdropPath("/contiguous-bg.jpg")
+            .firstAirDate("2020-01-01")
+            .voteAverage(8.5)
+            .numberOfSeasons(2)
+            .numberOfEpisodes(8)
+            .lastAirDate("2026-01-08")
+            .status("Returning Series")
+            .genres(List.of())
+            .nextEpisodeToAir(TmdbEpisodeSummaryDTO.builder()
+                .airDate("2099-01-15")
+                .seasonNumber(2)
+                .episodeNumber(3)
+                .name("Next Episode")
+                .build())
+            .lastEpisodeToAir(TmdbEpisodeSummaryDTO.builder()
+                .airDate("2026-01-08")
+                .seasonNumber(2)
+                .episodeNumber(2)
+                .name("Latest Aired Episode")
+                .build())
+            .seasons(List.of(
+                TmdbTvSeasonSummaryDTO.builder().id(401L).seasonNumber(1).name("Season 1").episodeCount(5).airDate("2020-01-01").build(),
+                TmdbTvSeasonSummaryDTO.builder().id(402L).seasonNumber(2).name("Season 2").episodeCount(3).airDate("2026-01-01").build()
+            ))
+            .build();
+    }
+
+    private TmdbTvDetailsDTO largeProgressShowDetailsWithId(Long tmdbId) {
+        return TmdbTvDetailsDTO.builder()
+            .id(tmdbId)
+            .name("Large Progress Show")
+            .overview("A show used for async progress tests")
+            .posterPath("/large-progress.jpg")
+            .backdropPath("/large-progress-bg.jpg")
+            .firstAirDate("2020-01-01")
+            .voteAverage(8.0)
+            .numberOfSeasons(6)
+            .numberOfEpisodes(6)
+            .lastAirDate("2020-02-12")
+            .status("Returning Series")
+            .genres(List.of())
+            .seasons(List.of(
+                TmdbTvSeasonSummaryDTO.builder().id(501L).seasonNumber(1).name("Season 1").episodeCount(1).airDate("2020-01-01").build(),
+                TmdbTvSeasonSummaryDTO.builder().id(502L).seasonNumber(2).name("Season 2").episodeCount(1).airDate("2020-01-08").build(),
+                TmdbTvSeasonSummaryDTO.builder().id(503L).seasonNumber(3).name("Season 3").episodeCount(1).airDate("2020-01-15").build(),
+                TmdbTvSeasonSummaryDTO.builder().id(504L).seasonNumber(4).name("Season 4").episodeCount(1).airDate("2020-01-22").build(),
+                TmdbTvSeasonSummaryDTO.builder().id(505L).seasonNumber(5).name("Season 5").episodeCount(1).airDate("2020-02-05").build(),
+                TmdbTvSeasonSummaryDTO.builder().id(506L).seasonNumber(6).name("Season 6").episodeCount(1).airDate("2020-02-12").build()
+            ))
+            .build();
+    }
+
     private TmdbTvDetailsDTO endedShowDetailsWithId(Long tmdbId) {
         return TmdbTvDetailsDTO.builder()
             .id(tmdbId)
@@ -673,28 +857,34 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
             .build();
     }
 
-    private TmdbTvSeasonDTO seasonOne() {
+
+    private TmdbTvSeasonDTO contiguousSeasonOne() {
         return TmdbTvSeasonDTO.builder()
-            .id(101L)
+            .id(401L)
             .seasonNumber(1)
             .name("Season 1")
-            .posterPath("/s1.jpg")
+            .posterPath("/contiguous-s1.jpg")
             .episodes(List.of(
-                TmdbTvEpisodeDTO.builder().id(1101L).seasonNumber(1).episodeNumber(1).name("Pilot").airDate("2020-01-01").runtime(45).stillPath("/pilot.jpg").build(),
-                TmdbTvEpisodeDTO.builder().id(1102L).seasonNumber(1).episodeNumber(2).name("Second").airDate("2020-01-08").runtime(46).stillPath("/second.jpg").build()))
+                TmdbTvEpisodeDTO.builder().id(4101L).seasonNumber(1).episodeNumber(1).name("Episode 1").airDate("2020-01-01").runtime(45).stillPath("/c-s1-e1.jpg").build(),
+                TmdbTvEpisodeDTO.builder().id(4102L).seasonNumber(1).episodeNumber(2).name("Episode 2").airDate("2020-01-08").runtime(45).stillPath("/c-s1-e2.jpg").build(),
+                TmdbTvEpisodeDTO.builder().id(4103L).seasonNumber(1).episodeNumber(3).name("Episode 3").airDate("2020-01-15").runtime(45).stillPath("/c-s1-e3.jpg").build(),
+                TmdbTvEpisodeDTO.builder().id(4104L).seasonNumber(1).episodeNumber(4).name("Episode 4").airDate("2020-01-22").runtime(45).stillPath("/c-s1-e4.jpg").build(),
+                TmdbTvEpisodeDTO.builder().id(4105L).seasonNumber(1).episodeNumber(5).name("Episode 5").airDate("2020-01-29").runtime(45).stillPath("/c-s1-e5.jpg").build()
+            ))
             .build();
     }
 
-    private TmdbTvSeasonDTO seasonTwo() {
+    private TmdbTvSeasonDTO contiguousSeasonTwo() {
         return TmdbTvSeasonDTO.builder()
-            .id(102L)
+            .id(402L)
             .seasonNumber(2)
             .name("Season 2")
-            .posterPath("/s2.jpg")
+            .posterPath("/contiguous-s2.jpg")
             .episodes(List.of(
-                TmdbTvEpisodeDTO.builder().id(1201L).seasonNumber(2).episodeNumber(1).name("Return").airDate("2026-01-01").runtime(47).stillPath("/return.jpg").build(),
-                TmdbTvEpisodeDTO.builder().id(1202L).seasonNumber(2).episodeNumber(2).name("Current").airDate("2026-01-08").runtime(48).stillPath("/current.jpg").build(),
-                TmdbTvEpisodeDTO.builder().id(1203L).seasonNumber(2).episodeNumber(3).name("Next Episode").airDate("2099-01-15").runtime(49).stillPath("/next.jpg").build()))
+                TmdbTvEpisodeDTO.builder().id(4201L).seasonNumber(2).episodeNumber(1).name("Episode 1").airDate("2026-01-01").runtime(45).stillPath("/c-s2-e1.jpg").build(),
+                TmdbTvEpisodeDTO.builder().id(4202L).seasonNumber(2).episodeNumber(2).name("Episode 2").airDate("2026-01-08").runtime(45).stillPath("/c-s2-e2.jpg").build(),
+                TmdbTvEpisodeDTO.builder().id(4203L).seasonNumber(2).episodeNumber(3).name("Next Episode").airDate("2099-01-15").runtime(45).stillPath("/c-s2-e3.jpg").build()
+            ))
             .build();
     }
 
@@ -732,11 +922,13 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
             ))
             .build();
     }
+
+    private void assertWatchedRows(UserShowTracking tracking, String... expected) {
+        assertThat(userEpisodeWatchRepository.findByUserShowTrackingOrderBySeasonNumberAscEpisodeNumberAsc(tracking))
+            .extracting(row -> row.getSeasonNumber() + "x" + row.getEpisodeNumber())
+            .containsExactly(expected);
+    }
 }
-
-
-
-
 
 
 

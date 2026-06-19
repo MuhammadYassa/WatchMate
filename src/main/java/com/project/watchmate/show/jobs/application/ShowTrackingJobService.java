@@ -83,7 +83,7 @@ public class ShowTrackingJobService {
         );
     }
 
-    public ShowTrackingJobDTO createOrReuseMarkPreviousEpisodesWatchedJob(
+    public ShowTrackingJobDTO createOrReuseSetShowProgressJob(
         Users user,
         Media media,
         Integer targetSeasonNumber,
@@ -93,7 +93,7 @@ public class ShowTrackingJobService {
         return createOrReuseJob(
             user,
             media,
-            ShowTrackingJobType.MARK_PREVIOUS_EPISODES_WATCHED,
+            ShowTrackingJobType.SET_SHOW_PROGRESS,
             null,
             targetSeasonNumber,
             targetEpisodeNumber,
@@ -205,7 +205,7 @@ public class ShowTrackingJobService {
                 case HYDRATE_SHOW_CATALOG -> processHydrateCatalogJob(job);
                 case MARK_SHOW_WATCHED -> processMarkWatchedJob(job);
                 case MARK_SHOW_UP_TO_DATE -> processMarkUpToDateJob(job);
-                case MARK_PREVIOUS_EPISODES_WATCHED -> processMarkPreviousEpisodesWatchedJob(job);
+                case SET_SHOW_PROGRESS -> processSetShowProgressJob(job);
             }
             completeJob(jobId);
         } catch (RuntimeException ex) {
@@ -275,7 +275,7 @@ public class ShowTrackingJobService {
         });
     }
 
-    private void processMarkPreviousEpisodesWatchedJob(ShowTrackingJob job) {
+    private void processSetShowProgressJob(ShowTrackingJob job) {
         Media media = job.getMedia();
         TmdbTvDetailsDTO tvDetails = showCatalogService.fetchAndRefreshShowDetails(media.getTmdbId(), media);
         List<Integer> requiredSeasons = showCatalogService.getRequiredSeasonNumbersThroughPointer(tvDetails, job.getTargetSeasonNumber());
@@ -294,7 +294,7 @@ public class ShowTrackingJobService {
             UserShowTracking tracking = showTrackingWriteSupport.loadOrCreateTracking(job.getUser(), media);
             tracking.setWatchPositionSeason(job.getTargetSeasonNumber());
             tracking.setWatchPositionEpisode(job.getTargetEpisodeNumber());
-            showTrackingWriteSupport.addEpisodeWatches(tracking, targetEpisodes, LocalDateTime.now());
+            showTrackingWriteSupport.replaceEpisodeWatches(tracking, targetEpisodes, LocalDateTime.now());
             showTrackingWriteSupport.applyCalculationAndPersist(
                 tracking,
                 media,
@@ -411,7 +411,7 @@ public class ShowTrackingJobService {
             case HYDRATE_SHOW_CATALOG -> "WatchMate is hydrating this show's catalog in the background.";
             case MARK_SHOW_WATCHED -> "WatchMate is preparing this show and marking episodes watched.";
             case MARK_SHOW_UP_TO_DATE -> "WatchMate is preparing this show and marking aired episodes watched.";
-            case MARK_PREVIOUS_EPISODES_WATCHED -> "WatchMate is preparing this show and marking previous episodes watched.";
+            case SET_SHOW_PROGRESS -> "WatchMate is preparing this show and setting contiguous show progress.";
         };
     }
 

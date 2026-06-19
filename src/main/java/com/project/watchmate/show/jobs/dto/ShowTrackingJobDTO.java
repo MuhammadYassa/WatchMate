@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Schema(name = "ShowTrackingJob", description = "Background job state for show catalog hydration or bulk tracking backfill.")
+@Schema(name = "ShowTrackingJob", description = "Background job state for show catalog hydration or asynchronous show tracking updates.")
 public class ShowTrackingJobDTO {
 
     private Long jobId;
@@ -55,7 +55,6 @@ public class ShowTrackingJobDTO {
 
     private LocalDateTime completedAt;
 }
-
 
 
 

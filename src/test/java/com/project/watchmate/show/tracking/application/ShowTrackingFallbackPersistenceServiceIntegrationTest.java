@@ -29,13 +29,13 @@ class ShowTrackingFallbackPersistenceServiceIntegrationTest extends AbstractInte
     private ShowTrackingFallbackPersistenceService fallbackPersistenceService;
 
     @Test
-    void savePointerAndCreateJob_whenJobCreationFails_rollsBackNewTrackingRow() {
+    void saveProgressAndCreateJob_whenJobCreationFails_rollsBackNewTrackingRow() {
         Users user = saveUser("pointer-fallback-failure-user", true);
         Media show = saveMedia(9701L, "Pointer Fallback Failure", MediaType.SHOW);
-        when(mockedShowTrackingJobService.createOrReuseMarkPreviousEpisodesWatchedJob(user, show, 2, 1, 2))
+        when(mockedShowTrackingJobService.createOrReuseSetShowProgressJob(user, show, 2, 1, 2))
             .thenThrow(new IllegalStateException("job creation failed"));
 
-        assertThatThrownBy(() -> fallbackPersistenceService.savePointerAndCreateJob(
+        assertThatThrownBy(() -> fallbackPersistenceService.saveProgressAndCreateJob(
             user,
             show,
             2,
@@ -52,7 +52,7 @@ class ShowTrackingFallbackPersistenceServiceIntegrationTest extends AbstractInte
     }
 
     @Test
-    void savePointerAndCreateJob_whenJobCreationFails_rollsBackPointerMutation() {
+    void saveProgressAndCreateJob_whenJobCreationFails_rollsBackPointerMutation() {
         Users user = saveUser("pointer-fallback-existing-user", true);
         Media show = saveMedia(9702L, "Pointer Fallback Existing", MediaType.SHOW);
         userShowTrackingRepository.saveAndFlush(UserShowTracking.builder()
@@ -63,10 +63,10 @@ class ShowTrackingFallbackPersistenceServiceIntegrationTest extends AbstractInte
             .watchPositionEpisode(1)
             .episodeWatches(new java.util.ArrayList<>())
             .build());
-        when(mockedShowTrackingJobService.createOrReuseMarkPreviousEpisodesWatchedJob(user, show, 2, 3, 2))
+        when(mockedShowTrackingJobService.createOrReuseSetShowProgressJob(user, show, 2, 3, 2))
             .thenThrow(new IllegalStateException("job creation failed"));
 
-        assertThatThrownBy(() -> fallbackPersistenceService.savePointerAndCreateJob(
+        assertThatThrownBy(() -> fallbackPersistenceService.saveProgressAndCreateJob(
             user,
             show,
             2,
@@ -84,19 +84,19 @@ class ShowTrackingFallbackPersistenceServiceIntegrationTest extends AbstractInte
     }
 
     @Test
-    void savePointerAndCreateJob_whenJobCreationSucceeds_persistsTrackingAndReturnsJob() {
+    void saveProgressAndCreateJob_whenJobCreationSucceeds_persistsTrackingAndReturnsJob() {
         Users user = saveUser("pointer-fallback-success-user", true);
         Media show = saveMedia(9703L, "Pointer Fallback Success", MediaType.SHOW);
-        when(mockedShowTrackingJobService.createOrReuseMarkPreviousEpisodesWatchedJob(user, show, 2, 1, 2))
+        when(mockedShowTrackingJobService.createOrReuseSetShowProgressJob(user, show, 2, 1, 2))
             .thenReturn(ShowTrackingJobDTO.builder()
                 .jobId(88L)
                 .status(ShowTrackingJobStatus.PENDING)
-                .jobType(ShowTrackingJobType.MARK_PREVIOUS_EPISODES_WATCHED)
+                .jobType(ShowTrackingJobType.SET_SHOW_PROGRESS)
                 .tmdbId(show.getTmdbId())
                 .mediaId(show.getId())
                 .build());
 
-        ShowTrackingJobDTO job = fallbackPersistenceService.savePointerAndCreateJob(
+        ShowTrackingJobDTO job = fallbackPersistenceService.saveProgressAndCreateJob(
             user,
             show,
             2,

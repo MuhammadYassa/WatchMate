@@ -3,7 +3,6 @@ package com.project.watchmate.show.tracking.application;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -133,23 +132,6 @@ public class ShowTrackingService {
         );
         validateEpisodeIsAired(pointerEpisode);
 
-        if (!Boolean.TRUE.equals(request.getMarkPreviousEpisodesWatched())) {
-            UserShowTracking tracking = showTrackingWriteSupport.loadOrCreateTracking(user, media);
-            tracking.setWatchPositionSeason(request.getWatchPositionSeason());
-            tracking.setWatchPositionEpisode(request.getWatchPositionEpisode());
-            tracking.setStatus(WatchStatus.WATCHING);
-            showTrackingWriteSupport.applyCalculationAndPersist(
-                tracking,
-                media,
-                eligibleEpisodesFromCache(media),
-                airedEligibleEpisodesFromCache(media),
-                false,
-                false,
-                showCatalogService.isEndedShow(tvDetails)
-            );
-            return ShowTrackingActionResult.completed(mapToShowTracking(media, tracking));
-        }
-
         List<Integer> requiredSeasons = showCatalogService.getRequiredSeasonNumbersThroughPointer(
             tvDetails,
             request.getWatchPositionSeason()
@@ -164,21 +146,21 @@ public class ShowTrackingService {
                     showHydrationProperties.getMaxSynchronousMissingSeasons(),
                     showHydrationProperties.getMaxSynchronousEpisodes()
                 );
-                return ShowTrackingActionResult.completed(completePointerBackfill(user, media, tvDetails, request));
+                return ShowTrackingActionResult.completed(completeProgressUpdate(user, media, tvDetails, request));
             } catch (RuntimeException ex) {
                 if (!isRecoverableAsyncFallbackFailure(ex) || !canQueueJobs()) {
-                    log.warn("Synchronous pointer backfill failed without async fallback tmdbId={} season={} episode={}",
+                    log.warn("Synchronous show progress update failed without async fallback tmdbId={} season={} episode={}",
                         tmdbId,
                         request.getWatchPositionSeason(),
                         request.getWatchPositionEpisode(),
                         ex);
                     throw ex;
                 }
-                log.info("Queueing pointer backfill job after recoverable synchronous failure tmdbId={} season={} episode={}",
+                log.info("Queueing show progress job after recoverable synchronous failure tmdbId={} season={} episode={}",
                     tmdbId,
                     request.getWatchPositionSeason(),
                     request.getWatchPositionEpisode());
-                return ShowTrackingActionResult.accepted(showTrackingFallbackPersistenceService.savePointerAndCreateJob(
+                return ShowTrackingActionResult.accepted(showTrackingFallbackPersistenceService.saveProgressAndCreateJob(
                     user,
                     media,
                     request.getWatchPositionSeason(),
@@ -193,11 +175,11 @@ public class ShowTrackingService {
 
         if (!canQueueJobs()) {
             throw new ShowMetadataSyncRequiredException(
-                "Previous seasons must be synced before earlier episodes can be marked watched from this pointer."
+                "Required season metadata must be synced before show progress can be set to this episode."
             );
         }
 
-        return ShowTrackingActionResult.accepted(showTrackingFallbackPersistenceService.savePointerAndCreateJob(
+        return ShowTrackingActionResult.accepted(showTrackingFallbackPersistenceService.saveProgressAndCreateJob(
             user,
             media,
             request.getWatchPositionSeason(),
@@ -207,54 +189,6 @@ public class ShowTrackingService {
             showCatalogService.isEndedShow(tvDetails),
             requiredSeasons.size()
         ));
-    }
-
-    @Transactional
-    public ShowTrackingDTO markEpisodeWatched(
-        Users user,
-        Long tmdbId,
-        MediaType mediaType,
-        Integer seasonNumber,
-        Integer episodeNumber,
-        boolean watched
-    ) {
-        showCatalogService.validateShowType(mediaType);
-        showCatalogService.validateTrackableSeasonNumber(seasonNumber);
-
-        Media media = showCatalogService.ensureBasicShowImported(tmdbId);
-        TmdbTvDetailsDTO tvDetails = showCatalogService.fetchAndRefreshShowDetails(tmdbId, media);
-
-        UserShowTracking tracking = userShowTrackingRepository.findWithEpisodeWatchesByUserAndMedia(user, media).orElse(null);
-        if (!watched && tracking == null) {
-            return buildEmptyTracking(tmdbId);
-        }
-
-        ShowEpisode episode = showCatalogService.requireEpisodeFromCachedSeason(media, tmdbId, seasonNumber, episodeNumber);
-        if (watched) {
-            validateEpisodeIsAired(episode);
-        }
-
-        if (tracking == null) {
-            tracking = showTrackingWriteSupport.loadOrCreateTracking(user, media);
-        }
-
-        UserEpisodeWatch existing = showTrackingWriteSupport.findEpisodeWatch(tracking, seasonNumber, episodeNumber);
-        if (watched) {
-            showTrackingWriteSupport.upsertWatchedEpisodeRow(tracking, existing, episode, LocalDateTime.now());
-        } else if (existing != null) {
-            tracking.getEpisodeWatches().remove(existing);
-        }
-
-        showTrackingWriteSupport.applyCalculationAndPersist(
-            tracking,
-            media,
-            eligibleEpisodesFromCache(media),
-            airedEligibleEpisodesFromCache(media),
-            showCatalogService.isAiredMetadataAvailable(media, tvDetails),
-            showCatalogService.isFullMetadataAvailable(media, tvDetails),
-            showCatalogService.isEndedShow(tvDetails)
-        );
-        return mapToShowTracking(media, tracking);
     }
 
     @Transactional(readOnly = true)
@@ -267,50 +201,6 @@ public class ShowTrackingService {
 
         UserShowTracking tracking = userShowTrackingRepository.findWithEpisodeWatchesByUserAndMedia(user, media).orElse(null);
         return tracking == null ? List.of() : watchedEpisodeDtos(tracking);
-    }
-
-    @Transactional
-    public ShowTrackingDTO markSeasonWatched(Users user, Long tmdbId, Integer seasonNumber, Boolean watched) {
-        showCatalogService.validateTrackableSeasonNumber(seasonNumber);
-
-        Media media = showCatalogService.ensureBasicShowImported(tmdbId);
-        TmdbTvDetailsDTO tvDetails = showCatalogService.fetchAndRefreshShowDetails(tmdbId, media);
-
-        UserShowTracking tracking = userShowTrackingRepository.findWithEpisodeWatchesByUserAndMedia(user, media).orElse(null);
-        if (!Boolean.TRUE.equals(watched) && tracking == null) {
-            return buildEmptyTracking(tmdbId);
-        }
-
-        ShowCatalogService.CachedSeasonData cachedSeason = showCatalogService.ensureSeasonCached(media, tmdbId, seasonNumber);
-        List<ShowEpisode> airedSeasonEpisodes = cachedSeason.episodes().stream()
-            .filter(showCatalogService::isEligibleEpisode)
-            .filter(showCatalogService::isAiredEpisode)
-            .toList();
-
-        if (Boolean.TRUE.equals(watched) && airedSeasonEpisodes.isEmpty()) {
-            throw new IllegalArgumentException("No eligible aired episodes are available for this season.");
-        }
-
-        if (tracking == null) {
-            tracking = showTrackingWriteSupport.loadOrCreateTracking(user, media);
-        }
-
-        if (Boolean.TRUE.equals(watched)) {
-            showTrackingWriteSupport.addEpisodeWatches(tracking, airedSeasonEpisodes, LocalDateTime.now());
-        } else {
-            tracking.getEpisodeWatches().removeIf(row -> Objects.equals(row.getSeasonNumber(), seasonNumber));
-        }
-
-        showTrackingWriteSupport.applyCalculationAndPersist(
-            tracking,
-            media,
-            eligibleEpisodesFromCache(media),
-            airedEligibleEpisodesFromCache(media),
-            showCatalogService.isAiredMetadataAvailable(media, tvDetails),
-            showCatalogService.isFullMetadataAvailable(media, tvDetails),
-            showCatalogService.isEndedShow(tvDetails)
-        );
-        return mapToShowTracking(media, tracking);
     }
 
     private ShowTrackingActionResult<ShowTrackingStatusDTO> handleBulkStatusAction(
@@ -398,7 +288,7 @@ public class ShowTrackingService {
         ).status();
     }
 
-    private ShowTrackingDTO completePointerBackfill(
+    private ShowTrackingDTO completeProgressUpdate(
         Users user,
         Media media,
         TmdbTvDetailsDTO tvDetails,
@@ -414,7 +304,7 @@ public class ShowTrackingService {
             request.getWatchPositionSeason(),
             request.getWatchPositionEpisode()
         );
-        showTrackingWriteSupport.addEpisodeWatches(tracking, watchedThroughPointer, LocalDateTime.now());
+        showTrackingWriteSupport.replaceEpisodeWatches(tracking, watchedThroughPointer, LocalDateTime.now());
         showTrackingWriteSupport.applyCalculationAndPersist(
             tracking,
             media,

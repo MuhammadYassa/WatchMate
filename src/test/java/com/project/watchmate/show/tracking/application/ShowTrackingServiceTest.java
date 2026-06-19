@@ -278,47 +278,68 @@ class ShowTrackingServiceTest {
     }
 
     @Test
-    void updateWatchPosition_withoutBackfill_setsManualPointerAndWatchingStatus() {
-        ShowEpisode pointerEpisode = ShowEpisode.builder()
+    void updateWatchPosition_replacesEpisodeRowsWithContiguousPrefix() {
+        UserShowTracking existing = UserShowTracking.builder()
+            .user(user)
             .media(show)
-            .seasonNumber(2)
-            .episodeNumber(1)
-            .airDate(LocalDate.of(2020, 2, 1))
+            .status(WatchStatus.WATCHING)
+            .watchPositionSeason(1)
+            .watchPositionEpisode(5)
+            .episodeWatches(new java.util.ArrayList<>(List.of(
+                watch(existingTrackingRef(), 1, 1, LocalDateTime.of(2026, 5, 1, 10, 0)),
+                watch(existingTrackingRef(), 1, 2, LocalDateTime.of(2026, 5, 1, 11, 0)),
+                watch(existingTrackingRef(), 1, 3, LocalDateTime.of(2026, 5, 1, 12, 0)),
+                watch(existingTrackingRef(), 1, 4, LocalDateTime.of(2026, 5, 1, 13, 0)),
+                watch(existingTrackingRef(), 1, 5, LocalDateTime.of(2026, 5, 1, 14, 0))
+            )))
             .build();
-        when(showCatalogService.requireEpisodeFromCachedSeason(show, 999L, 2, 1)).thenReturn(pointerEpisode);
+        existing.getEpisodeWatches().forEach(row -> row.setUserShowTracking(existing));
+        persistedTracking.set(existing);
+
+        ShowEpisode pointerEpisode = airedEpisode(1, 3);
+        List<ShowEpisode> targetEpisodes = List.of(
+            airedEpisode(1, 1),
+            airedEpisode(1, 2),
+            airedEpisode(1, 3)
+        );
+        when(showCatalogService.requireEpisodeFromCachedSeason(show, 999L, 1, 3)).thenReturn(pointerEpisode);
+        when(showCatalogService.getRequiredSeasonNumbersThroughPointer(ongoingShow, 1)).thenReturn(List.of(1));
+        when(showCatalogService.canHydrateSynchronously(show, ongoingShow, List.of(1), showHydrationProperties)).thenReturn(true);
+        when(showCatalogService.requireEligibleEpisodesThroughPointerFromCache(show, ongoingShow, 1, 3)).thenReturn(targetEpisodes);
+        when(showCatalogService.getAllCachedEpisodes(show.getId())).thenReturn(targetEpisodes);
 
         ShowTrackingActionResult<ShowTrackingDTO> result = showTrackingService.updateWatchPosition(
             user,
             999L,
             MediaType.SHOW,
             UpdateShowTrackingPositionRequestDTO.builder()
-                .watchPositionSeason(2)
-                .watchPositionEpisode(1)
-                .markPreviousEpisodesWatched(false)
+                .watchPositionSeason(1)
+                .watchPositionEpisode(3)
                 .build()
         );
 
         assertFalse(result.isAccepted());
         assertEquals(WatchStatus.WATCHING, result.completedBody().getStatus());
-        assertEquals(Integer.valueOf(2), result.completedBody().getWatchPositionSeason());
-        assertEquals(Integer.valueOf(1), result.completedBody().getWatchPositionEpisode());
-        assertEquals(0, result.completedBody().getEpisodesWatchedCount());
-        verify(showCatalogService, never()).requireEligibleEpisodesThroughPointerFromCache(any(), any(), any(), any());
+        assertEquals(Integer.valueOf(1), result.completedBody().getWatchPositionSeason());
+        assertEquals(Integer.valueOf(3), result.completedBody().getWatchPositionEpisode());
+        assertEquals(Integer.valueOf(1), result.completedBody().getLatestWatchedSeason());
+        assertEquals(Integer.valueOf(3), result.completedBody().getLatestWatchedEpisode());
+        assertEquals(3, result.completedBody().getEpisodesWatchedCount());
+        assertEquals(List.of("1x1", "1x2", "1x3"), persistedTracking.get().getEpisodeWatches().stream()
+            .sorted(java.util.Comparator.comparing(com.project.watchmate.show.tracking.domain.UserEpisodeWatch::getSeasonNumber)
+                .thenComparing(com.project.watchmate.show.tracking.domain.UserEpisodeWatch::getEpisodeNumber))
+            .map(row -> row.getSeasonNumber() + "x" + row.getEpisodeNumber())
+            .toList());
     }
 
     @Test
-    void updateWatchPosition_withBackfillWhenMetadataMissing_returnsAcceptedPointerJob() {
-        ShowEpisode pointerEpisode = ShowEpisode.builder()
-            .media(show)
-            .seasonNumber(2)
-            .episodeNumber(1)
-            .airDate(LocalDate.of(2020, 2, 1))
-            .build();
+    void updateWatchPosition_whenMetadataMissing_returnsAcceptedProgressJob() {
+        ShowEpisode pointerEpisode = airedEpisode(2, 1);
         when(showCatalogService.requireEpisodeFromCachedSeason(show, 999L, 2, 1)).thenReturn(pointerEpisode);
         when(showCatalogService.getRequiredSeasonNumbersThroughPointer(ongoingShow, 2)).thenReturn(List.of(1, 2));
         when(showCatalogService.canHydrateSynchronously(show, ongoingShow, List.of(1, 2), showHydrationProperties))
             .thenReturn(false);
-        when(showTrackingFallbackPersistenceService.savePointerAndCreateJob(
+        when(showTrackingFallbackPersistenceService.saveProgressAndCreateJob(
             user,
             show,
             2,
@@ -330,7 +351,7 @@ class ShowTrackingServiceTest {
         )).thenReturn(ShowTrackingJobDTO.builder()
             .jobId(55L)
             .status(ShowTrackingJobStatus.PENDING)
-            .jobType(ShowTrackingJobType.MARK_PREVIOUS_EPISODES_WATCHED)
+            .jobType(ShowTrackingJobType.SET_SHOW_PROGRESS)
             .tmdbId(999L)
             .mediaId(show.getId())
             .build());
@@ -342,7 +363,6 @@ class ShowTrackingServiceTest {
             UpdateShowTrackingPositionRequestDTO.builder()
                 .watchPositionSeason(2)
                 .watchPositionEpisode(1)
-                .markPreviousEpisodesWatched(true)
                 .build()
         );
 
@@ -351,20 +371,15 @@ class ShowTrackingServiceTest {
     }
 
     @Test
-    void updateWatchPosition_withRecoverableHydrationFailure_returnsAcceptedPointerJob() {
-        ShowEpisode pointerEpisode = ShowEpisode.builder()
-            .media(show)
-            .seasonNumber(2)
-            .episodeNumber(1)
-            .airDate(LocalDate.of(2020, 2, 1))
-            .build();
+    void updateWatchPosition_withRecoverableHydrationFailure_returnsAcceptedProgressJob() {
+        ShowEpisode pointerEpisode = airedEpisode(2, 1);
         when(showCatalogService.requireEpisodeFromCachedSeason(show, 999L, 2, 1)).thenReturn(pointerEpisode);
         when(showCatalogService.getRequiredSeasonNumbersThroughPointer(ongoingShow, 2)).thenReturn(List.of(1, 2));
         when(showCatalogService.canHydrateSynchronously(show, ongoingShow, List.of(1, 2), showHydrationProperties))
             .thenReturn(true);
         when(showCatalogService.hydrateMissingSeasons(eq(show), eq(999L), eq(List.of(1, 2)), eq(3), eq(100)))
             .thenThrow(new TmdbUnavailableException("TMDB temporarily unavailable"));
-        when(showTrackingFallbackPersistenceService.savePointerAndCreateJob(
+        when(showTrackingFallbackPersistenceService.saveProgressAndCreateJob(
             user,
             show,
             2,
@@ -376,7 +391,7 @@ class ShowTrackingServiceTest {
         )).thenReturn(ShowTrackingJobDTO.builder()
             .jobId(56L)
             .status(ShowTrackingJobStatus.PENDING)
-            .jobType(ShowTrackingJobType.MARK_PREVIOUS_EPISODES_WATCHED)
+            .jobType(ShowTrackingJobType.SET_SHOW_PROGRESS)
             .tmdbId(999L)
             .mediaId(show.getId())
             .build());
@@ -388,12 +403,38 @@ class ShowTrackingServiceTest {
             UpdateShowTrackingPositionRequestDTO.builder()
                 .watchPositionSeason(2)
                 .watchPositionEpisode(1)
-                .markPreviousEpisodesWatched(true)
                 .build()
         );
 
         assertTrue(result.isAccepted());
         assertEquals(56L, result.acceptedJob().getJobId());
+    }
+
+    private UserShowTracking existingTrackingRef() {
+        return persistedTracking.get();
+    }
+
+    private ShowEpisode airedEpisode(int seasonNumber, int episodeNumber) {
+        return ShowEpisode.builder()
+            .media(show)
+            .seasonNumber(seasonNumber)
+            .episodeNumber(episodeNumber)
+            .airDate(LocalDate.of(2020, seasonNumber, Math.min(episodeNumber, 28)))
+            .build();
+    }
+
+    private com.project.watchmate.show.tracking.domain.UserEpisodeWatch watch(
+        UserShowTracking tracking,
+        int seasonNumber,
+        int episodeNumber,
+        LocalDateTime watchedAt
+    ) {
+        return com.project.watchmate.show.tracking.domain.UserEpisodeWatch.builder()
+            .userShowTracking(tracking)
+            .seasonNumber(seasonNumber)
+            .episodeNumber(episodeNumber)
+            .watchedAt(watchedAt)
+            .build();
     }
 }
 

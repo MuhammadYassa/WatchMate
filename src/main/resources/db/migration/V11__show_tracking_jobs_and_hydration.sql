@@ -2,7 +2,7 @@ create table show_tracking_job (
     id bigint not null auto_increment,
     user_id bigint null,
     media_id bigint not null,
-    job_type enum ('HYDRATE_SHOW_CATALOG','MARK_SHOW_WATCHED','MARK_SHOW_UP_TO_DATE','MARK_PREVIOUS_EPISODES_WATCHED') not null,
+    job_type enum ('HYDRATE_SHOW_CATALOG','MARK_SHOW_WATCHED','MARK_SHOW_UP_TO_DATE','SET_SHOW_PROGRESS') not null,
     status enum ('PENDING','RUNNING','COMPLETED','FAILED') not null,
     requested_status enum ('TO_WATCH','WATCHING','UP_TO_DATE','WATCHED','NONE') null,
     target_season_number int null,

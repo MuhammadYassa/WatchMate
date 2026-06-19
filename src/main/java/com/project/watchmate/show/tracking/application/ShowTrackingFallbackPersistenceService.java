@@ -27,7 +27,7 @@ public class ShowTrackingFallbackPersistenceService {
     private final UserShowTrackingRepository userShowTrackingRepository;
 
     @Transactional
-    public ShowTrackingJobDTO savePointerAndCreateJob(
+    public ShowTrackingJobDTO saveProgressAndCreateJob(
         Users user,
         Media media,
         Integer seasonNumber,
@@ -51,7 +51,7 @@ public class ShowTrackingFallbackPersistenceService {
             endedShow
         );
 
-        return showTrackingJobService.createOrReuseMarkPreviousEpisodesWatchedJob(
+        return showTrackingJobService.createOrReuseSetShowProgressJob(
             user,
             media,
             seasonNumber,

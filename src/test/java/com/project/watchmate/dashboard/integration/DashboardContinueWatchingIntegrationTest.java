@@ -1,16 +1,25 @@
 package com.project.watchmate.dashboard.integration;
 
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
 import com.project.watchmate.common.integration.support.AbstractIntegrationTest;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.media.catalog.domain.MediaType;
+import com.project.watchmate.media.tmdb.dto.TmdbEpisodeSummaryDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbMovieDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbTvDetailsDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbTvEpisodeDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbTvSeasonDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbTvSeasonSummaryDTO;
 import com.project.watchmate.movie.tracking.domain.UserMediaStatus;
 import com.project.watchmate.show.tracking.domain.UserShowTracking;
 import com.project.watchmate.user.domain.Users;
@@ -131,6 +140,52 @@ class DashboardContinueWatchingIntegrationTest extends AbstractIntegrationTest {
             .andExpect(jsonPath("$.items[2].tmdbId").value(7103));
     }
 
+    @Test
+    void continueWatching_reflectsBackwardProgressCorrectionAfterCachePriming() throws Exception {
+        Users user = saveUser("dashboard-progress-cache-user", true);
+        when(tmdbClient.fetchMediaById(org.mockito.ArgumentMatchers.eq(7201L), org.mockito.ArgumentMatchers.eq(MediaType.SHOW)))
+            .thenReturn(TmdbMovieDTO.builder()
+                .id(7201L)
+                .title("Dashboard Progress Show")
+                .overview("Dashboard progress overview")
+                .posterPath("/dashboard-progress.jpg")
+                .releaseDate("2020-01-01")
+                .genres(List.of())
+                .build());
+        when(tmdbClient.fetchTvDetailsById(org.mockito.ArgumentMatchers.eq(7201L))).thenReturn(contiguousProgressShowDetailsWithId(7201L));
+        when(tmdbClient.fetchTvSeasonDetails(org.mockito.ArgumentMatchers.eq(7201L), org.mockito.ArgumentMatchers.eq(1))).thenReturn(contiguousSeasonOne());
+
+        mockMvc.perform(put("/api/v1/shows/{tmdbId}/progress", 7201L)
+            .header("Authorization", bearerToken(user))
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .content("""
+                {"watchPositionSeason":1,"watchPositionEpisode":5}
+                """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/dashboard/continue-watching")
+            .header("Authorization", bearerToken(user)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].resumeSeasonNumber").value(1))
+            .andExpect(jsonPath("$.items[0].resumeEpisodeNumber").value(5));
+
+        mockMvc.perform(put("/api/v1/shows/{tmdbId}/progress", 7201L)
+            .header("Authorization", bearerToken(user))
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .content("""
+                {"watchPositionSeason":1,"watchPositionEpisode":3}
+                """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/dashboard/continue-watching")
+            .header("Authorization", bearerToken(user)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].resumeSeasonNumber").value(1))
+            .andExpect(jsonPath("$.items[0].resumeEpisodeNumber").value(3));
+    }
+
     private void saveStatus(
         Users user,
         Media media,
@@ -161,6 +216,54 @@ class DashboardContinueWatchingIntegrationTest extends AbstractIntegrationTest {
             .status(watchStatus)
             .updatedAt(updatedAt)
             .build());
+    }
+
+    private TmdbTvDetailsDTO contiguousProgressShowDetailsWithId(Long tmdbId) {
+        return TmdbTvDetailsDTO.builder()
+            .id(tmdbId)
+            .name("Dashboard Progress Show")
+            .overview("A show used for dashboard progress cache tests")
+            .posterPath("/dashboard-progress.jpg")
+            .backdropPath("/dashboard-progress-bg.jpg")
+            .firstAirDate("2020-01-01")
+            .voteAverage(8.4)
+            .numberOfSeasons(2)
+            .numberOfEpisodes(8)
+            .lastAirDate("2026-01-08")
+            .status("Returning Series")
+            .genres(List.of())
+            .nextEpisodeToAir(TmdbEpisodeSummaryDTO.builder()
+                .airDate("2099-01-15")
+                .seasonNumber(2)
+                .episodeNumber(3)
+                .name("Next Episode")
+                .build())
+            .lastEpisodeToAir(TmdbEpisodeSummaryDTO.builder()
+                .airDate("2026-01-08")
+                .seasonNumber(2)
+                .episodeNumber(2)
+                .name("Latest Aired Episode")
+                .build())
+            .seasons(List.of(
+                TmdbTvSeasonSummaryDTO.builder().id(801L).seasonNumber(1).name("Season 1").episodeCount(5).airDate("2020-01-01").build(),
+                TmdbTvSeasonSummaryDTO.builder().id(802L).seasonNumber(2).name("Season 2").episodeCount(3).airDate("2026-01-01").build()
+            ))
+            .build();
+    }
+
+    private TmdbTvSeasonDTO contiguousSeasonOne() {
+        return TmdbTvSeasonDTO.builder()
+            .id(801L)
+            .seasonNumber(1)
+            .name("Season 1")
+            .episodes(List.of(
+                TmdbTvEpisodeDTO.builder().id(8101L).seasonNumber(1).episodeNumber(1).name("Episode 1").airDate("2020-01-01").runtime(45).stillPath("/d-s1-e1.jpg").build(),
+                TmdbTvEpisodeDTO.builder().id(8102L).seasonNumber(1).episodeNumber(2).name("Episode 2").airDate("2020-01-08").runtime(45).stillPath("/d-s1-e2.jpg").build(),
+                TmdbTvEpisodeDTO.builder().id(8103L).seasonNumber(1).episodeNumber(3).name("Episode 3").airDate("2020-01-15").runtime(45).stillPath("/d-s1-e3.jpg").build(),
+                TmdbTvEpisodeDTO.builder().id(8104L).seasonNumber(1).episodeNumber(4).name("Episode 4").airDate("2020-01-22").runtime(45).stillPath("/d-s1-e4.jpg").build(),
+                TmdbTvEpisodeDTO.builder().id(8105L).seasonNumber(1).episodeNumber(5).name("Episode 5").airDate("2020-01-29").runtime(45).stillPath("/d-s1-e5.jpg").build()
+            ))
+            .build();
     }
 }
 
