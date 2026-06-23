@@ -90,6 +90,11 @@
     "description": "Whether Redis-backed application caching is enabled."
   },
   {
+    "name": "watchmate.cors.allowed-origins",
+    "type": "java.util.List<java.lang.String>",
+    "description": "Allowed CORS origins for backend API requests."
+  },
+  {
     "name": "spring.data.redis.host",
     "type": "java.lang.String",
     "description": "Redis host used by Spring Cache."
