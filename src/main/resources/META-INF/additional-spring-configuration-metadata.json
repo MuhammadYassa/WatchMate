@@ -10,6 +10,16 @@
     "description": "A description for 'tmdb.api.token'"
   },
   {
+    "name": "watchmate.tmdb.default-region",
+    "type": "java.lang.String",
+    "description": "Default ISO 3166-1 alpha-2 region used when filtering TMDB watch-provider responses."
+  },
+  {
+    "name": "watchmate.tmdb.cast-limit",
+    "type": "java.lang.Integer",
+    "description": "Maximum number of TMDB cast members returned on movie and show detail responses."
+  },
+  {
     "name": "app.domain",
     "type": "java.lang.String",
     "description": "A description for 'app.domain'"

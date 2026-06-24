@@ -1,17 +1,27 @@
 package com.project.watchmate.media.integration;
 
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import com.project.watchmate.media.tmdb.dto.TmdbCastMemberDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbCreditsDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbMovieDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbResponseDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbVideoDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbVideosResponseDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbWatchProviderEntryDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbWatchProviderRegionDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbWatchProvidersResponseDTO;
 import com.project.watchmate.common.integration.support.AbstractIntegrationTest;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.media.catalog.domain.MediaType;
 import com.project.watchmate.user.domain.Users;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -79,6 +89,37 @@ class ExternalMediaIntegrationTest extends AbstractIntegrationTest {
 				.voteAverage(7.4)
 				.genres(List.of())
 				.build());
+		when(tmdbClient.fetchCredits(eq(8101L), eq(MediaType.MOVIE))).thenReturn(TmdbCreditsDTO.builder()
+			.cast(List.of(TmdbCastMemberDTO.builder()
+				.id(101L)
+				.name("Fetched Actor")
+				.character("Lead")
+				.profilePath("/actor.jpg")
+				.order(0)
+				.knownForDepartment("Acting")
+				.build()))
+			.build());
+		when(tmdbClient.fetchVideos(eq(8101L), eq(MediaType.MOVIE))).thenReturn(TmdbVideosResponseDTO.builder()
+			.results(List.of(TmdbVideoDTO.builder()
+				.key("movie-trailer")
+				.name("Fetched Trailer")
+				.site("YouTube")
+				.type("Trailer")
+				.official(true)
+				.publishedAt("2026-01-01T00:00:00.000Z")
+				.build()))
+			.build());
+		when(tmdbClient.fetchWatchProviders(eq(8101L), eq(MediaType.MOVIE))).thenReturn(TmdbWatchProvidersResponseDTO.builder()
+			.results(Map.of("US", TmdbWatchProviderRegionDTO.builder()
+				.link("https://example.com/us/movie")
+				.flatrate(List.of(TmdbWatchProviderEntryDTO.builder()
+					.providerId(1)
+					.providerName("StreamCo")
+					.logoPath("/streamco.jpg")
+					.displayPriority(0)
+					.build()))
+				.build()))
+			.build());
 
         mockMvc.perform(get("/api/v1/movies/{tmdbId}", 8101L)
             .header("Authorization", bearerToken(user)))
@@ -86,12 +127,44 @@ class ExternalMediaIntegrationTest extends AbstractIntegrationTest {
             .andExpect(jsonPath("$.tmdbId").value(8101))
             .andExpect(jsonPath("$.title").value("Fetched Movie"))
 			.andExpect(jsonPath("$.type").value("MOVIE"))
-			.andExpect(jsonPath("$.watchStatus").value("NONE"));
+			.andExpect(jsonPath("$.watchStatus").value("NONE"))
+			.andExpect(jsonPath("$.cast", hasSize(1)))
+			.andExpect(jsonPath("$.cast[0].tmdbPersonId").value(101))
+			.andExpect(jsonPath("$.cast[0].name").value("Fetched Actor"))
+			.andExpect(jsonPath("$.bestTrailer.key").value("movie-trailer"))
+			.andExpect(jsonPath("$.bestTrailer.youtubeUrl").value("https://www.youtube.com/watch?v=movie-trailer"))
+			.andExpect(jsonPath("$.watchProviders.region").value("US"))
+			.andExpect(jsonPath("$.watchProviders.flatrate[0].providerName").value("StreamCo"));
 
 		Media persisted = mediaRepository.findByTmdbIdAndType(8101L, MediaType.MOVIE).orElseThrow();
 
 		assertThat(persisted.getTitle()).isEqualTo("Fetched Movie");
 		assertThat(persisted.getType()).isEqualTo(MediaType.MOVIE);
+	}
+
+	@Test
+	void mediaDetails_whenTmdbExtrasEmpty_returnsDefaultExtrasShape() throws Exception {
+		when(tmdbClient.fetchMediaById(eq(8102L), eq(MediaType.MOVIE)))
+			.thenReturn(TmdbMovieDTO.builder()
+				.id(8102L)
+				.title("No Extras Movie")
+				.overview("No extras overview")
+				.posterPath("/no-extras.jpg")
+				.releaseDate("2020-01-02")
+				.voteAverage(7.4)
+				.genres(List.of())
+				.build());
+
+		mockMvc.perform(get("/api/v1/movies/{tmdbId}", 8102L))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.cast", hasSize(0)))
+			.andExpect(jsonPath("$.bestTrailer").value(nullValue()))
+			.andExpect(jsonPath("$.watchProviders.region").value("US"))
+			.andExpect(jsonPath("$.watchProviders.flatrate", hasSize(0)))
+			.andExpect(jsonPath("$.watchProviders.rent", hasSize(0)))
+			.andExpect(jsonPath("$.watchProviders.buy", hasSize(0)))
+			.andExpect(jsonPath("$.watchProviders.ads", hasSize(0)))
+			.andExpect(jsonPath("$.watchProviders.free", hasSize(0)));
 	}
 }
 

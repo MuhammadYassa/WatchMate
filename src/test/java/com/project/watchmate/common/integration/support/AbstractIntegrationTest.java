@@ -21,6 +21,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.project.watchmate.media.tmdb.client.TmdbClient;
 import com.project.watchmate.auth.dto.LoginRequestDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbResponseDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbCreditsDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbVideosResponseDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbWatchProvidersResponseDTO;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.media.catalog.domain.MediaType;
@@ -171,6 +174,9 @@ public abstract class AbstractIntegrationTest {
 		when(tmdbClient.fetchUpcomingMovies()).thenReturn(List.of());
 		when(tmdbClient.fetchAiringToday()).thenReturn(List.of());
 		when(tmdbClient.fetchOnTheAir()).thenReturn(List.of());
+		when(tmdbClient.fetchCredits(anyLong(), any())).thenReturn(TmdbCreditsDTO.builder().cast(List.of()).build());
+		when(tmdbClient.fetchVideos(anyLong(), any())).thenReturn(TmdbVideosResponseDTO.builder().results(List.of()).build());
+		when(tmdbClient.fetchWatchProviders(anyLong(), any())).thenReturn(TmdbWatchProvidersResponseDTO.builder().results(java.util.Map.of()).build());
 		when(tmdbClient.searchMulti(anyString(), anyInt())).thenReturn(new TmdbResponseDTO(List.of(), 1, 0, 0));
 		when(tmdbClient.discoverByGenre(anyString(), anyLong(), anyInt())).thenReturn(new TmdbResponseDTO(List.of(), 1, 0, 0));
 		jdbcTemplate.update("delete from user_following");
@@ -242,6 +248,9 @@ public abstract class AbstractIntegrationTest {
 		TmdbClient tmdbClient() {
 			return mock(TmdbClient.class, invocation -> switch (invocation.getMethod().getName()) {
 				case "fetchGenres", "fetchPopular", "fetchTrending", "fetchUpcomingMovies", "fetchAiringToday", "fetchOnTheAir" -> List.of();
+				case "fetchCredits" -> TmdbCreditsDTO.builder().cast(List.of()).build();
+				case "fetchVideos" -> TmdbVideosResponseDTO.builder().results(List.of()).build();
+				case "fetchWatchProviders" -> TmdbWatchProvidersResponseDTO.builder().results(java.util.Map.of()).build();
 				case "searchMulti", "discoverByGenre" -> new TmdbResponseDTO(List.of(), 1, 0, 0);
 				default -> null;
 			});

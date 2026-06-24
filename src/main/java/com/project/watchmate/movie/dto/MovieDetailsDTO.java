@@ -4,6 +4,9 @@ import java.time.LocalDate;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.project.watchmate.media.extras.dto.CastMemberDTO;
+import com.project.watchmate.media.extras.dto.TrailerDTO;
+import com.project.watchmate.media.extras.dto.WatchProvidersDTO;
 import com.project.watchmate.review.dto.ReviewResponseDTO;
 import com.project.watchmate.media.catalog.domain.MediaType;
 import com.project.watchmate.media.catalog.domain.WatchStatus;
@@ -57,6 +60,15 @@ public class MovieDetailsDTO {
 
     @Schema(description = "Watch status of the authenticated user for this movie. Null when unauthenticated.")
     private WatchStatus watchStatus;
+
+    @Schema(description = "Top cast members for this movie, sorted by TMDB billing order. Empty when unavailable.")
+    private List<CastMemberDTO> cast;
+
+    @Schema(description = "Best available YouTube trailer for this movie. Null when no suitable video exists.")
+    private TrailerDTO bestTrailer;
+
+    @Schema(description = "Streaming, rental, purchase, ad-supported, and free provider availability for the configured region.")
+    private WatchProvidersDTO watchProviders;
 }
 
 

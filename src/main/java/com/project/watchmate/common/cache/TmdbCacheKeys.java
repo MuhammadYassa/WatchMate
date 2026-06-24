@@ -25,6 +25,18 @@ public final class TmdbCacheKeys {
         return normalize(type == null ? null : type.name()) + ":" + tmdbId;
     }
 
+    public static String credits(MediaType type, Long tmdbId) {
+        return media(type, tmdbId);
+    }
+
+    public static String videos(MediaType type, Long tmdbId) {
+        return media(type, tmdbId);
+    }
+
+    public static String watchProviders(MediaType type, Long tmdbId) {
+        return media(type, tmdbId);
+    }
+
     public static String show(Long tmdbId) {
         return String.valueOf(tmdbId);
     }

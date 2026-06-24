@@ -95,6 +95,31 @@ class TmdbClientCachingTest {
     }
 
     @Test
+    void fetchCredits_whenSameRequestRepeated_usesCachedValue() {
+        assertEquals("First Actor", tmdbClient.fetchCredits(200L, com.project.watchmate.media.catalog.domain.MediaType.MOVIE).getCast().get(0).getName());
+        assertEquals("First Actor", tmdbClient.fetchCredits(200L, com.project.watchmate.media.catalog.domain.MediaType.MOVIE).getCast().get(0).getName());
+
+        assertEquals(1, exchangeFunction.requestCount());
+    }
+
+    @Test
+    void fetchVideos_whenSameRequestRepeated_usesCachedValue() {
+        assertEquals("trailer-key", tmdbClient.fetchVideos(201L, com.project.watchmate.media.catalog.domain.MediaType.MOVIE).getResults().get(0).getKey());
+        assertEquals("trailer-key", tmdbClient.fetchVideos(201L, com.project.watchmate.media.catalog.domain.MediaType.MOVIE).getResults().get(0).getKey());
+
+        assertEquals(1, exchangeFunction.requestCount());
+    }
+
+    @Test
+    void fetchWatchProviders_whenSameRequestRepeated_cachesRawResponseByTypeAndTmdbId() {
+        assertEquals("https://example.com/us", tmdbClient.fetchWatchProviders(202L, com.project.watchmate.media.catalog.domain.MediaType.MOVIE).getResults().get("US").getLink());
+        assertEquals("https://example.com/us", tmdbClient.fetchWatchProviders(202L, com.project.watchmate.media.catalog.domain.MediaType.MOVIE).getResults().get("US").getLink());
+
+        assertEquals(1, exchangeFunction.requestCount());
+        assertEquals("movie:202", TmdbCacheKeys.watchProviders(com.project.watchmate.media.catalog.domain.MediaType.MOVIE, 202L));
+    }
+
+    @Test
     void searchMulti_whenTmdbThrows_exceptionIsNotCached() {
         exchangeFunction.failSearch();
 
@@ -170,6 +195,15 @@ class TmdbClientCachingTest {
             String path = url.getPath();
             if (path.startsWith("/genre/")) {
                 return "{\"genres\":[{\"id\":28,\"name\":\"Action\"}]}";
+            }
+            if (path.endsWith("/credits")) {
+                return "{\"id\":200,\"cast\":[{\"id\":1,\"name\":\"First Actor\",\"character\":\"Lead\",\"order\":0}]}";
+            }
+            if (path.endsWith("/videos")) {
+                return "{\"id\":201,\"results\":[{\"key\":\"trailer-key\",\"name\":\"Trailer\",\"site\":\"YouTube\",\"type\":\"Trailer\",\"official\":true,\"published_at\":\"2026-01-01T00:00:00.000Z\"}]}";
+            }
+            if (path.endsWith("/watch/providers")) {
+                return "{\"id\":202,\"results\":{\"US\":{\"link\":\"https://example.com/us\",\"flatrate\":[{\"provider_id\":1,\"provider_name\":\"Provider\",\"display_priority\":0}]},\"GB\":{\"link\":\"https://example.com/gb\"}}}";
             }
             if (path.startsWith("/movie/100")) {
                 return "{\"id\":100,\"title\":\"The Matrix\",\"genre_ids\":[28]}";

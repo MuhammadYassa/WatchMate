@@ -17,6 +17,8 @@ import com.project.watchmate.common.error.UserNotFoundException;
 import com.project.watchmate.common.mapper.WatchMateMapper;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.media.catalog.domain.MediaType;
+import com.project.watchmate.media.extras.application.MediaExtrasService;
+import com.project.watchmate.media.extras.dto.MediaExtrasDTO;
 import com.project.watchmate.review.domain.Review;
 import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.media.catalog.domain.WatchStatus;
@@ -50,6 +52,8 @@ public class MediaService {
 
     private final PublicMediaDetailBaseCacheService publicMediaDetailBaseCacheService;
 
+    private final MediaExtrasService mediaExtrasService;
+
     @Transactional
     public MovieDetailsDTO getMovieDetails(Long tmdbId, Users userParam){
         Media media = userParam == null
@@ -59,8 +63,9 @@ public class MediaService {
         PublicMovieDetailBaseDTO publicBase = publicMediaDetailBaseCacheService.getMovieBase(tmdbId, MediaType.MOVIE);
         List<Review> reviews = media == null || media.getId() == null ? List.of() : reviewRepository.findByMedia(media);
         UserContext userContext = resolveUserContext(userParam, media);
+        MediaExtrasDTO extras = mediaExtrasService.getExtras(tmdbId, MediaType.MOVIE);
 
-        return toMovieDetailsDTO(publicBase, reviews, userContext.isFavourited(), userContext.watchStatus());
+        return toMovieDetailsDTO(publicBase, reviews, userContext.isFavourited(), userContext.watchStatus(), extras);
     }
 
     public Page<Media> getMoviesWatchedPage(Users user){
@@ -100,7 +105,8 @@ public class MediaService {
         PublicMovieDetailBaseDTO publicBase,
         List<Review> reviews,
         Boolean isFavourited,
-        WatchStatus watchStatus
+        WatchStatus watchStatus,
+        MediaExtrasDTO extras
     ) {
         return MovieDetailsDTO.builder()
             .tmdbId(publicBase.getTmdbId())
@@ -115,6 +121,9 @@ public class MediaService {
             .reviews(reviews.stream().map(watchMateMapper::mapToReviewDTO).toList())
             .isFavourited(isFavourited)
             .watchStatus(watchStatus)
+            .cast(extras.cast())
+            .bestTrailer(extras.bestTrailer())
+            .watchProviders(extras.watchProviders())
             .build();
     }
 

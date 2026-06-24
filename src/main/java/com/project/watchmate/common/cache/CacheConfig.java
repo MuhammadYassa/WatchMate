@@ -32,6 +32,9 @@ public class CacheConfig implements CachingConfigurer {
     private static final Duration GENRES_TTL = Duration.ofHours(24);
     private static final Duration SEARCH_TTL = Duration.ofMinutes(10);
     private static final Duration DISCOVERY_TTL = Duration.ofMinutes(30);
+    private static final Duration TMDB_MEDIA_CREDITS_TTL = Duration.ofHours(24);
+    private static final Duration TMDB_MEDIA_VIDEOS_TTL = Duration.ofHours(6);
+    private static final Duration TMDB_MEDIA_WATCH_PROVIDERS_TTL = Duration.ofHours(2);
     private static final Duration PUBLIC_MEDIA_DETAIL_BASE_TTL = Duration.ofHours(6);
     private static final Duration PUBLIC_SHOW_METADATA_TTL = Duration.ofHours(6);
     private static final Duration PUBLIC_SEASON_METADATA_TTL = Duration.ofHours(6);
@@ -66,6 +69,9 @@ public class CacheConfig implements CachingConfigurer {
             Map.entry(TmdbCacheNames.TMDB_UPCOMING_MOVIES, redisCacheConfiguration(DISCOVERY_TTL, valueSerializer)),
             Map.entry(TmdbCacheNames.TMDB_AIRING_TODAY, redisCacheConfiguration(DISCOVERY_TTL, valueSerializer)),
             Map.entry(TmdbCacheNames.TMDB_ON_THE_AIR, redisCacheConfiguration(DISCOVERY_TTL, valueSerializer)),
+            Map.entry(TmdbCacheNames.TMDB_MEDIA_CREDITS, redisCacheConfiguration(TMDB_MEDIA_CREDITS_TTL, valueSerializer)),
+            Map.entry(TmdbCacheNames.TMDB_MEDIA_VIDEOS, redisCacheConfiguration(TMDB_MEDIA_VIDEOS_TTL, valueSerializer)),
+            Map.entry(TmdbCacheNames.TMDB_MEDIA_WATCH_PROVIDERS, redisCacheConfiguration(TMDB_MEDIA_WATCH_PROVIDERS_TTL, valueSerializer)),
             Map.entry(WatchMateCacheNames.DISCOVERY_HOMEPAGE_SECTIONS, redisCacheConfiguration(DISCOVERY_TTL, valueSerializer)),
             Map.entry(WatchMateCacheNames.CURATED_CONTENT_LISTS, redisCacheConfiguration(DISCOVERY_TTL, valueSerializer)),
             Map.entry(WatchMateCacheNames.PUBLIC_MEDIA_DETAIL_BASE, redisCacheConfiguration(PUBLIC_MEDIA_DETAIL_BASE_TTL, valueSerializer)),

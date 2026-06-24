@@ -33,6 +33,11 @@ import com.project.watchmate.common.error.UserNotFoundException;
 import com.project.watchmate.common.mapper.WatchMateMapper;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.media.catalog.domain.MediaType;
+import com.project.watchmate.media.extras.application.MediaExtrasService;
+import com.project.watchmate.media.extras.dto.CastMemberDTO;
+import com.project.watchmate.media.extras.dto.MediaExtrasDTO;
+import com.project.watchmate.media.extras.dto.TrailerDTO;
+import com.project.watchmate.media.extras.dto.WatchProvidersDTO;
 import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.media.catalog.domain.WatchStatus;
 import com.project.watchmate.media.catalog.persistence.MediaRepository;
@@ -71,6 +76,9 @@ class MediaServiceTest {
     @Mock
     private PublicMediaDetailBaseCacheService publicMediaDetailBaseCacheService;
 
+    @Mock
+    private MediaExtrasService mediaExtrasService;
+
     @InjectMocks
     private MediaService mediaService;
 
@@ -95,6 +103,7 @@ class MediaServiceTest {
             when(publicMediaDetailBaseCacheService.getMovieBase(TMDB_ID, MediaType.MOVIE)).thenReturn(publicBase("Test Movie"));
             when(reviewRepository.findByMedia(media)).thenReturn(List.of());
             when(userWatchStatusResolver.resolveWatchStatus(user, media)).thenReturn(WatchStatus.NONE);
+            when(mediaExtrasService.getExtras(TMDB_ID, MediaType.MOVIE)).thenReturn(extras());
 
             MovieDetailsDTO result = mediaService.getMovieDetails(TMDB_ID, user);
 
@@ -105,6 +114,9 @@ class MediaServiceTest {
             assertEquals(WatchStatus.NONE, result.getWatchStatus());
             assertEquals(List.of(), result.getReviews());
             assertEquals(Boolean.FALSE, result.getIsFavourited());
+            assertEquals("Actor", result.getCast().get(0).getName());
+            assertEquals("trailer-key", result.getBestTrailer().getKey());
+            assertEquals("US", result.getWatchProviders().getRegion());
         }
 
         @Test
@@ -113,6 +125,7 @@ class MediaServiceTest {
 
             when(mediaRepository.findByTmdbIdAndType(TMDB_ID, MediaType.MOVIE)).thenReturn(Optional.of(publicMovie));
             when(publicMediaDetailBaseCacheService.getMovieBase(TMDB_ID, MediaType.MOVIE)).thenReturn(publicBase("Public Movie"));
+            when(mediaExtrasService.getExtras(TMDB_ID, MediaType.MOVIE)).thenReturn(emptyExtras());
 
             MovieDetailsDTO result = mediaService.getMovieDetails(TMDB_ID, null);
 
@@ -121,6 +134,8 @@ class MediaServiceTest {
             assertEquals("Public Movie", result.getTitle());
             assertEquals(Boolean.FALSE, result.getIsFavourited());
             assertEquals(WatchStatus.NONE, result.getWatchStatus());
+            assertEquals(List.of(), result.getCast());
+            assertEquals("US", result.getWatchProviders().getRegion());
         }
 
         @Test
@@ -175,6 +190,22 @@ class MediaServiceTest {
             .type(MediaType.MOVIE)
             .genres(List.of())
             .build();
+    }
+
+    private MediaExtrasDTO extras() {
+        return new MediaExtrasDTO(
+            List.of(CastMemberDTO.builder().tmdbPersonId(1L).name("Actor").order(0).build()),
+            TrailerDTO.builder().key("trailer-key").youtubeUrl("https://www.youtube.com/watch?v=trailer-key").build(),
+            WatchProvidersDTO.builder().region("US").flatrate(List.of()).rent(List.of()).buy(List.of()).ads(List.of()).free(List.of()).build()
+        );
+    }
+
+    private MediaExtrasDTO emptyExtras() {
+        return new MediaExtrasDTO(
+            List.of(),
+            null,
+            WatchProvidersDTO.builder().region("US").flatrate(List.of()).rent(List.of()).buy(List.of()).ads(List.of()).free(List.of()).build()
+        );
     }
 }
 

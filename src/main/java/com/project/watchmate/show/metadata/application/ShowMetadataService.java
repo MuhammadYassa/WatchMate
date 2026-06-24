@@ -23,6 +23,8 @@ import com.project.watchmate.media.tmdb.dto.TmdbTvDetailsDTO;
 import com.project.watchmate.show.metadata.mapper.ShowMetadataMapper;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.media.catalog.domain.MediaType;
+import com.project.watchmate.media.extras.application.MediaExtrasService;
+import com.project.watchmate.media.extras.dto.MediaExtrasDTO;
 import com.project.watchmate.review.domain.Review;
 import com.project.watchmate.show.tracking.domain.UserShowTracking;
 import com.project.watchmate.user.domain.Users;
@@ -53,6 +55,8 @@ public class ShowMetadataService {
 
     private final PublicShowMetadataCacheService publicShowMetadataCacheService;
 
+    private final MediaExtrasService mediaExtrasService;
+
     @Transactional
     public NextEpisodeAiringDTO getNextEpisode(Long tmdbId, MediaType mediaType) {
         showCatalogService.validateShowType(mediaType);
@@ -75,7 +79,8 @@ public class ShowMetadataService {
         UserContext userContext = resolveUserContext(userParam, importedShow);
 
         PublicShowMetadataDTO publicMetadata = publicShowMetadataCacheService.getShowMetadata(tmdbId);
-        return toShowDetailsDTO(publicMetadata, reviews, userContext.isFavourited(), userContext.watchStatus());
+        MediaExtrasDTO extras = mediaExtrasService.getExtras(tmdbId, MediaType.SHOW);
+        return toShowDetailsDTO(publicMetadata, reviews, userContext.isFavourited(), userContext.watchStatus(), extras);
     }
 
     @Transactional
@@ -124,7 +129,8 @@ public class ShowMetadataService {
         PublicShowMetadataDTO publicMetadata,
         List<Review> reviews,
         Boolean isFavourited,
-        WatchStatus watchStatus
+        WatchStatus watchStatus,
+        MediaExtrasDTO extras
     ) {
         return ShowDetailsDTO.builder()
             .tmdbId(publicMetadata.getTmdbId())
@@ -151,6 +157,9 @@ public class ShowMetadataService {
             .seasons(publicMetadata.getSeasons())
             .isFavourited(isFavourited)
             .watchStatus(watchStatus)
+            .cast(extras.cast())
+            .bestTrailer(extras.bestTrailer())
+            .watchProviders(extras.watchProviders())
             .build();
     }
 

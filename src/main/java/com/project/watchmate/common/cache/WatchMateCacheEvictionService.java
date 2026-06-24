@@ -74,6 +74,27 @@ public class WatchMateCacheEvictionService {
     }
 
     @CacheEvict(
+        cacheNames = TmdbCacheNames.TMDB_MEDIA_CREDITS,
+        key = "T(com.project.watchmate.common.cache.TmdbCacheKeys).credits(#type, #tmdbId)"
+    )
+    public void evictTmdbMediaCredits(MediaType type, Long tmdbId) {
+    }
+
+    @CacheEvict(
+        cacheNames = TmdbCacheNames.TMDB_MEDIA_VIDEOS,
+        key = "T(com.project.watchmate.common.cache.TmdbCacheKeys).videos(#type, #tmdbId)"
+    )
+    public void evictTmdbMediaVideos(MediaType type, Long tmdbId) {
+    }
+
+    @CacheEvict(
+        cacheNames = TmdbCacheNames.TMDB_MEDIA_WATCH_PROVIDERS,
+        key = "T(com.project.watchmate.common.cache.TmdbCacheKeys).watchProviders(#type, #tmdbId)"
+    )
+    public void evictTmdbMediaWatchProviders(MediaType type, Long tmdbId) {
+    }
+
+    @CacheEvict(
         cacheNames = WatchMateCacheNames.CONTINUE_WATCHING,
         key = "T(com.project.watchmate.common.cache.WatchMateCacheKeys).user(#userId)"
     )

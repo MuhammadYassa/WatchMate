@@ -32,6 +32,11 @@ import com.project.watchmate.common.mapper.WatchMateMapper;
 import com.project.watchmate.show.metadata.mapper.ShowMetadataMapper;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.media.catalog.domain.MediaType;
+import com.project.watchmate.media.extras.application.MediaExtrasService;
+import com.project.watchmate.media.extras.dto.CastMemberDTO;
+import com.project.watchmate.media.extras.dto.MediaExtrasDTO;
+import com.project.watchmate.media.extras.dto.TrailerDTO;
+import com.project.watchmate.media.extras.dto.WatchProvidersDTO;
 import com.project.watchmate.show.tracking.domain.UserShowTracking;
 import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.media.catalog.domain.WatchStatus;
@@ -66,6 +71,9 @@ class ShowMetadataServiceTest {
     @Mock
     private PublicShowMetadataCacheService publicShowMetadataCacheService;
 
+    @Mock
+    private MediaExtrasService mediaExtrasService;
+
     @InjectMocks
     private ShowMetadataService showMetadataService;
 
@@ -88,6 +96,7 @@ class ShowMetadataServiceTest {
             when(showCatalogService.validateShowType(MediaType.SHOW)).thenReturn(MediaType.SHOW);
             when(showCatalogService.findImportedShow(TMDB_ID)).thenReturn(null);
             when(publicShowMetadataCacheService.getShowMetadata(TMDB_ID)).thenReturn(publicShowMetadata("Public Show"));
+            when(mediaExtrasService.getExtras(TMDB_ID, MediaType.SHOW)).thenReturn(emptyExtras());
 
             ShowDetailsDTO result = showMetadataService.getShowDetails(TMDB_ID, MediaType.SHOW, null);
 
@@ -96,6 +105,8 @@ class ShowMetadataServiceTest {
             assertEquals("Public Show", result.getTitle());
             assertEquals(WatchStatus.NONE, result.getWatchStatus());
             assertEquals(Boolean.FALSE, result.getIsFavourited());
+            assertEquals(List.of(), result.getCast());
+            assertEquals("US", result.getWatchProviders().getRegion());
         }
 
         @Test
@@ -106,6 +117,7 @@ class ShowMetadataServiceTest {
             when(reviewRepository.findByMedia(show)).thenReturn(List.of());
             when(userShowTrackingRepository.findByUserAndMedia(user, show)).thenReturn(Optional.empty());
             when(publicShowMetadataCacheService.getShowMetadata(TMDB_ID)).thenReturn(publicShowMetadata("Imported Show"));
+            when(mediaExtrasService.getExtras(TMDB_ID, MediaType.SHOW)).thenReturn(extras());
 
             ShowDetailsDTO result = showMetadataService.getShowDetails(TMDB_ID, MediaType.SHOW, user);
 
@@ -113,6 +125,9 @@ class ShowMetadataServiceTest {
             assertEquals(TMDB_ID, result.getTmdbId());
             assertEquals("Imported Show", result.getTitle());
             assertEquals(WatchStatus.NONE, result.getWatchStatus());
+            assertEquals("Show Actor", result.getCast().get(0).getName());
+            assertEquals("show-trailer", result.getBestTrailer().getKey());
+            assertEquals("US", result.getWatchProviders().getRegion());
         }
 
         @Test
@@ -137,6 +152,7 @@ class ShowMetadataServiceTest {
                 UserShowTracking.builder().user(user).media(show).status(WatchStatus.WATCHING).build()
             ));
             when(publicShowMetadataCacheService.getShowMetadata(TMDB_ID)).thenReturn(publicShowMetadata("Tracked Show"));
+            when(mediaExtrasService.getExtras(TMDB_ID, MediaType.SHOW)).thenReturn(emptyExtras());
 
             ShowDetailsDTO result = showMetadataService.getShowDetails(TMDB_ID, MediaType.SHOW, user);
 
@@ -194,8 +210,23 @@ class ShowMetadataServiceTest {
             .seasons(List.of())
             .build();
     }
-}
 
+    private MediaExtrasDTO extras() {
+        return new MediaExtrasDTO(
+            List.of(CastMemberDTO.builder().tmdbPersonId(1L).name("Show Actor").order(0).build()),
+            TrailerDTO.builder().key("show-trailer").youtubeUrl("https://www.youtube.com/watch?v=show-trailer").build(),
+            WatchProvidersDTO.builder().region("US").flatrate(List.of()).rent(List.of()).buy(List.of()).ads(List.of()).free(List.of()).build()
+        );
+    }
+
+    private MediaExtrasDTO emptyExtras() {
+        return new MediaExtrasDTO(
+            List.of(),
+            null,
+            WatchProvidersDTO.builder().region("US").flatrate(List.of()).rent(List.of()).buy(List.of()).ads(List.of()).free(List.of()).build()
+        );
+    }
+}
 
 
 

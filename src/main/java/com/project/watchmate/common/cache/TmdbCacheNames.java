@@ -13,6 +13,9 @@ public final class TmdbCacheNames {
     public static final String TMDB_UPCOMING_MOVIES = "tmdbUpcomingMovies";
     public static final String TMDB_AIRING_TODAY = "tmdbAiringToday";
     public static final String TMDB_ON_THE_AIR = "tmdbOnTheAir";
+    public static final String TMDB_MEDIA_CREDITS = "tmdbMediaCredits";
+    public static final String TMDB_MEDIA_VIDEOS = "tmdbMediaVideos";
+    public static final String TMDB_MEDIA_WATCH_PROVIDERS = "tmdbMediaWatchProviders";
 
     private TmdbCacheNames() {
     }

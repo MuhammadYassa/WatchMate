@@ -16,17 +16,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MvcResult;
 
 import com.project.watchmate.show.jobs.dto.ShowTrackingJobDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbEpisodeSummaryDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbCastMemberDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbCreditsDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbMovieDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbVideoDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbVideosResponseDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbTvDetailsDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbTvEpisodeDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbTvSeasonDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbTvSeasonSummaryDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbWatchProviderEntryDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbWatchProviderRegionDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbWatchProvidersResponseDTO;
 import com.project.watchmate.common.integration.support.AbstractIntegrationTest;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.media.catalog.domain.MediaType;
@@ -64,6 +72,35 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
     @Test
     void publicShowDetails_returnsSeasonSummariesWithoutAuth_andDoesNotAutoImport() throws Exception {
         when(tmdbClient.fetchTvDetailsById(eq(9100L))).thenReturn(tmdbTvDetails());
+        when(tmdbClient.fetchCredits(eq(9100L), eq(MediaType.SHOW))).thenReturn(TmdbCreditsDTO.builder()
+            .cast(List.of(TmdbCastMemberDTO.builder()
+                .id(501L)
+                .name("Show Actor")
+                .character("Lead")
+                .order(0)
+                .knownForDepartment("Acting")
+                .build()))
+            .build());
+        when(tmdbClient.fetchVideos(eq(9100L), eq(MediaType.SHOW))).thenReturn(TmdbVideosResponseDTO.builder()
+            .results(List.of(TmdbVideoDTO.builder()
+                .key("show-trailer")
+                .name("Show Trailer")
+                .site("YouTube")
+                .type("Trailer")
+                .official(true)
+                .publishedAt("2026-01-01T00:00:00.000Z")
+                .build()))
+            .build());
+        when(tmdbClient.fetchWatchProviders(eq(9100L), eq(MediaType.SHOW))).thenReturn(TmdbWatchProvidersResponseDTO.builder()
+            .results(Map.of("US", TmdbWatchProviderRegionDTO.builder()
+                .link("https://example.com/us/show")
+                .flatrate(List.of(TmdbWatchProviderEntryDTO.builder()
+                    .providerId(2)
+                    .providerName("ShowStream")
+                    .displayPriority(0)
+                    .build()))
+                .build()))
+            .build());
 
         mockMvc.perform(get("/api/v1/shows/{tmdbId}", 9100L))
             .andExpect(status().isOk())
@@ -76,10 +113,31 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
             .andExpect(jsonPath("$.seasons[2].episodeCount").value(3))
             .andExpect(jsonPath("$.seasons[2].posterPath").value("/s2.jpg"))
             .andExpect(jsonPath("$.seasons[1].episodes").doesNotExist())
-            .andExpect(jsonPath("$.seasons[2].episodes").doesNotExist());
+            .andExpect(jsonPath("$.seasons[2].episodes").doesNotExist())
+            .andExpect(jsonPath("$.cast", hasSize(1)))
+            .andExpect(jsonPath("$.cast[0].tmdbPersonId").value(501))
+            .andExpect(jsonPath("$.bestTrailer.key").value("show-trailer"))
+            .andExpect(jsonPath("$.watchProviders.region").value("US"))
+            .andExpect(jsonPath("$.watchProviders.flatrate[0].providerName").value("ShowStream"));
 
         assertThat(mediaRepository.findByTmdbIdAndType(9100L, MediaType.SHOW)).isEmpty();
         verify(tmdbClient, never()).fetchTvSeasonDetails(eq(9100L), anyInt());
+    }
+
+    @Test
+    void publicShowDetails_whenTmdbExtrasEmpty_returnsDefaultExtrasShape() throws Exception {
+        when(tmdbClient.fetchTvDetailsById(eq(9101L))).thenReturn(tmdbTvDetailsWithId(9101L));
+
+        mockMvc.perform(get("/api/v1/shows/{tmdbId}", 9101L))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.cast", hasSize(0)))
+            .andExpect(jsonPath("$.bestTrailer").value(nullValue()))
+            .andExpect(jsonPath("$.watchProviders.region").value("US"))
+            .andExpect(jsonPath("$.watchProviders.flatrate", hasSize(0)))
+            .andExpect(jsonPath("$.watchProviders.rent", hasSize(0)))
+            .andExpect(jsonPath("$.watchProviders.buy", hasSize(0)))
+            .andExpect(jsonPath("$.watchProviders.ads", hasSize(0)))
+            .andExpect(jsonPath("$.watchProviders.free", hasSize(0)));
     }
 
     @Test
@@ -968,5 +1026,4 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
             .containsExactly(expected);
     }
 }
-
 

@@ -2,6 +2,8 @@ package com.project.watchmate.common.cache;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -32,6 +34,9 @@ import com.project.watchmate.media.catalog.domain.ShowEpisode;
 import com.project.watchmate.media.catalog.domain.ShowSeason;
 import com.project.watchmate.media.catalog.domain.WatchStatus;
 import com.project.watchmate.media.catalog.persistence.MediaRepository;
+import com.project.watchmate.media.extras.application.MediaExtrasService;
+import com.project.watchmate.media.extras.dto.MediaExtrasDTO;
+import com.project.watchmate.media.extras.dto.WatchProvidersDTO;
 import com.project.watchmate.media.tmdb.application.TmdbService;
 import com.project.watchmate.media.tmdb.dto.TmdbTvDetailsDTO;
 import com.project.watchmate.movie.application.MediaService;
@@ -88,6 +93,9 @@ class PublicDetailOverlayCacheBehaviorTest {
     private UserShowTrackingRepository userShowTrackingRepository;
 
     @Autowired
+    private MediaExtrasService mediaExtrasService;
+
+    @Autowired
     private CacheManager cacheManager;
 
     private Media movie;
@@ -108,8 +116,10 @@ class PublicDetailOverlayCacheBehaviorTest {
             userWatchStatusResolver,
             tmdbService,
             showCatalogService,
-            userShowTrackingRepository
+            userShowTrackingRepository,
+            mediaExtrasService
         );
+        when(mediaExtrasService.getExtras(anyLong(), any())).thenReturn(emptyExtras());
         cacheManager.getCacheNames().stream()
             .map(cacheManager::getCache)
             .filter(java.util.Objects::nonNull)
@@ -300,6 +310,11 @@ class PublicDetailOverlayCacheBehaviorTest {
         }
 
         @Bean
+        MediaExtrasService mediaExtrasService() {
+            return org.mockito.Mockito.mock(MediaExtrasService.class);
+        }
+
+        @Bean
         ShowMetadataMapper showMetadataMapper() {
             return org.mockito.Mockito.mock(ShowMetadataMapper.class);
         }
@@ -335,7 +350,8 @@ class PublicDetailOverlayCacheBehaviorTest {
             UserMediaStatusRepository userMediaStatusRepository,
             UserShowTrackingRepository userShowTrackingRepository,
             UserWatchStatusResolver userWatchStatusResolver,
-            PublicMediaDetailBaseCacheService publicMediaDetailBaseCacheService
+            PublicMediaDetailBaseCacheService publicMediaDetailBaseCacheService,
+            MediaExtrasService mediaExtrasService
         ) {
             return new MediaService(
                 mediaResolutionService,
@@ -346,7 +362,8 @@ class PublicDetailOverlayCacheBehaviorTest {
                 userMediaStatusRepository,
                 userShowTrackingRepository,
                 userWatchStatusResolver,
-                publicMediaDetailBaseCacheService
+                publicMediaDetailBaseCacheService,
+                mediaExtrasService
             );
         }
 
@@ -359,7 +376,8 @@ class PublicDetailOverlayCacheBehaviorTest {
             UsersRepository usersRepository,
             ReviewRepository reviewRepository,
             UserShowTrackingRepository userShowTrackingRepository,
-            PublicShowMetadataCacheService publicShowMetadataCacheService
+            PublicShowMetadataCacheService publicShowMetadataCacheService,
+            MediaExtrasService mediaExtrasService
         ) {
             return new ShowMetadataService(
                 showCatalogService,
@@ -369,8 +387,24 @@ class PublicDetailOverlayCacheBehaviorTest {
                 usersRepository,
                 reviewRepository,
                 userShowTrackingRepository,
-                publicShowMetadataCacheService
+                publicShowMetadataCacheService,
+                mediaExtrasService
             );
         }
+    }
+
+    private MediaExtrasDTO emptyExtras() {
+        return new MediaExtrasDTO(
+            List.of(),
+            null,
+            WatchProvidersDTO.builder()
+                .region("US")
+                .flatrate(List.of())
+                .rent(List.of())
+                .buy(List.of())
+                .ads(List.of())
+                .free(List.of())
+                .build()
+        );
     }
 }

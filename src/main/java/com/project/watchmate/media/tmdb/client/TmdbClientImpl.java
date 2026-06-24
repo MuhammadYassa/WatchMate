@@ -16,12 +16,15 @@ import org.springframework.web.reactive.function.client.WebClientRequestExceptio
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import com.project.watchmate.common.cache.TmdbCacheNames;
+import com.project.watchmate.media.tmdb.dto.TmdbCreditsDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbGenreDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbGenreResponseDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbMovieDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbResponseDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbTvDetailsDTO;
 import com.project.watchmate.media.tmdb.dto.TmdbTvSeasonDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbVideosResponseDTO;
+import com.project.watchmate.media.tmdb.dto.TmdbWatchProvidersResponseDTO;
 import com.project.watchmate.common.error.MediaNotFoundException;
 import com.project.watchmate.common.error.TmdbClientException;
 import com.project.watchmate.common.error.TmdbUnavailableException;
@@ -178,6 +181,75 @@ public class TmdbClientImpl implements TmdbClient {
     }
 
     @Override
+    @Cacheable(cacheNames = TmdbCacheNames.TMDB_MEDIA_CREDITS, key = "T(com.project.watchmate.common.cache.TmdbCacheKeys).credits(#type, #tmdbId)", unless = "#result == null")
+    public TmdbCreditsDTO fetchCredits(Long tmdbId, MediaType type) {
+        String typePath = tmdbTypePath(type);
+        String uri = "/" + typePath + "/" + tmdbId + "/credits?language=en-US";
+
+        try {
+            return tmdbWebClient.get()
+                .uri(uri)
+                .retrieve()
+                .bodyToMono(TmdbCreditsDTO.class)
+                .blockOptional()
+                .orElseGet(() -> TmdbCreditsDTO.builder().id(tmdbId).build());
+        } catch (WebClientResponseException.NotFound ex) {
+            log.warn("TMDB credits not found tmdbId={} type={}", tmdbId, type);
+            throw new MediaNotFoundException("TMDB credits not found for ID: " + tmdbId);
+        } catch (WebClientResponseException ex) {
+            throw handleWebClientResponseException(ex, "credits lookup", "tmdbId=" + tmdbId + " type=" + type);
+        } catch (Exception ex) {
+            throw handleGenericException(ex, "credits lookup", "tmdbId=" + tmdbId + " type=" + type);
+        }
+    }
+
+    @Override
+    @Cacheable(cacheNames = TmdbCacheNames.TMDB_MEDIA_VIDEOS, key = "T(com.project.watchmate.common.cache.TmdbCacheKeys).videos(#type, #tmdbId)", unless = "#result == null")
+    public TmdbVideosResponseDTO fetchVideos(Long tmdbId, MediaType type) {
+        String typePath = tmdbTypePath(type);
+        String uri = "/" + typePath + "/" + tmdbId + "/videos?language=en-US";
+
+        try {
+            return tmdbWebClient.get()
+                .uri(uri)
+                .retrieve()
+                .bodyToMono(TmdbVideosResponseDTO.class)
+                .blockOptional()
+                .orElseGet(() -> TmdbVideosResponseDTO.builder().id(tmdbId).build());
+        } catch (WebClientResponseException.NotFound ex) {
+            log.warn("TMDB videos not found tmdbId={} type={}", tmdbId, type);
+            throw new MediaNotFoundException("TMDB videos not found for ID: " + tmdbId);
+        } catch (WebClientResponseException ex) {
+            throw handleWebClientResponseException(ex, "videos lookup", "tmdbId=" + tmdbId + " type=" + type);
+        } catch (Exception ex) {
+            throw handleGenericException(ex, "videos lookup", "tmdbId=" + tmdbId + " type=" + type);
+        }
+    }
+
+    @Override
+    @Cacheable(cacheNames = TmdbCacheNames.TMDB_MEDIA_WATCH_PROVIDERS, key = "T(com.project.watchmate.common.cache.TmdbCacheKeys).watchProviders(#type, #tmdbId)", unless = "#result == null")
+    public TmdbWatchProvidersResponseDTO fetchWatchProviders(Long tmdbId, MediaType type) {
+        String typePath = tmdbTypePath(type);
+        String uri = "/" + typePath + "/" + tmdbId + "/watch/providers";
+
+        try {
+            return tmdbWebClient.get()
+                .uri(uri)
+                .retrieve()
+                .bodyToMono(TmdbWatchProvidersResponseDTO.class)
+                .blockOptional()
+                .orElseGet(() -> TmdbWatchProvidersResponseDTO.builder().id(tmdbId).build());
+        } catch (WebClientResponseException.NotFound ex) {
+            log.warn("TMDB watch providers not found tmdbId={} type={}", tmdbId, type);
+            throw new MediaNotFoundException("TMDB watch providers not found for ID: " + tmdbId);
+        } catch (WebClientResponseException ex) {
+            throw handleWebClientResponseException(ex, "watch providers lookup", "tmdbId=" + tmdbId + " type=" + type);
+        } catch (Exception ex) {
+            throw handleGenericException(ex, "watch providers lookup", "tmdbId=" + tmdbId + " type=" + type);
+        }
+    }
+
+    @Override
     @Cacheable(cacheNames = TmdbCacheNames.TMDB_SEARCH, key = "T(com.project.watchmate.common.cache.TmdbCacheKeys).search(#query, #page)", unless = "#result == null")
     public TmdbResponseDTO searchMulti(String query, int page) {
         try {
@@ -233,6 +305,10 @@ public class TmdbClientImpl implements TmdbClient {
         return new TmdbClientException(TMDB_CLIENT_MESSAGE, HttpStatus.BAD_GATEWAY, "TMDB_CLIENT_ERROR", ex);
     }
 
+    private String tmdbTypePath(MediaType type) {
+        return type == MediaType.SHOW ? "tv" : "movie";
+    }
+
     private RuntimeException handleGenericException(Exception ex, String operation, String context) {
         if (ex instanceof WebClientRequestException || isNetworkOrTimeoutFailure(ex)) {
             log.error("TMDB {} unavailable context={} reason={}", operation, context, ex.getClass().getSimpleName(), ex);
@@ -261,4 +337,3 @@ public class TmdbClientImpl implements TmdbClient {
         return false;
     }
 }
-
