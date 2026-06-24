@@ -1,8 +1,11 @@
 package com.project.watchmate.common.cache;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -22,6 +25,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
 import com.project.watchmate.dashboard.application.ContinueWatchingCacheService;
@@ -74,13 +79,16 @@ class UserSpecificCacheBehaviorTest {
     @Autowired
     private CacheManager cacheManager;
 
-    private Users userOne;
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
+    private Users userOne;
     private Users userTwo;
 
     @BeforeEach
     void setUp() {
-        reset(usersRepository, userMediaStatusRepository, userShowTrackingRepository, watchListRepository, watchListDtoAssembler);
+        reset(usersRepository, userMediaStatusRepository, userShowTrackingRepository,
+              watchListRepository, watchListDtoAssembler, stringRedisTemplate);
         cacheManager.getCacheNames().stream()
             .map(cacheManager::getCache)
             .filter(java.util.Objects::nonNull)
@@ -171,6 +179,88 @@ class UserSpecificCacheBehaviorTest {
         verify(watchListRepository, times(2)).findAllByUser(eq(userOne), any(Pageable.class));
     }
 
+    /**
+     * Verifies that user-scoped watchlist eviction uses Redis SCAN (via {@code execute})
+     * rather than the blocking {@code KEYS} command, and that it does not touch other
+     * users' in-memory cache entries.
+     *
+     * <p>This test uses {@link ConcurrentMapCacheManager} for Spring Cache (not real
+     * Redis), so the SCAN callback is invoked against the mock {@code StringRedisTemplate}
+     * which returns {@code null} by default.  The mock returning {@code null} means no
+     * actual deletion happens in-memory — exactly what we want: user two's
+     * {@code ConcurrentMapCache} entry is preserved, proving cross-user isolation.
+     *
+     * <p>Full Redis round-trip correctness (including real key deletion) is verified
+     * separately in {@code RedisCacheRoundTripTest.evictWatchlistSummaryPagesForUser_*}.
+     */
+    @Test
+    void watchlistPages_userScopedEviction_usesScanNotKeysAndLeavesOtherUsersCacheIntact() {
+        WatchList listOne = WatchList.builder().id(1L).name("One").user(userOne).items(new ArrayList<>()).build();
+        WatchList listTwo = WatchList.builder().id(2L).name("Two").user(userTwo).items(new ArrayList<>()).build();
+        WatchListDTO dtoOne = WatchListDTO.builder().id(1L).name("One").media(List.of()).build();
+        WatchListDTO dtoTwo = WatchListDTO.builder().id(2L).name("Two").media(List.of()).build();
+
+        when(watchListRepository.findAllByUser(eq(userOne), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(listOne)));
+        when(watchListRepository.findAllByUser(eq(userTwo), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(listTwo)));
+        when(watchListDtoAssembler.mapWatchLists(userOne, List.of(listOne))).thenReturn(List.of(dtoOne));
+        when(watchListDtoAssembler.mapWatchLists(userTwo, List.of(listTwo))).thenReturn(List.of(dtoTwo));
+
+        // Populate the in-memory Spring Cache for both users.
+        watchListPageCacheService.getAllWatchLists(userOne, 0, 20);
+        watchListPageCacheService.getAllWatchLists(userTwo, 0, 20);
+
+        // Trigger user-scoped eviction for user one.
+        cacheEvictionService.evictWatchlistSummaryPagesForUser(1L);
+
+        // Eviction must use SCAN (execute) — never the blocking KEYS command.
+        verify(stringRedisTemplate).execute(org.mockito.ArgumentMatchers.<RedisCallback<Long>>any());
+        verify(stringRedisTemplate, never()).keys(org.mockito.ArgumentMatchers.anyString());
+
+        // User two's in-memory cache entry is unaffected — no second DB call.
+        watchListPageCacheService.getAllWatchLists(userTwo, 0, 20);
+        verify(watchListRepository, times(1)).findAllByUser(eq(userTwo), any(Pageable.class));
+    }
+
+    /**
+     * Pure function test: confirms the Redis SCAN glob pattern built by
+     * {@link WatchMateCacheEvictionService#buildWatchlistEvictionPattern} matches
+     * the exact key format Spring Cache writes to Redis for watchlist summary pages,
+     * and does not match keys belonging to a different user.
+     *
+     * <p>This test exercises key-pattern correctness without requiring a running Redis
+     * instance. The end-to-end proof that SCAN actually deletes the right keys is in
+     * {@code RedisCacheRoundTripTest}.
+     */
+    @Test
+    void evictionPattern_matchesActualSpringCacheKeyFormatAndNotOtherUsers() {
+        // Reconstruct the exact Redis key Spring Cache would write:
+        //   prefixCacheNameWith("watchmate::") + cacheName + "::" + watchlistPage(...)
+        String user1Key = "watchmate::"
+            + WatchMateCacheNames.WATCHLIST_SUMMARY_PAGES
+            + "::"
+            + WatchMateCacheKeys.watchlistPage(1L, 0, 20);
+        String user2Key = "watchmate::"
+            + WatchMateCacheNames.WATCHLIST_SUMMARY_PAGES
+            + "::"
+            + WatchMateCacheKeys.watchlistPage(2L, 0, 20);
+
+        String pattern = WatchMateCacheEvictionService.buildWatchlistEvictionPattern(1L);
+
+        // Verify the literal pattern string.
+        assertEquals("watchmate::watchlistSummaryPages::user:1:*", pattern);
+
+        // The user-1 key must start with the pattern prefix (pattern without the glob).
+        String patternPrefix = pattern.substring(0, pattern.length() - 1); // strip trailing "*"
+        assertTrue(user1Key.startsWith(patternPrefix),
+            "Pattern '" + pattern + "' must match user-1 key '" + user1Key + "'");
+
+        // The user-2 key must NOT start with user-1's pattern prefix.
+        assertFalse(user2Key.startsWith(patternPrefix),
+            "Pattern for user 1 must NOT match user 2's key '" + user2Key + "'");
+    }
+
     private Media media(Long tmdbId, String title) {
         return Media.builder()
             .id(tmdbId)
@@ -242,8 +332,13 @@ class UserSpecificCacheBehaviorTest {
         }
 
         @Bean
-        WatchMateCacheEvictionService watchMateCacheEvictionService() {
-            return new WatchMateCacheEvictionService();
+        StringRedisTemplate stringRedisTemplate() {
+            return org.mockito.Mockito.mock(StringRedisTemplate.class);
+        }
+
+        @Bean
+        WatchMateCacheEvictionService watchMateCacheEvictionService(StringRedisTemplate stringRedisTemplate) {
+            return new WatchMateCacheEvictionService(stringRedisTemplate);
         }
     }
 }

@@ -75,6 +75,36 @@ class AuthRateLimitFilterTest {
             }
             verify(chain, times(5)).doFilter(any(), any());
         }
+
+        @Test
+        void getRequest_onRateLimitedPath_alwaysPassesThrough() throws Exception {
+            properties.setLoginCapacity(1);
+            filter = new AuthRateLimitFilter(properties, objectMapper);
+            MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/auth/login");
+            request.setRequestURI("/api/v1/auth/login");
+            MockFilterChain chain = mock(MockFilterChain.class);
+
+            // Even though login is rate-limited, GET requests must bypass the limiter.
+            for (int i = 0; i < 5; i++) {
+                filter.doFilter(request, new MockHttpServletResponse(), chain);
+            }
+            verify(chain, times(5)).doFilter(any(), any());
+        }
+
+        @Test
+        void optionsRequest_onRateLimitedPath_alwaysPassesThrough() throws Exception {
+            properties.setLoginCapacity(1);
+            filter = new AuthRateLimitFilter(properties, objectMapper);
+            MockHttpServletRequest request = new MockHttpServletRequest("OPTIONS", "/api/v1/auth/login");
+            request.setRequestURI("/api/v1/auth/login");
+            MockFilterChain chain = mock(MockFilterChain.class);
+
+            // OPTIONS/preflight must never be rate-limited.
+            for (int i = 0; i < 5; i++) {
+                filter.doFilter(request, new MockHttpServletResponse(), chain);
+            }
+            verify(chain, times(5)).doFilter(any(), any());
+        }
     }
 
     @Nested
@@ -96,6 +126,7 @@ class AuthRateLimitFilterTest {
         @Test
         void overLimit_returns429WithApiError() throws Exception {
             properties.setLoginCapacity(2);
+            properties.setLoginRefillSeconds(90);
             filter = new AuthRateLimitFilter(properties, objectMapper);
             MockHttpServletRequest request = postRequest("/api/v1/auth/login");
 
@@ -106,11 +137,27 @@ class AuthRateLimitFilterTest {
             filter.doFilter(request, response, new MockFilterChain());
 
             assertEquals(429, response.getStatus());
-            assertEquals("60", response.getHeader("Retry-After"));
+            // Retry-After must reflect the configured refill window for the endpoint.
+            assertEquals("90", response.getHeader("Retry-After"));
             assertEquals("application/json", response.getContentType());
 
             ApiError error = objectMapper.readValue(response.getContentAsString(), ApiError.class);
             assertEquals("TOO_MANY_REQUESTS", error.code());
+        }
+
+        @Test
+        void retryAfter_reflectsEndpointSpecificRefillWindow() throws Exception {
+            properties.setResendCapacity(1);
+            properties.setResendRefillSeconds(120);
+            filter = new AuthRateLimitFilter(properties, objectMapper);
+            MockHttpServletRequest request = postRequest("/api/v1/auth/verify/resend");
+            filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            filter.doFilter(request, response, new MockFilterChain());
+
+            assertEquals(429, response.getStatus());
+            assertEquals("120", response.getHeader("Retry-After"));
         }
     }
 

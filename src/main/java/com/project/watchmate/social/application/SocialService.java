@@ -271,15 +271,15 @@ public class SocialService {
             .build();
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public FollowStatusDTO getFollowStatus(Long userId, Users user) {
         if (user.getId().equals(userId)){
             return FollowStatusDTO.builder()
-           .followStatus(FollowStatuses.NOT_FOLLOWING)
+           .followStatus(FollowStatuses.SELF)
            .build();
         }
         Users targetUser = findAndValidateTargetUser(userId);
-        if (usersRepository.isBlockingUser(user.getId(), targetUser.getId()) || usersRepository.isBlockingUser(targetUser.getId(), user.getId())){
+        if (usersRepository.isEitherBlocking(user.getId(), targetUser.getId())) {
             return FollowStatusDTO.builder()
             .followStatus(FollowStatuses.BLOCKED)
             .build();
@@ -361,8 +361,7 @@ public class SocialService {
         if(user.getId().equals(targetUser.getId())){
             return retrieveSelfUserProfile(targetUser);
         }
-        if(usersRepository.isBlockingUser(targetUser.getId(), user.getId())
-    || usersRepository.isBlockingUser(user.getId(), targetUser.getId())){
+        if(usersRepository.isEitherBlocking(targetUser.getId(), user.getId())){
             return UserProfileDTO.builder()
             .userId(targetUser.getId())
             .username(targetUser.getUsername())
@@ -380,7 +379,7 @@ public class SocialService {
             .userId(user.getId())
             .username(user.getUsername())
             .privacyStatus(user.getPrivacyStatus())
-            .followStatus(FollowStatuses.NOT_FOLLOWING)
+            .followStatus(FollowStatuses.SELF)
             .followersCount(usersRepository.countFollowersByUserId(user.getId()))
             .followingCount(usersRepository.countFollowingByUserId(user.getId()))
             .watchlists(getProfileWatchLists(user, user))

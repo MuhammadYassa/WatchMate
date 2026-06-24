@@ -386,17 +386,16 @@ class SocialServiceTest {
     class GetFollowStatusTests {
 
         @Test
-        void getFollowStatus_WhenSelf_ReturnsNotFollowing() {
+        void getFollowStatus_WhenSelf_ReturnsSelf() {
             FollowStatusDTO result = socialService.getFollowStatus(USER_ID, user);
 
-            assertEquals(FollowStatuses.NOT_FOLLOWING, result.getFollowStatus());
+            assertEquals(FollowStatuses.SELF, result.getFollowStatus());
         }
 
         @Test
         void getFollowStatus_WhenFollowing_ReturnsFollowing() {
             when(usersRepository.findByIdAndEmailVerifiedTrue(TARGET_ID)).thenReturn(Optional.of(targetUser));
-            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
-            when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
+            when(usersRepository.isEitherBlocking(USER_ID, TARGET_ID)).thenReturn(false);
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(true);
 
             FollowStatusDTO result = socialService.getFollowStatus(TARGET_ID, user);
@@ -408,8 +407,7 @@ class SocialServiceTest {
         void getFollowStatus_WhenPendingRequestExists_ReturnsRequested() {
             targetUser.setPrivacyStatus(PrivacyStatuses.PRIVATE);
             when(usersRepository.findByIdAndEmailVerifiedTrue(TARGET_ID)).thenReturn(Optional.of(targetUser));
-            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
-            when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
+            when(usersRepository.isEitherBlocking(USER_ID, TARGET_ID)).thenReturn(false);
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
             when(followRequestRepository.existsByRequestUserAndTargetUserAndStatus(user, targetUser, FollowRequestStatuses.PENDING))
                 .thenReturn(true);
@@ -464,8 +462,7 @@ class SocialServiceTest {
         @Test
         void getUserProfileByUsername_WhenUserExists_ReturnsProfile() {
             when(usersRepository.findByUsernameIgnoreCaseAndEmailVerifiedTrue("target")).thenReturn(Optional.of(targetUser));
-            when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
-            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
+            when(usersRepository.isEitherBlocking(TARGET_ID, USER_ID)).thenReturn(false);
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
             when(usersRepository.countFollowersByUserId(TARGET_ID)).thenReturn(0L);
             when(usersRepository.countFollowingByUserId(TARGET_ID)).thenReturn(0L);
@@ -485,8 +482,7 @@ class SocialServiceTest {
         @Test
         void getUserProfileByUsername_WhenViewerFollowsVisibleTarget_ReturnsFollowing() {
             when(usersRepository.findByUsernameIgnoreCaseAndEmailVerifiedTrue("target")).thenReturn(Optional.of(targetUser));
-            when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
-            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
+            when(usersRepository.isEitherBlocking(TARGET_ID, USER_ID)).thenReturn(false);
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(true);
             when(usersRepository.countFollowersByUserId(TARGET_ID)).thenReturn(1L);
             when(usersRepository.countFollowingByUserId(TARGET_ID)).thenReturn(0L);
@@ -504,8 +500,7 @@ class SocialServiceTest {
         void getUserProfileByUsername_WhenPrivateProfileNotVisibleAndRequestPending_ReturnsRequested() {
             targetUser.setPrivacyStatus(PrivacyStatuses.PRIVATE);
             when(usersRepository.findByUsernameIgnoreCaseAndEmailVerifiedTrue("target")).thenReturn(Optional.of(targetUser));
-            when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
-            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
+            when(usersRepository.isEitherBlocking(TARGET_ID, USER_ID)).thenReturn(false);
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
             when(followRequestRepository.existsByRequestUserAndTargetUserAndStatus(user, targetUser, FollowRequestStatuses.PENDING))
                 .thenReturn(true);
@@ -525,8 +520,7 @@ class SocialServiceTest {
             Page<WatchList> watchListPage = new PageImpl<>(List.of(watchList));
 
             when(usersRepository.findByUsernameIgnoreCaseAndEmailVerifiedTrue("target")).thenReturn(Optional.of(targetUser));
-            when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
-            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
+            when(usersRepository.isEitherBlocking(TARGET_ID, USER_ID)).thenReturn(false);
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
             when(usersRepository.countFollowersByUserId(TARGET_ID)).thenReturn(0L);
             when(usersRepository.countFollowingByUserId(TARGET_ID)).thenReturn(0L);
@@ -561,6 +555,7 @@ class SocialServiceTest {
             UserProfileDTO result = socialService.getUserProfile("user", user);
 
             assertEquals(USER_ID, result.getUserId());
+            assertEquals(FollowStatuses.SELF, result.getFollowStatus());
             assertEquals(1, result.getWatchlists().getContent().size());
             verify(watchListService).mapWatchListsForViewer(List.of(watchList), user);
         }

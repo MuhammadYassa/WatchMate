@@ -63,7 +63,7 @@ public class WatchListService {
 
         saveWatchListOrThrowNameConflict(watchList, "Watchlist Already Exists.");
 
-        cacheEvictionService.evictWatchlistSummaryPages();
+        cacheEvictionService.evictWatchlistSummaryPagesForUser(user.getId());
         return watchListDtoAssembler.mapToWatchListDTO(watchList);
     }
 
@@ -75,8 +75,9 @@ public class WatchListService {
             throw new UnauthorizedWatchListAccessException("You do not own this watchlist");
         }
 
+        Long ownerId = watchList.getUser().getId();
         watchListRepository.delete(watchList);
-        cacheEvictionService.evictWatchlistSummaryPages();
+        cacheEvictionService.evictWatchlistSummaryPagesForUser(ownerId);
     }
 
     @Transactional
@@ -94,7 +95,7 @@ public class WatchListService {
         watchList.setName(newName);
         saveWatchListOrThrowNameConflict(watchList, "A WatchList with this name Already Exists");
 
-        cacheEvictionService.evictWatchlistSummaryPages();
+        cacheEvictionService.evictWatchlistSummaryPagesForUser(watchList.getUser().getId());
         return watchListDtoAssembler.mapToWatchListDTO(watchList);
     }
 
@@ -138,7 +139,7 @@ public class WatchListService {
         watchList.getItems().add(newItem);
         watchListRepository.save(watchList);
 
-        cacheEvictionService.evictWatchlistSummaryPages();
+        cacheEvictionService.evictWatchlistSummaryPagesForUser(watchList.getUser().getId());
         return watchListDtoAssembler.mapToWatchListDTO(watchList);
     }   
 
@@ -160,7 +161,7 @@ public class WatchListService {
         watchList.getItems().remove(itemToRemove);
         watchListRepository.save(watchList);
 
-        cacheEvictionService.evictWatchlistSummaryPages();
+        cacheEvictionService.evictWatchlistSummaryPagesForUser(watchList.getUser().getId());
         return watchListDtoAssembler.mapToWatchListDTO(watchList);
     }
 

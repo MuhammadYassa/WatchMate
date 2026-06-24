@@ -40,6 +40,7 @@ import com.project.watchmate.media.catalog.domain.MediaType;
 import com.project.watchmate.movie.tracking.persistence.UserMediaStatusRepository;
 import com.project.watchmate.watchlist.domain.WatchList;
 import com.project.watchmate.watchlist.domain.WatchListItem;
+import com.project.watchmate.user.domain.Role;
 import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.review.persistence.ReviewRepository;
 import com.project.watchmate.show.tracking.persistence.UserShowTrackingRepository;
@@ -152,7 +153,7 @@ class WatchListServiceTest {
             assertNotNull(saved);
             assertEquals("New List", saved.getName());
             assertEquals("New List", result.getName());
-            verify(cacheEvictionService).evictWatchlistSummaryPages();
+            verify(cacheEvictionService).evictWatchlistSummaryPagesForUser(1L);
         }
 
         @Test
@@ -190,7 +191,7 @@ class WatchListServiceTest {
             watchListService.deleteWatchList(user, WATCHLIST_ID);
 
             verify(watchListRepository).delete(watchList);
-            verify(cacheEvictionService).evictWatchlistSummaryPages();
+            verify(cacheEvictionService).evictWatchlistSummaryPagesForUser(1L);
         }
 
         @Test
@@ -202,6 +203,18 @@ class WatchListServiceTest {
 
             assertEquals("You do not own this watchlist", e.getMessage());
             verify(watchListRepository, never()).delete(any(WatchList.class));
+        }
+
+        @Test
+        void deleteWatchList_WhenAdmin_EvictsOwnerCacheNotAdminCache() {
+            Users admin = Users.builder().id(99L).username("admin").role(Role.ADMIN).build();
+            when(watchListRepository.findById(WATCHLIST_ID)).thenReturn(Optional.of(watchList)); // owned by user (1L)
+
+            watchListService.deleteWatchList(admin, WATCHLIST_ID);
+
+            verify(watchListRepository).delete(watchList);
+            verify(cacheEvictionService).evictWatchlistSummaryPagesForUser(1L);   // owner
+            verify(cacheEvictionService, never()).evictWatchlistSummaryPagesForUser(99L); // not admin
         }
 
         @Test
@@ -235,7 +248,7 @@ class WatchListServiceTest {
             assertEquals("My List", result.getName());
             assertEquals(1, watchList.getItems().size());
             verify(watchListRepository).save(watchList);
-            verify(cacheEvictionService).evictWatchlistSummaryPages();
+            verify(cacheEvictionService).evictWatchlistSummaryPagesForUser(1L);
         }
 
         @Test
@@ -284,7 +297,24 @@ class WatchListServiceTest {
             assertEquals("My List", result.getName());
             assertEquals(0, watchList.getItems().size());
             verify(watchListRepository).save(watchList);
-            verify(cacheEvictionService).evictWatchlistSummaryPages();
+            verify(cacheEvictionService).evictWatchlistSummaryPagesForUser(1L);
+        }
+
+        @Test
+        void removeMediaFromWatchList_WhenAdmin_EvictsOwnerCacheNotAdminCache() {
+            Users admin = Users.builder().id(99L).username("admin").role(Role.ADMIN).build();
+            WatchListItem item = WatchListItem.builder().media(media).watchList(watchList).build();
+            watchList.getItems().add(item);
+            when(watchListRepository.findById(WATCHLIST_ID)).thenReturn(Optional.of(watchList)); // owned by user (1L)
+            when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
+            when(watchListRepository.save(any(WatchList.class))).thenReturn(watchList);
+            WatchListDTO dto = WatchListDTO.builder().id(WATCHLIST_ID).name("My List").build();
+            when(watchListDtoAssembler.mapToWatchListDTO(any(WatchList.class))).thenReturn(dto);
+
+            watchListService.removeMediaFromWatchList(admin, WATCHLIST_ID, TMDB_ID, TYPE);
+
+            verify(cacheEvictionService).evictWatchlistSummaryPagesForUser(1L);   // owner
+            verify(cacheEvictionService, never()).evictWatchlistSummaryPagesForUser(99L); // not admin
         }
 
         @Test
@@ -327,7 +357,7 @@ class WatchListServiceTest {
             assertEquals(WATCHLIST_ID, result.getId());
             assertEquals("New Name", watchList.getName());
             verify(watchListRepository).saveAndFlush(watchList);
-            verify(cacheEvictionService).evictWatchlistSummaryPages();
+            verify(cacheEvictionService).evictWatchlistSummaryPagesForUser(1L);
         }
 
         @Test

@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -15,6 +17,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +38,7 @@ import com.project.watchmate.media.catalog.dto.MediaDetailsDTO;
 import com.project.watchmate.common.error.DuplicateFavouriteException;
 import com.project.watchmate.common.mapper.WatchMateMapper;
 import com.project.watchmate.media.catalog.domain.Media;
+import com.project.watchmate.review.persistence.ReviewRepository;
 import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.media.catalog.domain.WatchStatus;
 import com.project.watchmate.user.persistence.UsersRepository;
@@ -56,6 +60,9 @@ class FavouriteServiceTest {
 
     @Mock
     private WatchMateCacheEvictionService cacheEvictionService;
+
+    @Mock
+    private ReviewRepository reviewRepository;
 
     @InjectMocks
     private FavouriteService favouriteService;
@@ -198,8 +205,11 @@ class FavouriteServiceTest {
             MediaDetailsDTO mappedDto = MediaDetailsDTO.builder().tmdbId(TMDB_ID).title("Test Media").build();
             when(usersRepository.findFavoritesByUserId(eq(user.getId()), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(media)));
-            when(userWatchStatusResolver.resolveWatchStatus(user, media)).thenReturn(WatchStatus.WATCHED);
-            when(watchMateMapper.mapToMediaDetailsDTO(any(), any(), eq(true), eq(WatchStatus.WATCHED)))
+            when(userWatchStatusResolver.resolveWatchStatusBatch(eq(user), anyList()))
+                .thenReturn(Map.of(media.getId(), WatchStatus.WATCHED));
+            when(reviewRepository.findAllByMediaIdInWithUserAndMedia(anyCollection()))
+                .thenReturn(List.of());
+            when(watchMateMapper.mapToMediaDetailsDTO(eq(media), any(), eq(true), eq(WatchStatus.WATCHED)))
                 .thenReturn(mappedDto);
 
             Page<MediaDetailsDTO> result = favouriteService.getUserFavourites(user, 0, 20);
@@ -225,14 +235,18 @@ class FavouriteServiceTest {
             MediaDetailsDTO mappedDto = MediaDetailsDTO.builder().tmdbId(TMDB_ID).build();
             when(usersRepository.findFavoritesByUserId(eq(user.getId()), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(media)));
-            when(userWatchStatusResolver.resolveWatchStatus(user, media)).thenReturn(WatchStatus.NONE);
-            when(watchMateMapper.mapToMediaDetailsDTO(any(), any(), eq(true), eq(WatchStatus.NONE)))
+            // Empty map → defaults to NONE via getOrDefault.
+            when(userWatchStatusResolver.resolveWatchStatusBatch(eq(user), anyList()))
+                .thenReturn(Map.of());
+            when(reviewRepository.findAllByMediaIdInWithUserAndMedia(anyCollection()))
+                .thenReturn(List.of());
+            when(watchMateMapper.mapToMediaDetailsDTO(eq(media), any(), eq(true), eq(WatchStatus.NONE)))
                 .thenReturn(mappedDto);
 
             Page<MediaDetailsDTO> result = favouriteService.getUserFavourites(user, 0, 20);
 
             assertEquals(1, result.getTotalElements());
-            verify(watchMateMapper).mapToMediaDetailsDTO(any(), any(), eq(true), eq(WatchStatus.NONE));
+            verify(watchMateMapper).mapToMediaDetailsDTO(eq(media), any(), eq(true), eq(WatchStatus.NONE));
         }
 
         @Test

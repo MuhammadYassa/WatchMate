@@ -69,6 +69,12 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
+        // Only apply rate limiting to POST requests; OPTIONS/preflight and other methods pass through.
+        if (!"POST".equalsIgnoreCase(request.getMethod())) {
+            chain.doFilter(request, response);
+            return;
+        }
+
         String endpointKey = ENDPOINT_KEYS.get(request.getRequestURI());
         if (endpointKey == null) {
             chain.doFilter(request, response);
@@ -88,8 +94,18 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
         } else {
             log.warn("Rate limit exceeded path={} ip={}", request.getRequestURI(), clientIp);
-            sendRateLimitResponse(response);
+            sendRateLimitResponse(response, refillSecondsFor(endpointKey));
         }
+    }
+
+    private long refillSecondsFor(String endpointKey) {
+        return switch (endpointKey) {
+            case "login"    -> properties.getLoginRefillSeconds();
+            case "register" -> properties.getRegisterRefillSeconds();
+            case "resend"   -> properties.getResendRefillSeconds();
+            case "refresh"  -> properties.getRefreshRefillSeconds();
+            default         -> 60L;
+        };
     }
 
     private Bucket buildBucket(String endpointKey) {
@@ -122,10 +138,10 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         return request.getRemoteAddr();
     }
 
-    private void sendRateLimitResponse(HttpServletResponse response) throws IOException {
+    private void sendRateLimitResponse(HttpServletResponse response, long retryAfterSeconds) throws IOException {
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setHeader("Retry-After", "60");
+        response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
         objectMapper.writeValue(
             response.getWriter(),
             new ApiError("Too many requests. Please slow down and try again later.", "TOO_MANY_REQUESTS", null)

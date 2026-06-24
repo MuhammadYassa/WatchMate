@@ -1,5 +1,6 @@
 package com.project.watchmate.common.cache;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -32,6 +33,7 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -51,7 +53,7 @@ class RedisCacheRoundTripTest {
 
     @Container
     @SuppressWarnings("resource")
-    static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7.4-alpine")
+    static final GenericContainer<?> REDIS = new GenericContainer<>(DockerImageName.parse("redis:7.4-alpine"))
         .withExposedPorts(6379);
 
     @Autowired
@@ -69,10 +71,17 @@ class RedisCacheRoundTripTest {
     @Autowired
     private SeasonMetadataCacheProbe seasonMetadataCacheProbe;
 
+    @Autowired
+    private WatchlistPageCacheProbe watchlistPageCacheProbe;
+
+    @Autowired
+    private WatchMateCacheEvictionService cacheEvictionService;
+
     @BeforeEach
     void setUp() {
         exchangeFunction.reset();
         seasonMetadataCacheProbe.reset();
+        watchlistPageCacheProbe.reset();
         flushRedis();
     }
 
@@ -119,6 +128,60 @@ class RedisCacheRoundTripTest {
         assertEquals(2101L, second.getEpisodes().get(0).getTmdbEpisodeId());
         assertNull(second.getEpisodes().get(1).getTmdbEpisodeId());
         assertTrue(rawValue.contains("\"tmdbEpisodeId\":2101"));
+    }
+
+    /**
+     * Verifies that SCAN-based eviction deletes all Redis keys belonging to the target
+     * user and leaves a different user's keys intact.
+     *
+     * <p>This is the end-to-end proof that:
+     * <ul>
+     *   <li>The eviction pattern {@code watchmate::watchlistSummaryPages::user:{id}:*}
+     *       actually matches the Redis keys written by Spring Cache.</li>
+     *   <li>SCAN correctly iterates and deletes only matching keys.</li>
+     *   <li>Keys for another user are not touched.</li>
+     * </ul>
+     */
+    @Test
+    void evictWatchlistSummaryPagesForUser_evictsOnlyTargetUsersRedisEntries() {
+        // Populate Redis via the @Cacheable proxy for two different users.
+        watchlistPageCacheProbe.getPage(1L, 0, 20);
+        watchlistPageCacheProbe.getPage(2L, 0, 20);
+        assertEquals(2, watchlistPageCacheProbe.invocationCount(), "Both calls should be cache misses initially");
+
+        String user1Key = WatchMateCacheEvictionService.WATCHLIST_PAGE_KEY_PREFIX + WatchMateCacheKeys.watchlistPage(1L, 0, 20);
+        String user2Key = WatchMateCacheEvictionService.WATCHLIST_PAGE_KEY_PREFIX + WatchMateCacheKeys.watchlistPage(2L, 0, 20);
+
+        // Both keys exist before eviction.
+        assertNotNull(stringRedisTemplate.opsForValue().get(user1Key), "User 1 key must exist before eviction");
+        assertNotNull(stringRedisTemplate.opsForValue().get(user2Key), "User 2 key must exist before eviction");
+
+        // Evict only user 1's entries.
+        cacheEvictionService.evictWatchlistSummaryPagesForUser(1L);
+
+        // User 1's key is gone; user 2's key survives.
+        assertNull(stringRedisTemplate.opsForValue().get(user1Key), "User 1 key must be deleted after eviction");
+        assertNotNull(stringRedisTemplate.opsForValue().get(user2Key), "User 2 key must survive user 1 eviction");
+
+        // Next call for user 1 is a cache miss → probe invoked again.
+        watchlistPageCacheProbe.getPage(1L, 0, 20);
+        assertEquals(3, watchlistPageCacheProbe.invocationCount(), "User 1 call after eviction must be a cache miss");
+
+        // Next call for user 2 is still a cache hit → probe NOT invoked again.
+        watchlistPageCacheProbe.getPage(2L, 0, 20);
+        assertEquals(3, watchlistPageCacheProbe.invocationCount(), "User 2 call after user 1 eviction must still be a cache hit");
+    }
+
+    /**
+     * Verifies that SCAN on an empty Redis keyspace does not throw, does not call the
+     * cache probe, and produces no error log.
+     */
+    @Test
+    void evictWatchlistSummaryPagesForUser_whenNoMatchingKeys_doesNothing() {
+        assertDoesNotThrow(() -> cacheEvictionService.evictWatchlistSummaryPagesForUser(1L),
+            "Eviction on empty Redis must not throw");
+        assertEquals(0, watchlistPageCacheProbe.invocationCount(),
+            "No cache population occurred so probe invocation count must be 0");
     }
 
     private void flushRedis() {
@@ -171,6 +234,16 @@ class RedisCacheRoundTripTest {
         SeasonMetadataCacheProbe seasonMetadataCacheProbe() {
             return new SeasonMetadataCacheProbe();
         }
+
+        @Bean
+        WatchlistPageCacheProbe watchlistPageCacheProbe() {
+            return new WatchlistPageCacheProbe();
+        }
+
+        @Bean
+        WatchMateCacheEvictionService cacheEvictionService(StringRedisTemplate stringRedisTemplate) {
+            return new WatchMateCacheEvictionService(stringRedisTemplate);
+        }
     }
 
     static class CountingExchangeFunction implements ExchangeFunction {
@@ -203,6 +276,36 @@ class RedisCacheRoundTripTest {
             return """
                 {"results":[{"id":1,"media_type":"movie","title":"Cached Result"}],"page":1,"total_pages":1,"total_results":1}
                 """;
+        }
+    }
+
+    /**
+     * Thin cache probe for watchlist summary pages.
+     *
+     * <p>Uses the same {@code cacheNames} and {@code key} expression as the production
+     * {@link com.project.watchmate.watchlist.application.WatchListPageCacheService}, so
+     * the Redis keys it writes are identical to the ones {@link WatchMateCacheEvictionService}
+     * is designed to delete.
+     */
+    static class WatchlistPageCacheProbe {
+
+        private final AtomicInteger invocationCount = new AtomicInteger();
+
+        @Cacheable(
+            cacheNames = WatchMateCacheNames.WATCHLIST_SUMMARY_PAGES,
+            key = "T(com.project.watchmate.common.cache.WatchMateCacheKeys).watchlistPage(#userId, #page, #size)"
+        )
+        public String getPage(Long userId, int page, int size) {
+            invocationCount.incrementAndGet();
+            return "page-for-user-" + userId;
+        }
+
+        int invocationCount() {
+            return invocationCount.get();
+        }
+
+        void reset() {
+            invocationCount.set(0);
         }
     }
 

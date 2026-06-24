@@ -61,6 +61,19 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
     @Query("SELECT COUNT(b) > 0 FROM Users u JOIN u.blockedUsers b WHERE u.id = :blockerId AND b.id = :targetId")
     boolean isBlockingUser(@Param("blockerId") Long blockerId, @Param("targetId") Long targetId);
 
+    /**
+     * Returns {@code true} if either party has blocked the other.
+     * Uses a single JPQL query across all block-relation rows instead of two
+     * separate {@link #isBlockingUser} calls.
+     */
+    @Query("""
+        SELECT COUNT(b) > 0
+        FROM Users blocker JOIN blocker.blockedUsers b
+        WHERE (blocker.id = :id1 AND b.id = :id2)
+           OR (blocker.id = :id2 AND b.id = :id1)
+        """)
+    boolean isEitherBlocking(@Param("id1") Long id1, @Param("id2") Long id2);
+
     @Query("SELECT COUNT(f) > 0 FROM Users u JOIN u.favorites f WHERE u.id = :userId AND f.id = :mediaId")
     boolean isFavouritedByUser(@Param("userId") Long userId, @Param("mediaId") Long mediaId);
 
