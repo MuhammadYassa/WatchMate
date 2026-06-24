@@ -95,6 +95,71 @@
     "description": "Allowed CORS origins for backend API requests."
   },
   {
+    "name": "watchmate.rate-limit.enabled",
+    "type": "java.lang.Boolean",
+    "description": "Whether authentication-related rate limiting is enabled."
+  },
+  {
+    "name": "watchmate.rate-limit.login-capacity",
+    "type": "java.lang.Integer",
+    "description": "Maximum number of login requests allowed within one refill window for a single client bucket."
+  },
+  {
+    "name": "watchmate.rate-limit.login-refill-seconds",
+    "type": "java.lang.Long",
+    "description": "Number of seconds between login rate-limit bucket refills."
+  },
+  {
+    "name": "watchmate.rate-limit.register-capacity",
+    "type": "java.lang.Integer",
+    "description": "Maximum number of registration requests allowed within one refill window for a single client bucket."
+  },
+  {
+    "name": "watchmate.rate-limit.register-refill-seconds",
+    "type": "java.lang.Long",
+    "description": "Number of seconds between registration rate-limit bucket refills."
+  },
+  {
+    "name": "watchmate.rate-limit.resend-capacity",
+    "type": "java.lang.Integer",
+    "description": "Maximum number of verification email resend requests allowed within one refill window for a single client bucket."
+  },
+  {
+    "name": "watchmate.rate-limit.resend-refill-seconds",
+    "type": "java.lang.Long",
+    "description": "Number of seconds between resend rate-limit bucket refills."
+  },
+  {
+    "name": "watchmate.rate-limit.refresh-capacity",
+    "type": "java.lang.Integer",
+    "description": "Maximum number of refresh-token requests allowed within one refill window for a single client bucket."
+  },
+  {
+    "name": "watchmate.rate-limit.refresh-refill-seconds",
+    "type": "java.lang.Long",
+    "description": "Number of seconds between refresh-token rate-limit bucket refills."
+  },
+  {
+    "name": "watchmate.rate-limit.bucket-ttl-seconds",
+    "type": "java.lang.Long",
+    "description": "Seconds an unused in-memory rate-limit bucket is retained before eviction."
+  },
+  {
+    "name": "watchmate.rate-limit.bucket-cleanup-interval-seconds",
+    "type": "java.lang.Long",
+    "description": "Number of seconds between stale rate-limit bucket cleanup runs."
+  },
+  {
+    "name": "watchmate.refresh-token.cleanup.cron",
+    "type": "java.lang.String",
+    "description": "Cron expression that schedules refresh-token cleanup."
+  },
+  {
+    "name": "watchmate.refresh-token.cleanup.revoked-retention-days",
+    "type": "java.lang.Integer",
+    "description": "Number of days to retain revoked refresh tokens before cleanup removes them."
+  },
+  {
     "name": "spring.data.redis.host",
     "type": "java.lang.String",
     "description": "Redis host used by Spring Cache."

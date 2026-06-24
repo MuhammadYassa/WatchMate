@@ -207,6 +207,35 @@ class DashboardServiceTest {
                 LocalDate.of(2099, 1, 1))
         );
     }
+
+    @Test
+    void getCalendarForUser_whenRangeExactly90Days_doesNotThrow() {
+        Users user = Users.builder().id(5L).username("calendar-90").build();
+        LocalDate from = LocalDate.of(2099, 1, 1);
+        LocalDate to = from.plusDays(90);
+
+        when(userShowTrackingRepository.findCalendarItemsByUser(
+            eq(user),
+            any(),
+            eq(from),
+            eq(to)))
+            .thenReturn(List.of());
+
+        CalendarResponseDTO result = dashboardService.getCalendarForUser(user, from, to);
+        assertEquals(0, result.getItems().size());
+    }
+
+    @Test
+    void getCalendarForUser_whenRangeExceeds90Days_throwsIllegalArgumentException() {
+        Users user = Users.builder().id(6L).username("calendar-91").build();
+        LocalDate from = LocalDate.of(2099, 1, 1);
+        LocalDate to = from.plusDays(91);
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> dashboardService.getCalendarForUser(user, from, to)
+        );
+    }
 }
 
 

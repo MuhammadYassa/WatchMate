@@ -187,6 +187,35 @@ class DashboardCalendarIntegrationTest extends AbstractIntegrationTest {
         verifyNoInteractions(tmdbClient);
     }
 
+    @Test
+    void calendar_rangeOf90Days_returns200() throws Exception {
+        Users user = saveUser("calendar-90-user", true);
+        LocalDate from = LocalDate.of(2099, 1, 1);
+        LocalDate to = from.plusDays(90);
+
+        mockMvc.perform(get("/api/v1/dashboard/calendar")
+            .header("Authorization", bearerToken(user))
+            .param("from", from.toString())
+            .param("to", to.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items").isArray());
+    }
+
+    @Test
+    void calendar_rangeOf91Days_returnsBadRequest() throws Exception {
+        Users user = saveUser("calendar-91-user", true);
+        LocalDate from = LocalDate.of(2099, 1, 1);
+        LocalDate to = from.plusDays(91);
+
+        mockMvc.perform(get("/api/v1/dashboard/calendar")
+            .header("Authorization", bearerToken(user))
+            .param("from", from.toString())
+            .param("to", to.toString()))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+            .andExpect(jsonPath("$.message").value("Date range cannot exceed 90 days."));
+    }
+
     private void saveStatus(Users user, Media media, WatchStatus watchStatus) {
         if (media.getType() != MediaType.SHOW) {
             return;

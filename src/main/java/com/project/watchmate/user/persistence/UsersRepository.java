@@ -61,6 +61,9 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
     @Query("SELECT COUNT(b) > 0 FROM Users u JOIN u.blockedUsers b WHERE u.id = :blockerId AND b.id = :targetId")
     boolean isBlockingUser(@Param("blockerId") Long blockerId, @Param("targetId") Long targetId);
 
+    @Query("SELECT COUNT(f) > 0 FROM Users u JOIN u.favorites f WHERE u.id = :userId AND f.id = :mediaId")
+    boolean isFavouritedByUser(@Param("userId") Long userId, @Param("mediaId") Long mediaId);
+
     @Query("""
         SELECT new com.project.watchmate.social.dto.SearchListUserDetailsDTO(
             u.id,

@@ -60,7 +60,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(SesException.class)
     public ResponseEntity<ApiError> handleSesException(SesException ex, HttpServletRequest request){
-        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), "SES_EXCEPTION", null, ex, request);
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE,
+            "Email service is temporarily unavailable. Please try again later.",
+            "EMAIL_SERVICE_UNAVAILABLE", null, ex, request);
     }
 
     @ExceptionHandler(InvalidRefreshTokenException.class)

@@ -155,10 +155,9 @@ class FavouriteServiceTest {
     class IsFavouritedTests {
 
         @Test
-        void isFavourited_WhenMediaExistsAndFavourited_ReturnsDtoWithTrue() {
-            managedUser.getFavorites().add(media);
-            when(usersRepository.findByIdWithFavorites(user.getId())).thenReturn(Optional.of(managedUser));
+        void isFavourited_WhenFavourited_ReturnsDtoWithTrue() {
             when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
+            when(usersRepository.isFavouritedByUser(user.getId(), media.getId())).thenReturn(true);
 
             FavouriteStatusDTO result = favouriteService.isFavourited(TMDB_ID, TYPE, user);
 
@@ -167,9 +166,9 @@ class FavouriteServiceTest {
         }
 
         @Test
-        void isFavourited_WhenMediaExistsAndNotFavourited_ReturnsDtoWithFalse() {
-            when(usersRepository.findByIdWithFavorites(user.getId())).thenReturn(Optional.of(managedUser));
+        void isFavourited_WhenNotFavourited_ReturnsDtoWithFalse() {
             when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
+            when(usersRepository.isFavouritedByUser(user.getId(), media.getId())).thenReturn(false);
 
             FavouriteStatusDTO result = favouriteService.isFavourited(TMDB_ID, TYPE, user);
 
@@ -177,6 +176,17 @@ class FavouriteServiceTest {
             assertFalse(result.isFavourited());
         }
 
+        @Test
+        void isFavourited_DoesNotLoadFullFavouritesList() {
+            when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, TYPE)).thenReturn(media);
+            when(usersRepository.isFavouritedByUser(user.getId(), media.getId())).thenReturn(true);
+
+            favouriteService.isFavourited(TMDB_ID, TYPE, user);
+
+            verify(usersRepository).isFavouritedByUser(user.getId(), media.getId());
+            // findByIdWithFavorites must NOT be called for a simple status check
+            verify(usersRepository, org.mockito.Mockito.never()).findByIdWithFavorites(any());
+        }
     }
 
     @Nested

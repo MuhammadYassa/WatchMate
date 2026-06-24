@@ -1,6 +1,7 @@
 package com.project.watchmate.dashboard.application;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -92,6 +93,9 @@ public class DashboardService {
     private void validateDateRange(LocalDate from, LocalDate to) {
         if (from.isAfter(to)) {
             throw new IllegalArgumentException("Parameter 'from' must be on or before 'to'.");
+        }
+        if (ChronoUnit.DAYS.between(from, to) > 90) {
+            throw new IllegalArgumentException("Date range cannot exceed 90 days.");
         }
     }
 }

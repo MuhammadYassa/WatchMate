@@ -22,6 +22,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import com.project.watchmate.common.ratelimit.AuthRateLimitFilter;
 import com.project.watchmate.common.security.auth.CustomAuthenticationEntryPoint;
 import com.project.watchmate.common.security.auth.WmUserDetailsService;
 import com.project.watchmate.common.security.jwt.JwtFilter;
@@ -37,6 +38,8 @@ public class SecurityConfig {
     private final WmUserDetailsService userDetailsService;
 
     private final JwtFilter jwtFilter;
+
+    private final AuthRateLimitFilter authRateLimitFilter;
 
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
 
@@ -70,6 +73,7 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .sessionManagement(session ->
                     session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .addFilterBefore(authRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

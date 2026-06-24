@@ -73,7 +73,8 @@ import static org.mockito.Mockito.mock;
 	"spring.data.redis.password=",
 	"management.health.redis.enabled=false",
 	"watchmate.discovery.sync.startup-enabled=false",
-	"watchmate.show-jobs.poll-delay-ms=3600000"
+	"watchmate.show-jobs.poll-delay-ms=3600000",
+	"watchmate.rate-limit.enabled=false"
 })
 public abstract class AbstractIntegrationTest {
 
