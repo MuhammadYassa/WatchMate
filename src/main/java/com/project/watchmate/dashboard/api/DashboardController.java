@@ -41,7 +41,13 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     @GetMapping("/continue-watching")
-    @Operation(summary = "Get continue-watching items", description = "Returns the authenticated user's active in-progress media using local database data only. Show rows prefer a saved watch position and otherwise fall back to the latest watched episode.")
+    @Operation(
+        summary = "Get continue-watching items",
+        description = "Returns the authenticated user's active in-progress media (both movies and shows) sorted by most-recent "
+            + "activity descending. Movie rows carry watchStatus=WATCHING and no season/episode fields. "
+            + "Show rows include resumeSeasonNumber, resumeEpisodeNumber, and nextSeason/Episode fields when locally available. "
+            + "Uses local database data only; no live TMDB calls."
+    )
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Continue-watching items returned", content = @Content(schema = @Schema(implementation = ContinueWatchingResponseDTO.class))),

@@ -197,6 +197,11 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage(), "USER_BLOCKED", null, ex, request);
     }
 
+    @ExceptionHandler(PrivateProfileException.class)
+    public ResponseEntity<ApiError> handlePrivateProfile(PrivateProfileException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage(), "PRIVATE_PROFILE", null, ex, request);
+    }
+
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleHttpMessageNotReadable(HttpMessageNotReadableException ex, HttpServletRequest request) {

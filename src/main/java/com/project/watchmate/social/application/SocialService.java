@@ -24,6 +24,8 @@ import com.project.watchmate.social.dto.UserProfileDTO;
 import com.project.watchmate.common.error.AlreadyFollowingException;
 import com.project.watchmate.common.error.BlockedUserException;
 import com.project.watchmate.common.error.FollowRequestNotFoundException;
+import com.project.watchmate.common.error.PrivateProfileException;
+import com.project.watchmate.review.dto.ReviewResponseDTO;
 import com.project.watchmate.common.error.FollowRequestStateConflictException;
 import com.project.watchmate.common.error.NotFollowingException;
 import com.project.watchmate.common.error.SelfFollowException;
@@ -421,6 +423,47 @@ public class SocialService {
 
     private boolean canViewPrivateProfile(Users user) {
         return user.getRole() == Role.MODERATOR || user.getRole() == Role.ADMIN;
+    }
+
+    /**
+     * Asserts that {@code viewer} is permitted to access {@code targetUser}'s profile content.
+     * Throws the appropriate typed exception when access is denied, matching the behavior of
+     * {@link #buildUserProfile}:
+     * <ul>
+     *   <li>{@link BlockedUserException} (403) when either party has blocked the other</li>
+     *   <li>{@link PrivateProfileException} (403) when target is PRIVATE and viewer is not a
+     *       follower, MODERATOR, or ADMIN</li>
+     * </ul>
+     */
+    private void assertProfileViewable(Users targetUser, Users viewer) {
+        if (usersRepository.isEitherBlocking(targetUser.getId(), viewer.getId())) {
+            throw new BlockedUserException("Profile is not accessible");
+        }
+        if (targetUser.getPrivacyStatus() == PrivacyStatuses.PRIVATE
+                && !usersRepository.isFollowing(viewer.getId(), targetUser.getId())
+                && !canViewPrivateProfile(viewer)) {
+            throw new PrivateProfileException("This profile is private");
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ReviewResponseDTO> getUserReviews(Long targetUserId, Users viewer, int page, int size) {
+        if (viewer.getId().equals(targetUserId)) {
+            return reviewService.getReviewsByUser(viewer, page, size);
+        }
+        Users targetUser = findAndValidateTargetUser(targetUserId);
+        assertProfileViewable(targetUser, viewer);
+        return reviewService.getReviewsByUser(targetUser, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ReviewResponseDTO> getUserReviews(String targetUsername, Users viewer, int page, int size) {
+        Users targetUser = findAndValidateTargetUser(targetUsername);
+        if (viewer.getId().equals(targetUser.getId())) {
+            return reviewService.getReviewsByUser(viewer, page, size);
+        }
+        assertProfileViewable(targetUser, viewer);
+        return reviewService.getReviewsByUser(targetUser, page, size);
     }
 
     private Page<WatchListDTO> getProfileWatchLists(Users profileOwner, Users viewer) {

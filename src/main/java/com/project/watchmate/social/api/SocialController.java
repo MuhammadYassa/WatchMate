@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.validation.annotation.Validated;
 
 import com.project.watchmate.common.error.ApiError;
+import com.project.watchmate.review.dto.ReviewResponseDTO;
 import com.project.watchmate.social.dto.FollowListUserDetailsDTO;
 import com.project.watchmate.social.dto.FollowRequestDTO;
 import com.project.watchmate.social.dto.FollowRequestResponseDTO;
@@ -304,6 +305,56 @@ public class SocialController {
         Users user = userPrincipal.getUser();
         Page<FollowRequestDTO> response = socialService.getSentRequests(user, page, size);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/profile/by-id/{userId}/reviews")
+    @Operation(
+        summary = "Get paginated reviews for a user profile (by ID)",
+        description = "Returns a paginated list of reviews written by the specified user. "
+            + "Access rules match the profile endpoint: blocked users and unapproved viewers of private profiles receive 403."
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Reviews returned"),
+        @ApiResponse(responseCode = "400", description = "Invalid path or pagination parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "403", description = "Access denied — target user blocked or profile is private", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "404", description = "Target user not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<Page<ReviewResponseDTO>> getUserReviewsById(
+        @PathVariable @Min(1) Long userId,
+        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "20") @Min(1) @Max(MAX_SIZE) int size
+    ) {
+        Users user = userPrincipal.getUser();
+        Page<ReviewResponseDTO> reviews = socialService.getUserReviews(userId, user, page, size);
+        return ResponseEntity.ok(reviews);
+    }
+
+    @GetMapping("/profile/{username}/reviews")
+    @Operation(
+        summary = "Get paginated reviews for a user profile (by username)",
+        description = "Returns a paginated list of reviews written by the specified user. "
+            + "Access rules match the profile endpoint: blocked users and unapproved viewers of private profiles receive 403."
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Reviews returned"),
+        @ApiResponse(responseCode = "400", description = "Invalid pagination parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "403", description = "Access denied — target user blocked or profile is private", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "404", description = "Target user not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<Page<ReviewResponseDTO>> getUserReviewsByUsername(
+        @PathVariable String username,
+        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "20") @Min(1) @Max(MAX_SIZE) int size
+    ) {
+        Users user = userPrincipal.getUser();
+        Page<ReviewResponseDTO> reviews = socialService.getUserReviews(username, user, page, size);
+        return ResponseEntity.ok(reviews);
     }
 
     @PatchMapping("/profile/me")

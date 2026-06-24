@@ -99,6 +99,13 @@ public class ReviewService {
         return reviewRepository.findAllByUser(user, pageable);
     }
 
+    @Transactional(readOnly = true)
+    public Page<ReviewResponseDTO> getReviewsByUser(Users user, int page, int size) {
+        int cappedSize = Math.min(size, 50);
+        Pageable pageable = PageRequest.of(page, cappedSize, Sort.by("datePosted").descending().and(Sort.by("id").descending()));
+        return reviewRepository.findAllByUser(user, pageable).map(watchMateMapper::mapToReviewResponseDTO);
+    }
+
     private boolean canDeleteReview(Users user, Review review) {
         return review.getUser().getId().equals(user.getId())
             || user.getRole() == Role.MODERATOR
