@@ -314,6 +314,7 @@ class SocialServiceTest {
         @Test
         void blockUser_WhenNotAlreadyBlocking_AddsToBlockedAndReturnsBlockedStatus() {
             when(usersRepository.findByIdAndEmailVerifiedTrue(TARGET_ID)).thenReturn(Optional.of(targetUser));
+            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
 
             FollowStatusDTO result = socialService.blockUser(TARGET_ID, user);
 
@@ -326,11 +327,57 @@ class SocialServiceTest {
         }
 
         @Test
+        void blockUser_WhenAlreadyBlocking_ReturnsBlockedIdempotently() {
+            when(usersRepository.findByIdAndEmailVerifiedTrue(TARGET_ID)).thenReturn(Optional.of(targetUser));
+            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(true);
+
+            FollowStatusDTO result = socialService.blockUser(TARGET_ID, user);
+
+            assertEquals(FollowStatuses.BLOCKED, result.getFollowStatus());
+            verify(usersRepository, never()).insertBlockRelation(any(), any());
+        }
+
+        @Test
         void blockUser_WhenBlockingSelf_ThrowsSelfFollowException() {
             when(usersRepository.findByIdAndEmailVerifiedTrue(USER_ID)).thenReturn(Optional.of(user));
 
             SelfFollowException e = assertThrows(SelfFollowException.class, () -> socialService.blockUser(USER_ID, user));
             assertEquals("Cannot block yourself!", e.getMessage());
+        }
+    }
+
+    @Nested
+    @DisplayName("Unblock User Tests")
+    class UnblockUserTests {
+
+        @Test
+        void unblockUser_WhenBlocking_RemovesBlockAndReturnsNotFollowing() {
+            when(usersRepository.findByIdAndEmailVerifiedTrue(TARGET_ID)).thenReturn(Optional.of(targetUser));
+            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(true);
+
+            FollowStatusDTO result = socialService.unblockUser(TARGET_ID, user);
+
+            assertEquals(FollowStatuses.NOT_FOLLOWING, result.getFollowStatus());
+            verify(usersRepository).deleteBlockRelation(USER_ID, TARGET_ID);
+        }
+
+        @Test
+        void unblockUser_WhenNotBlocking_ReturnsNotFollowingIdempotently() {
+            when(usersRepository.findByIdAndEmailVerifiedTrue(TARGET_ID)).thenReturn(Optional.of(targetUser));
+            when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
+
+            FollowStatusDTO result = socialService.unblockUser(TARGET_ID, user);
+
+            assertEquals(FollowStatuses.NOT_FOLLOWING, result.getFollowStatus());
+            verify(usersRepository, never()).deleteBlockRelation(any(), any());
+        }
+
+        @Test
+        void unblockUser_WhenUnblockingSelf_ThrowsSelfFollowException() {
+            when(usersRepository.findByIdAndEmailVerifiedTrue(USER_ID)).thenReturn(Optional.of(user));
+
+            SelfFollowException e = assertThrows(SelfFollowException.class, () -> socialService.unblockUser(USER_ID, user));
+            assertEquals("Cannot unblock yourself!", e.getMessage());
         }
     }
 
