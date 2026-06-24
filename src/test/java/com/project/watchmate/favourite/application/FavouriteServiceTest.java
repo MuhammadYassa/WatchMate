@@ -8,11 +8,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -23,11 +25,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.favourite.dto.FavouriteStatusDTO;
 import com.project.watchmate.media.catalog.dto.MediaDetailsDTO;
-import com.project.watchmate.favourite.dto.UserFavouritesDTO;
 import com.project.watchmate.common.error.DuplicateFavouriteException;
 import com.project.watchmate.common.mapper.WatchMateMapper;
 import com.project.watchmate.media.catalog.domain.Media;
@@ -180,43 +184,56 @@ class FavouriteServiceTest {
     class GetUserFavouritesTests {
 
         @Test
-        void getUserFavourites_WhenUserHasFavourites_ReturnsDtoWithMappedListAndCount() {
-            managedUser.getFavorites().add(media);
+        void getUserFavourites_WhenUserHasFavourites_ReturnsPageWithMappedContent() {
             MediaDetailsDTO mappedDto = MediaDetailsDTO.builder().tmdbId(TMDB_ID).title("Test Media").build();
-            when(usersRepository.findByIdWithFavorites(user.getId())).thenReturn(Optional.of(managedUser));
-            when(userWatchStatusResolver.resolveWatchStatus(managedUser, media)).thenReturn(WatchStatus.WATCHED);
+            when(usersRepository.findFavoritesByUserId(eq(user.getId()), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(media)));
+            when(userWatchStatusResolver.resolveWatchStatus(user, media)).thenReturn(WatchStatus.WATCHED);
             when(watchMateMapper.mapToMediaDetailsDTO(any(), any(), eq(true), eq(WatchStatus.WATCHED)))
                 .thenReturn(mappedDto);
 
-            UserFavouritesDTO result = favouriteService.getUserFavourites(user);
+            Page<MediaDetailsDTO> result = favouriteService.getUserFavourites(user, 0, 20);
 
-            assertEquals(1, result.getTotalCount());
-            assertEquals(1, result.getFavourites().size());
-            assertEquals(mappedDto, result.getFavourites().get(0));
+            assertEquals(1, result.getTotalElements());
+            assertEquals(1, result.getContent().size());
+            assertEquals(mappedDto, result.getContent().get(0));
         }
 
         @Test
-        void getUserFavourites_WhenUserHasNoFavourites_ReturnsEmptyListAndZeroCount() {
-            when(usersRepository.findByIdWithFavorites(user.getId())).thenReturn(Optional.of(managedUser));
-            UserFavouritesDTO result = favouriteService.getUserFavourites(user);
+        void getUserFavourites_WhenUserHasNoFavourites_ReturnsEmptyPage() {
+            when(usersRepository.findFavoritesByUserId(eq(user.getId()), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
 
-            assertEquals(0, result.getTotalCount());
-            assertTrue(result.getFavourites().isEmpty());
+            Page<MediaDetailsDTO> result = favouriteService.getUserFavourites(user, 0, 20);
+
+            assertEquals(0, result.getTotalElements());
+            assertTrue(result.getContent().isEmpty());
         }
 
         @Test
         void getUserFavourites_WhenNoUserMediaStatus_UsesWatchStatusNone() {
-            managedUser.getFavorites().add(media);
             MediaDetailsDTO mappedDto = MediaDetailsDTO.builder().tmdbId(TMDB_ID).build();
-            when(usersRepository.findByIdWithFavorites(user.getId())).thenReturn(Optional.of(managedUser));
-            when(userWatchStatusResolver.resolveWatchStatus(managedUser, media)).thenReturn(WatchStatus.NONE);
+            when(usersRepository.findFavoritesByUserId(eq(user.getId()), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(media)));
+            when(userWatchStatusResolver.resolveWatchStatus(user, media)).thenReturn(WatchStatus.NONE);
             when(watchMateMapper.mapToMediaDetailsDTO(any(), any(), eq(true), eq(WatchStatus.NONE)))
                 .thenReturn(mappedDto);
 
-            UserFavouritesDTO result = favouriteService.getUserFavourites(user);
+            Page<MediaDetailsDTO> result = favouriteService.getUserFavourites(user, 0, 20);
 
-            assertEquals(1, result.getTotalCount());
+            assertEquals(1, result.getTotalElements());
             verify(watchMateMapper).mapToMediaDetailsDTO(any(), any(), eq(true), eq(WatchStatus.NONE));
+        }
+
+        @Test
+        void getUserFavourites_SizeCappedAt50() {
+            when(usersRepository.findFavoritesByUserId(eq(user.getId()), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+            favouriteService.getUserFavourites(user, 0, 200);
+
+            verify(usersRepository).findFavoritesByUserId(eq(user.getId()),
+                argThat(p -> p.getPageSize() == 50));
         }
     }
 }

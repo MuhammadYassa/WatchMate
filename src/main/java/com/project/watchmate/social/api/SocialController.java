@@ -7,8 +7,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,6 +22,8 @@ import com.project.watchmate.social.dto.FollowRequestDTO;
 import com.project.watchmate.social.dto.FollowRequestResponseDTO;
 import com.project.watchmate.social.dto.FollowStatusDTO;
 import com.project.watchmate.social.dto.SearchListUserDetailsDTO;
+import com.project.watchmate.social.dto.UpdateProfileRequestDTO;
+import com.project.watchmate.social.dto.UpdateProfileResponseDTO;
 import com.project.watchmate.social.dto.UserProfileDTO;
 import com.project.watchmate.social.domain.FollowRequestStatuses;
 import com.project.watchmate.common.security.auth.UserPrincipal;
@@ -35,6 +39,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -172,9 +177,9 @@ public class SocialController {
     }
     
     @PostMapping("/block/{userId}")
-    @Operation(summary = "Block or unblock user", description = "Blocks a user, or removes an existing block if the user is already blocked.")
+    @Operation(summary = "Block user", description = "Blocks a user. Idempotent: returns BLOCKED even if the user is already blocked.")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Block status updated", content = @Content(schema = @Schema(implementation = FollowStatusDTO.class))),
+        @ApiResponse(responseCode = "200", description = "User blocked", content = @Content(schema = @Schema(implementation = FollowStatusDTO.class))),
         @ApiResponse(responseCode = "400", description = "Invalid request", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "404", description = "Target user not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
@@ -183,6 +188,21 @@ public class SocialController {
     public ResponseEntity<FollowStatusDTO> blockUser(@PathVariable @Min(1) Long userId, @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal) {
         Users user = userPrincipal.getUser();
         FollowStatusDTO response = socialService.blockUser(userId, user);
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/block/{userId}")
+    @Operation(summary = "Unblock user", description = "Removes an existing block. Idempotent: returns NOT_FOLLOWING even if the user is not currently blocked.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "User unblocked", content = @Content(schema = @Schema(implementation = FollowStatusDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid request", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "404", description = "Target user not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<FollowStatusDTO> unblockUser(@PathVariable @Min(1) Long userId, @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        Users user = userPrincipal.getUser();
+        FollowStatusDTO response = socialService.unblockUser(userId, user);
         return ResponseEntity.ok(response);
     }
     
@@ -250,6 +270,56 @@ public class SocialController {
     public ResponseEntity<UserProfileDTO> getUserProfile(@Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal, @PathVariable String username) {
         Users user = userPrincipal.getUser();
         UserProfileDTO response = socialService.getUserProfile(username, user);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/profile/by-id/{userId}")
+    @Operation(summary = "Get user profile by ID", description = "Returns the profile view available to the authenticated user for the user identified by numeric ID.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "User profile returned", content = @Content(schema = @Schema(implementation = UserProfileDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid path parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "404", description = "Target user not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<UserProfileDTO> getUserProfileById(@PathVariable @Min(1) Long userId, @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        Users user = userPrincipal.getUser();
+        UserProfileDTO response = socialService.getUserProfile(userId, user);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/follow-requests/sent")
+    @Operation(summary = "List sent follow requests", description = "Returns pending follow requests sent by the authenticated user.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Sent follow requests returned"),
+        @ApiResponse(responseCode = "400", description = "Invalid pagination parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<Page<FollowRequestDTO>> sentRequests(
+        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "10") @Min(1) @Max(MAX_SIZE) int size
+    ) {
+        Users user = userPrincipal.getUser();
+        Page<FollowRequestDTO> response = socialService.getSentRequests(user, page, size);
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/profile/me")
+    @Operation(summary = "Update profile settings", description = "Updates the privacy status for the authenticated user.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Profile updated", content = @Content(schema = @Schema(implementation = UpdateProfileResponseDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Validation failed or invalid value", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<UpdateProfileResponseDTO> updateProfile(
+        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @Valid @RequestBody UpdateProfileRequestDTO request
+    ) {
+        Users user = userPrincipal.getUser();
+        UpdateProfileResponseDTO response = socialService.updateProfile(user, request);
         return ResponseEntity.ok(response);
     }
 

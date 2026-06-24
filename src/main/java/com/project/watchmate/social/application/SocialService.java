@@ -18,6 +18,8 @@ import com.project.watchmate.social.dto.FollowRequestDTO;
 import com.project.watchmate.social.dto.FollowRequestResponseDTO;
 import com.project.watchmate.social.dto.FollowStatusDTO;
 import com.project.watchmate.social.dto.SearchListUserDetailsDTO;
+import com.project.watchmate.social.dto.UpdateProfileRequestDTO;
+import com.project.watchmate.social.dto.UpdateProfileResponseDTO;
 import com.project.watchmate.social.dto.UserProfileDTO;
 import com.project.watchmate.common.error.AlreadyFollowingException;
 import com.project.watchmate.common.error.BlockedUserException;
@@ -248,9 +250,25 @@ public class SocialService {
     @Transactional(readOnly = true)
     public Page<FollowRequestDTO> getReceivedRequests(Users user, int pageNumber, int size) {
         Pageable pageable = PageRequest.of(pageNumber, size, Sort.by("requestedAt").descending().and(Sort.by("id").descending()));
-        Page <FollowRequest> page = followRequestRepository.findByTargetUserAndStatus(user, FollowRequestStatuses.PENDING, pageable);
+        Page<FollowRequest> page = followRequestRepository.findByTargetUserAndStatus(user, FollowRequestStatuses.PENDING, pageable);
+        return page.map(watchMateMapper::mapToFollowRequestDTO);
+    }
 
-        return page.map(followRequest -> watchMateMapper.mapToFollowRequestDTO(followRequest));
+    @Transactional(readOnly = true)
+    public Page<FollowRequestDTO> getSentRequests(Users user, int pageNumber, int size) {
+        Pageable pageable = PageRequest.of(pageNumber, size, Sort.by("requestedAt").descending().and(Sort.by("id").descending()));
+        return followRequestRepository.findByRequestUserAndStatus(user, FollowRequestStatuses.PENDING, pageable)
+            .map(watchMateMapper::mapToFollowRequestDTO);
+    }
+
+    @Transactional
+    public UpdateProfileResponseDTO updateProfile(Users user, UpdateProfileRequestDTO request) {
+        user.setPrivacyStatus(request.getPrivacyStatus());
+        Users saved = usersRepository.save(user);
+        return UpdateProfileResponseDTO.builder()
+            .userId(saved.getId())
+            .privacyStatus(saved.getPrivacyStatus())
+            .build();
     }
 
     @Transactional
@@ -278,22 +296,29 @@ public class SocialService {
             throw new SelfFollowException("Cannot block yourself!");
         }
         if (usersRepository.isBlockingUser(user.getId(), targetUser.getId())){
-            usersRepository.deleteBlockRelation(user.getId(), targetUser.getId());
-            log.info("User unblocked target username={} targetUsername={}", user.getUsername(), targetUser.getUsername());
-            return FollowStatusDTO.builder()
-            .followStatus(FollowStatuses.NOT_FOLLOWING)
-            .build();
-        } else {
-            usersRepository.insertBlockRelation(user.getId(), targetUser.getId());
-            usersRepository.deleteFollowRelation(user.getId(), targetUser.getId());
-            usersRepository.deleteFollowRelation(targetUser.getId(), user.getId());
-            followRequestRepository.deleteByRequestUserAndTargetUser(user, targetUser);
-            followRequestRepository.deleteByRequestUserAndTargetUser(targetUser, user);
-            log.info("User blocked target username={} targetUsername={}", user.getUsername(), targetUser.getUsername());
-            return FollowStatusDTO.builder()
-            .followStatus(FollowStatuses.BLOCKED)
-            .build();
+            return FollowStatusDTO.builder().followStatus(FollowStatuses.BLOCKED).build();
         }
+        usersRepository.insertBlockRelation(user.getId(), targetUser.getId());
+        usersRepository.deleteFollowRelation(user.getId(), targetUser.getId());
+        usersRepository.deleteFollowRelation(targetUser.getId(), user.getId());
+        followRequestRepository.deleteByRequestUserAndTargetUser(user, targetUser);
+        followRequestRepository.deleteByRequestUserAndTargetUser(targetUser, user);
+        log.info("User blocked target username={} targetUsername={}", user.getUsername(), targetUser.getUsername());
+        return FollowStatusDTO.builder().followStatus(FollowStatuses.BLOCKED).build();
+    }
+
+    @Transactional
+    public FollowStatusDTO unblockUser(Long userId, Users user) {
+        Users targetUser = findAndValidateTargetUser(userId);
+        if (user.getId().equals(userId)){
+            throw new SelfFollowException("Cannot unblock yourself!");
+        }
+        if (!usersRepository.isBlockingUser(user.getId(), targetUser.getId())){
+            return FollowStatusDTO.builder().followStatus(FollowStatuses.NOT_FOLLOWING).build();
+        }
+        usersRepository.deleteBlockRelation(user.getId(), targetUser.getId());
+        log.info("User unblocked target username={} targetUsername={}", user.getUsername(), targetUser.getUsername());
+        return FollowStatusDTO.builder().followStatus(FollowStatuses.NOT_FOLLOWING).build();
     }
 
     @Transactional(readOnly = true)

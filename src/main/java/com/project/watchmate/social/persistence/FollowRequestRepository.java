@@ -14,6 +14,8 @@ public interface FollowRequestRepository extends JpaRepository<FollowRequest, Lo
 
     Page<FollowRequest> findByTargetUserAndStatus(Users targetUser, FollowRequestStatuses status, Pageable pageable);
 
+    Page<FollowRequest> findByRequestUserAndStatus(Users requestUser, FollowRequestStatuses status, Pageable pageable);
+
     Optional<FollowRequest> findByRequestUserAndTargetUser(Users requestUser, Users targetUser);
 
     boolean existsByRequestUserAndTargetUserAndStatus(Users requestUser, Users targetUser, FollowRequestStatuses status);

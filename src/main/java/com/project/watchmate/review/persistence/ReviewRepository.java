@@ -17,6 +17,8 @@ public interface ReviewRepository extends JpaRepository<Review, Long>{
 
     List<Review> findByMedia(Media media);
 
+    Page<Review> findByMedia(Media media, Pageable pageable);
+
     boolean existsByUserAndMedia(Users user, Media media);
 
     Page<Review> findAllByUser(Users user, Pageable pageable);

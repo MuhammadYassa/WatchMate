@@ -107,10 +107,11 @@ class ReviewIntegrationTest extends AbstractIntegrationTest {
 
 		mockMvc.perform(get("/api/v1/movies/{tmdbId}/reviews", media.getTmdbId()))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$[0].reviewId").isNumber())
-			.andExpect(jsonPath("$[0].tmdbId").value(media.getTmdbId().intValue()))
-			.andExpect(jsonPath("$[0].starRating").value(5))
-			.andExpect(jsonPath("$[0].comment").value("Excellent"));
+			.andExpect(jsonPath("$.content[0].reviewId").isNumber())
+			.andExpect(jsonPath("$.content[0].tmdbId").value(media.getTmdbId().intValue()))
+			.andExpect(jsonPath("$.content[0].starRating").value(5))
+			.andExpect(jsonPath("$.content[0].comment").value("Excellent"))
+			.andExpect(jsonPath("$.totalElements").value(1));
 	}
 
 	@Test
@@ -121,9 +122,27 @@ class ReviewIntegrationTest extends AbstractIntegrationTest {
 
 		mockMvc.perform(get("/api/v1/shows/{tmdbId}/reviews", media.getTmdbId()))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$[0].reviewId").isNumber())
-			.andExpect(jsonPath("$[0].starRating").value(4))
-			.andExpect(jsonPath("$[0].comment").value("Great show"));
+			.andExpect(jsonPath("$.content[0].reviewId").isNumber())
+			.andExpect(jsonPath("$.content[0].starRating").value(4))
+			.andExpect(jsonPath("$.content[0].comment").value("Great show"))
+			.andExpect(jsonPath("$.totalElements").value(1));
+	}
+
+	@Test
+	void getMovieReviews_withSizeParam_returnsPaginatedSubset() throws Exception {
+		Users user1 = saveUser("review-page-user-1", true);
+		Users user2 = saveUser("review-page-user-2", true);
+		Media media = saveMedia(7012L, "Paginated Review Movie", com.project.watchmate.media.catalog.domain.MediaType.MOVIE);
+		saveReview(user1, media, 5, "First");
+		saveReview(user2, media, 4, "Second");
+
+		mockMvc.perform(get("/api/v1/movies/{tmdbId}/reviews", media.getTmdbId())
+			.param("page", "0")
+			.param("size", "1"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content.length()").value(1))
+			.andExpect(jsonPath("$.totalElements").value(2))
+			.andExpect(jsonPath("$.totalPages").value(2));
 	}
 
 	@Test

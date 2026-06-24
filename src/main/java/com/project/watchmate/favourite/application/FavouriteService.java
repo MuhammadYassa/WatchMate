@@ -3,15 +3,17 @@ package com.project.watchmate.favourite.application;
 import com.project.watchmate.media.catalog.application.MediaResolutionService;
 import com.project.watchmate.media.catalog.application.UserWatchStatusResolver;
 
-import java.util.List;
 import java.util.Objects;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.favourite.dto.FavouriteStatusDTO;
-import com.project.watchmate.favourite.dto.UserFavouritesDTO;
 import com.project.watchmate.media.catalog.dto.MediaDetailsDTO;
 import com.project.watchmate.common.error.UserNotFoundException;
 import com.project.watchmate.common.mapper.WatchMateMapper;
@@ -70,20 +72,13 @@ public class FavouriteService {
     }
 
     @Transactional(readOnly = true)
-    public UserFavouritesDTO getUserFavourites (Users user){
-        Users managedUser = loadUserWithFavorites(user);
-        List<Media> allMedia = managedUser.getFavorites();
-        List<MediaDetailsDTO> allMediaDetails = allMedia.stream().map(m -> {
-            WatchStatus watchStatus = userWatchStatusResolver.resolveWatchStatus(managedUser, m);
-            boolean isFavourited = managedUser.getFavorites().contains(m);
-
-            return watchMateMapper.mapToMediaDetailsDTO(m, m.getReviews(), isFavourited, watchStatus);
-        }).toList();
-
-        return UserFavouritesDTO.builder()
-            .favourites(allMediaDetails)
-            .totalCount(allMediaDetails.size())
-            .build();
+    public Page<MediaDetailsDTO> getUserFavourites(Users user, int page, int size) {
+        int cappedSize = Math.min(size, 50);
+        Pageable pageable = PageRequest.of(page, cappedSize, Sort.by("id").descending());
+        return usersRepository.findFavoritesByUserId(user.getId(), pageable).map(m -> {
+            WatchStatus watchStatus = userWatchStatusResolver.resolveWatchStatus(user, m);
+            return watchMateMapper.mapToMediaDetailsDTO(m, m.getReviews(), true, watchStatus);
+        });
     }
 
     private Users loadUserWithFavorites(Users user) {
@@ -91,6 +86,7 @@ public class FavouriteService {
         return usersRepository.findByIdWithFavorites(userId)
             .orElseThrow(() -> new UserNotFoundException("User not found"));
     }
+
 }
 
 

@@ -23,6 +23,7 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -539,6 +540,130 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 		Users viewer = saveUser("missing-profile-viewer", true);
 
 		mockMvc.perform(get("/api/v1/social/profile/{username}", "does-not-exist")
+			.header("Authorization", bearerToken(viewer)))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
+	}
+
+	@Test
+	void sentFollowRequests_returnsPendingRequestsSentByUser() throws Exception {
+		Users requester = saveUser("social-sent-requester", true);
+		Users target1 = savePrivateUser("social-sent-target-1");
+		Users target2 = savePrivateUser("social-sent-target-2");
+		saveFollowRequest(requester, target1, FollowRequestStatuses.PENDING);
+		saveFollowRequest(requester, target2, FollowRequestStatuses.PENDING);
+		saveFollowRequest(target1, requester, FollowRequestStatuses.PENDING);
+
+		mockMvc.perform(get("/api/v1/social/follow-requests/sent")
+			.header("Authorization", bearerToken(requester)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.totalElements").value(2))
+			.andExpect(jsonPath("$.content[0].requesterUserId").value(requester.getId().intValue()));
+	}
+
+	@Test
+	void updateProfile_toPrivate_returns200_andPersists() throws Exception {
+		Users user = saveUser("social-privacy-user", true);
+
+		mockMvc.perform(patch("/api/v1/social/profile/me")
+			.header("Authorization", bearerToken(user))
+			.contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+			.content("{\"privacyStatus\":\"PRIVATE\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.userId").value(user.getId().intValue()))
+			.andExpect(jsonPath("$.privacyStatus").value("PRIVATE"));
+
+		Users updated = usersRepository.findById(user.getId()).orElseThrow();
+		assertThat(updated.getPrivacyStatus()).isEqualTo(PrivacyStatuses.PRIVATE);
+	}
+
+	@Test
+	void updateProfile_withInvalidEnum_returns400() throws Exception {
+		Users user = saveUser("social-privacy-invalid-user", true);
+
+		mockMvc.perform(patch("/api/v1/social/profile/me")
+			.header("Authorization", bearerToken(user))
+			.contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+			.content("{\"privacyStatus\":\"INVALID\"}"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+	}
+
+	@Test
+	void updateProfile_unauthenticated_returns401() throws Exception {
+		mockMvc.perform(patch("/api/v1/social/profile/me")
+			.contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+			.content("{\"privacyStatus\":\"PRIVATE\"}"))
+			.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void blockUser_isIdempotent_doubleBlock_returnsBlockedBothTimes() throws Exception {
+		Users user = saveUser("social-dbl-block-user", true);
+		Users target = saveUser("social-dbl-block-target", true);
+
+		mockMvc.perform(post("/api/v1/social/block/{userId}", target.getId())
+			.header("Authorization", bearerToken(user)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.followStatus").value("BLOCKED"));
+
+		mockMvc.perform(post("/api/v1/social/block/{userId}", target.getId())
+			.header("Authorization", bearerToken(user)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.followStatus").value("BLOCKED"));
+
+		assertThat(usersRepository.isBlockingUser(user.getId(), target.getId())).isTrue();
+	}
+
+	@Test
+	void unblockUser_removesBlockRelation_andReturnsNotFollowing() throws Exception {
+		Users user = saveUser("social-unblock-user", true);
+		Users target = saveUser("social-unblock-target", true);
+		mockMvc.perform(post("/api/v1/social/block/{userId}", target.getId())
+			.header("Authorization", bearerToken(user)))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(delete("/api/v1/social/block/{userId}", target.getId())
+			.header("Authorization", bearerToken(user)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.followStatus").value("NOT_FOLLOWING"));
+
+		assertThat(usersRepository.isBlockingUser(user.getId(), target.getId())).isFalse();
+	}
+
+	@Test
+	void unblockUser_isIdempotent_doubleUnblock_returnsNotFollowingBothTimes() throws Exception {
+		Users user = saveUser("social-dbl-unblock-user", true);
+		Users target = saveUser("social-dbl-unblock-target", true);
+
+		mockMvc.perform(delete("/api/v1/social/block/{userId}", target.getId())
+			.header("Authorization", bearerToken(user)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.followStatus").value("NOT_FOLLOWING"));
+
+		mockMvc.perform(delete("/api/v1/social/block/{userId}", target.getId())
+			.header("Authorization", bearerToken(user)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.followStatus").value("NOT_FOLLOWING"));
+	}
+
+	@Test
+	void getUserProfileById_returnsProfileForPublicUser() throws Exception {
+		Users viewer = saveUser("social-profile-by-id-viewer", true);
+		Users target = saveUser("social-profile-by-id-target", true);
+
+		mockMvc.perform(get("/api/v1/social/profile/by-id/{userId}", target.getId())
+			.header("Authorization", bearerToken(viewer)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.userId").value(target.getId().intValue()))
+			.andExpect(jsonPath("$.username").value(target.getUsername()));
+	}
+
+	@Test
+	void getUserProfileById_whenNotFound_returns404() throws Exception {
+		Users viewer = saveUser("social-profile-by-id-missing-viewer", true);
+
+		mockMvc.perform(get("/api/v1/social/profile/by-id/{userId}", 999999L)
 			.header("Authorization", bearerToken(viewer)))
 			.andExpect(status().isNotFound())
 			.andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));

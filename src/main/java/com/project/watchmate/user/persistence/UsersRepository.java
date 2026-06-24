@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.social.dto.SearchListUserDetailsDTO;
 
@@ -43,6 +44,10 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
 
     @Query("SELECT DISTINCT u FROM Users u LEFT JOIN FETCH u.favorites WHERE u.id = :userId")
     Optional<Users> findByIdWithFavorites(@Param("userId") Long userId);
+
+    @Query(value = "select m from Users u join u.favorites m where u.id = :userId",
+           countQuery = "select count(m) from Users u join u.favorites m where u.id = :userId")
+    Page<Media> findFavoritesByUserId(@Param("userId") Long userId, Pageable pageable);
 
     @Query("select favorite.id from Users u join u.favorites favorite where u.id = :userId and favorite.id in :mediaIds")
     List<Long> findFavoriteMediaIds(@Param("userId") Long userId, @Param("mediaIds") Collection<Long> mediaIds);

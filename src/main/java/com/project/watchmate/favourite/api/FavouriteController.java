@@ -7,7 +7,7 @@ import com.project.watchmate.common.error.ApiError;
 import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.favourite.application.FavouriteService;
 import com.project.watchmate.favourite.dto.FavouriteStatusDTO;
-import com.project.watchmate.favourite.dto.UserFavouritesDTO;
+import com.project.watchmate.media.catalog.dto.MediaDetailsDTO;
 import com.project.watchmate.common.security.auth.UserPrincipal;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,6 +20,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
 
@@ -73,15 +75,20 @@ public class FavouriteController {
     }
 
     @GetMapping
-    @Operation(summary = "List favourites", description = "Returns all favourites for the authenticated user.")
+    @Operation(summary = "List favourites", description = "Returns paginated favourites for the authenticated user.")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Favourites returned", content = @Content(schema = @Schema(implementation = UserFavouritesDTO.class))),
+        @ApiResponse(responseCode = "200", description = "Favourites returned (paginated)", content = @Content(schema = @Schema(implementation = MediaDetailsDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid pagination parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<UserFavouritesDTO> allFavourites(@Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal) {
+    public ResponseEntity<Page<MediaDetailsDTO>> allFavourites(
+        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size
+    ) {
         Users user = userPrincipal.getUser();
-        UserFavouritesDTO response = favouriteService.getUserFavourites(user);
+        Page<MediaDetailsDTO> response = favouriteService.getUserFavourites(user, page, size);
         return ResponseEntity.ok(response);
     }
 

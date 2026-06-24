@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -21,6 +22,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.review.dto.CreateReviewRequestDTO;
@@ -186,16 +190,16 @@ class ReviewServiceTest {
     class GetReviewsTests {
 
         @Test
-        void getReviews_WhenMediaExists_ReturnsMappedList() {
+        void getReviews_WhenMediaExists_ReturnsMappedPage() {
             when(mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, MediaType.MOVIE)).thenReturn(media);
-            when(reviewRepository.findByMedia(media)).thenReturn(List.of(review));
+            when(reviewRepository.findByMedia(eq(media), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(review)));
             ReviewResponseDTO dto = ReviewResponseDTO.builder().reviewId(REVIEW_ID).build();
             when(watchMateMapper.mapToReviewResponseDTO(any(Review.class))).thenReturn(dto);
 
-            List<ReviewResponseDTO> result = reviewService.getReviews(TMDB_ID, MediaType.MOVIE);
+            Page<ReviewResponseDTO> result = reviewService.getReviews(TMDB_ID, MediaType.MOVIE, 0, 20);
 
-            assertEquals(1, result.size());
-            assertEquals(REVIEW_ID, result.get(0).getReviewId());
+            assertEquals(1, result.getTotalElements());
+            assertEquals(REVIEW_ID, result.getContent().get(0).getReviewId());
         }
 
     }

@@ -3,15 +3,14 @@ package com.project.watchmate.review.application;
 import com.project.watchmate.media.catalog.application.MediaResolutionService;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.review.dto.CreateReviewRequestDTO;
@@ -82,10 +81,12 @@ public class ReviewService {
         return;
     }
 
-    public List<ReviewResponseDTO> getReviews(Long tmdbId, MediaType mediaType) {
+    @Transactional(readOnly = true)
+    public Page<ReviewResponseDTO> getReviews(Long tmdbId, MediaType mediaType, int page, int size) {
+        int cappedSize = Math.min(size, 50);
+        Pageable pageable = PageRequest.of(page, cappedSize, Sort.by("datePosted").descending());
         Media media = mediaResolutionService.resolveMediaByTmdbId(tmdbId, mediaType);
-        List<Review> reviews = reviewRepository.findByMedia(media);
-        return reviews.stream().map(review -> watchMateMapper.mapToReviewResponseDTO(review)).collect(Collectors.toList());
+        return reviewRepository.findByMedia(media, pageable).map(watchMateMapper::mapToReviewResponseDTO);
     }
 
     public ReviewResponseDTO getReview(Long reviewId) {
