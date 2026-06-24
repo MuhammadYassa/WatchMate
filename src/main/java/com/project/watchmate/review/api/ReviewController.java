@@ -37,13 +37,13 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/reviews")
 @Validated
-@Tag(name = "Reviews", description = "Authenticated review management endpoints.")
-@SecurityRequirement(name = "bearerAuth")
+@Tag(name = "Reviews", description = "Review management endpoints. Write operations require authentication.")
 public class ReviewController {
 
     private final ReviewService reviewService;
 
-    @PostMapping("/create")
+    @PostMapping
+    @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Create review", description = "Creates a new review for a media item.")
     @ApiResponses({
         @ApiResponse(responseCode = "201", description = "Review created", content = @Content(schema = @Schema(implementation = ReviewResponseDTO.class))),
@@ -63,6 +63,7 @@ public class ReviewController {
     }
 
     @PatchMapping("/{reviewId}")
+    @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Update review", description = "Updates an existing review owned by the authenticated user.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Review updated", content = @Content(schema = @Schema(implementation = ReviewResponseDTO.class))),
@@ -83,6 +84,7 @@ public class ReviewController {
     }
     
     @DeleteMapping("/{reviewId}")
+    @SecurityRequirement(name = "bearerAuth")
     @Operation(summary = "Delete review", description = "Deletes an existing review owned by the authenticated user.")
     @ApiResponses({
         @ApiResponse(responseCode = "204", description = "Review deleted"),
@@ -106,7 +108,6 @@ public class ReviewController {
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Review returned", content = @Content(schema = @Schema(implementation = ReviewResponseDTO.class))),
         @ApiResponse(responseCode = "400", description = "Invalid path parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "404", description = "Review not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })

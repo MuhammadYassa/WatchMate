@@ -33,7 +33,7 @@ class FavouriteIntegrationTest extends AbstractIntegrationTest {
 				.genres(List.of())
 				.build());
 
-		mockMvc.perform(post("/api/v1/favourites/add/{tmdbId}", 9101L)
+		mockMvc.perform(post("/api/v1/favourites/{tmdbId}", 9101L)
 			.header("Authorization", bearerToken(user))
 			.param("type", "MOVIE"))
 			.andExpect(status().isOk())

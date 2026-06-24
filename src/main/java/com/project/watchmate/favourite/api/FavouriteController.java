@@ -41,8 +41,7 @@ import jakarta.validation.constraints.Min;
 public class FavouriteController {
 
     private final FavouriteService favouriteService;
-
-    @PostMapping("/add/{tmdbId}")
+    @PostMapping("/{tmdbId}")
     @Operation(summary = "Add favourite", description = "Marks a media item as a favourite for the authenticated user. Provide type when the item may need to be imported first.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Favourite added", content = @Content(schema = @Schema(implementation = FavouriteStatusDTO.class))),
@@ -58,7 +57,7 @@ public class FavouriteController {
         return ResponseEntity.ok(response);
     }
     
-    @DeleteMapping("/remove/{tmdbId}")
+    @DeleteMapping("/{tmdbId}")
     @Operation(summary = "Remove favourite", description = "Removes a media item from the authenticated user's favourites. Provide type when the item may need to be imported first.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Favourite removed", content = @Content(schema = @Schema(implementation = FavouriteStatusDTO.class))),
@@ -73,7 +72,7 @@ public class FavouriteController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/all")
+    @GetMapping
     @Operation(summary = "List favourites", description = "Returns all favourites for the authenticated user.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Favourites returned", content = @Content(schema = @Schema(implementation = UserFavouritesDTO.class))),
@@ -86,7 +85,7 @@ public class FavouriteController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/check/{tmdbId}")
+    @GetMapping("/{tmdbId}/status")
     @Operation(summary = "Check favourite status", description = "Returns whether a media item is favourited by the authenticated user. Provide type when the item may need to be imported first.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Favourite status returned", content = @Content(schema = @Schema(implementation = FavouriteStatusDTO.class))),

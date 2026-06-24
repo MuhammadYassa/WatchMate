@@ -34,7 +34,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    public final WmUserDetailsService userDetailsService;
+    private final WmUserDetailsService userDetailsService;
 
     private final JwtFilter jwtFilter;
 
@@ -57,6 +57,8 @@ public class SecurityConfig {
                     .requestMatchers("/api/v1/media/search/**")
                     .permitAll()
                     .requestMatchers("/api/v1/shows/*", "/api/v1/shows/*/next-episode", "/api/v1/shows/*/seasons/*/episodes", "/api/v1/movies/*")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/movies/*/reviews", "/api/v1/shows/*/reviews", "/api/v1/reviews/*")
                     .permitAll()
                     .requestMatchers("/api/v1/home", "/api/v1/discover/**", "/api/v1/genre/**")
                     .permitAll()

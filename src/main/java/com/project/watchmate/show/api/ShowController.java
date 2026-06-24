@@ -196,11 +196,9 @@ public class ShowController {
 
     @GetMapping("/{tmdbId}/reviews")
     @Operation(summary = "List show reviews", description = "Returns reviews for a show identified by TMDB ID.")
-    @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Show reviews returned", content = @Content(array = @ArraySchema(schema = @Schema(implementation = ReviewResponseDTO.class)))),
         @ApiResponse(responseCode = "400", description = "Invalid path parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
-        @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "404", description = "Show not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })

@@ -91,7 +91,7 @@ class SocialServiceTest {
 
         @Test
         void followUser_WhenPublicTarget_PerformsDirectFollowAndSaves() {
-            when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.of(targetUser));
+            when(usersRepository.findByIdAndEmailVerifiedTrue(TARGET_ID)).thenReturn(Optional.of(targetUser));
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
             when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
             when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
@@ -104,17 +104,17 @@ class SocialServiceTest {
 
         @Test
         void followUser_WhenUserNotFound_ThrowsUserNotFoundException() {
-            when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.empty());
+            when(usersRepository.findByIdAndEmailVerifiedTrue(TARGET_ID)).thenReturn(Optional.empty());
 
             UserNotFoundException e = assertThrows(UserNotFoundException.class, () -> socialService.followUser(TARGET_ID, user));
 
             assertEquals("User not found", e.getMessage());
-            verify(usersRepository).findById(TARGET_ID);
+            verify(usersRepository).findByIdAndEmailVerifiedTrue(TARGET_ID);
         }
 
         @Test
         void followUser_WhenSelfFollow_ThrowsSelfFollowException() {
-            when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+            when(usersRepository.findByIdAndEmailVerifiedTrue(USER_ID)).thenReturn(Optional.of(user));
 
             SelfFollowException e = assertThrows(SelfFollowException.class, () -> socialService.followUser(USER_ID, user));
 
@@ -123,7 +123,7 @@ class SocialServiceTest {
 
         @Test
         void followUser_WhenAlreadyFollowing_ThrowsAlreadyFollowingException() {
-            when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.of(targetUser));
+            when(usersRepository.findByIdAndEmailVerifiedTrue(TARGET_ID)).thenReturn(Optional.of(targetUser));
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(true);
 
             AlreadyFollowingException e = assertThrows(AlreadyFollowingException.class, () -> socialService.followUser(TARGET_ID, user));
@@ -135,7 +135,7 @@ class SocialServiceTest {
         @Test
         void followUser_WhenPrivateTarget_ReturnsRequested() {
             targetUser.setPrivacyStatus(PrivacyStatuses.PRIVATE);
-            when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.of(targetUser));
+            when(usersRepository.findByIdAndEmailVerifiedTrue(TARGET_ID)).thenReturn(Optional.of(targetUser));
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
             when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
             when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
@@ -155,7 +155,7 @@ class SocialServiceTest {
 
         @Test
         void unfollowUser_WhenFollowing_RemovesAndSaves() {
-            when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.of(targetUser));
+            when(usersRepository.findByIdAndEmailVerifiedTrue(TARGET_ID)).thenReturn(Optional.of(targetUser));
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(true);
             when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
             when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
@@ -168,7 +168,7 @@ class SocialServiceTest {
 
         @Test
         void unfollowUser_WhenNotFollowing_ThrowsNotFollowingException() {
-            when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.of(targetUser));
+            when(usersRepository.findByIdAndEmailVerifiedTrue(TARGET_ID)).thenReturn(Optional.of(targetUser));
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
 
             NotFollowingException e = assertThrows(NotFollowingException.class, () -> socialService.unfollowUser(TARGET_ID, user));
@@ -313,7 +313,7 @@ class SocialServiceTest {
 
         @Test
         void blockUser_WhenNotAlreadyBlocking_AddsToBlockedAndReturnsBlockedStatus() {
-            when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.of(targetUser));
+            when(usersRepository.findByIdAndEmailVerifiedTrue(TARGET_ID)).thenReturn(Optional.of(targetUser));
 
             FollowStatusDTO result = socialService.blockUser(TARGET_ID, user);
 
@@ -327,7 +327,7 @@ class SocialServiceTest {
 
         @Test
         void blockUser_WhenBlockingSelf_ThrowsSelfFollowException() {
-            when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+            when(usersRepository.findByIdAndEmailVerifiedTrue(USER_ID)).thenReturn(Optional.of(user));
 
             SelfFollowException e = assertThrows(SelfFollowException.class, () -> socialService.blockUser(USER_ID, user));
             assertEquals("Cannot block yourself!", e.getMessage());
@@ -347,7 +347,7 @@ class SocialServiceTest {
 
         @Test
         void getFollowStatus_WhenFollowing_ReturnsFollowing() {
-            when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.of(targetUser));
+            when(usersRepository.findByIdAndEmailVerifiedTrue(TARGET_ID)).thenReturn(Optional.of(targetUser));
             when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
             when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(true);
@@ -360,7 +360,7 @@ class SocialServiceTest {
         @Test
         void getFollowStatus_WhenPendingRequestExists_ReturnsRequested() {
             targetUser.setPrivacyStatus(PrivacyStatuses.PRIVATE);
-            when(usersRepository.findById(TARGET_ID)).thenReturn(Optional.of(targetUser));
+            when(usersRepository.findByIdAndEmailVerifiedTrue(TARGET_ID)).thenReturn(Optional.of(targetUser));
             when(usersRepository.isBlockingUser(USER_ID, TARGET_ID)).thenReturn(false);
             when(usersRepository.isBlockingUser(TARGET_ID, USER_ID)).thenReturn(false);
             when(usersRepository.isFollowing(USER_ID, TARGET_ID)).thenReturn(false);
@@ -374,7 +374,7 @@ class SocialServiceTest {
 
         @Test
         void getFollowStatus_WhenTargetNotFound_ThrowsUserNotFoundException() {
-            when(usersRepository.findById(999L)).thenReturn(Optional.empty());
+            when(usersRepository.findByIdAndEmailVerifiedTrue(999L)).thenReturn(Optional.empty());
 
             assertThrows(UserNotFoundException.class, () -> socialService.getFollowStatus(999L, user));
         }

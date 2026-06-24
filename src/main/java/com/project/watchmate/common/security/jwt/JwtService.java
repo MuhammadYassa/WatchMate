@@ -26,6 +26,9 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String secret;
 
+    @Value("${jwt.access-token-expiry-minutes:15}")
+    private long accessTokenExpiryMinutes;
+
     private SecretKey signingKey;
 
     @PostConstruct
@@ -55,14 +58,14 @@ public class JwtService {
                     .add(claims)
                     .subject(username)
                     .issuedAt(new Date(System.currentTimeMillis()))
-                    .expiration(new Date(System.currentTimeMillis() + 1000L * 60 * 15))
+                    .expiration(new Date(System.currentTimeMillis() + 1000L * 60 * accessTokenExpiryMinutes))
                     .and()
                     .signWith(getKey())
                     .compact();
     }
 
     public LocalDateTime getAccessTokenExpiry() {
-        return LocalDateTime.now().plusMinutes(15);
+        return LocalDateTime.now().plusMinutes(accessTokenExpiryMinutes);
     }
 
     private SecretKey getKey() {

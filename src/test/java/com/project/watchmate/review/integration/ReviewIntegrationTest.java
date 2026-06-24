@@ -26,7 +26,7 @@ class ReviewIntegrationTest extends AbstractIntegrationTest {
 		Users user = saveUser("review-create-user", true);
 		Media media = saveMedia(7001L, "Reviewed Movie", com.project.watchmate.media.catalog.domain.MediaType.MOVIE);
 
-		mockMvc.perform(post("/api/v1/reviews/create")
+		mockMvc.perform(post("/api/v1/reviews")
 			.header("Authorization", bearerToken(user))
 			.contentType(MediaType.APPLICATION_JSON)
 			.content(createReviewBody(media.getTmdbId(), "MOVIE", 5, "Loved it")))
@@ -49,7 +49,7 @@ class ReviewIntegrationTest extends AbstractIntegrationTest {
 		Media media = saveMedia(7002L, "Duplicate Movie", com.project.watchmate.media.catalog.domain.MediaType.MOVIE);
 		saveReview(user, media, 4, "First");
 
-		mockMvc.perform(post("/api/v1/reviews/create")
+		mockMvc.perform(post("/api/v1/reviews")
 			.header("Authorization", bearerToken(user))
 			.contentType(MediaType.APPLICATION_JSON)
 			.content(createReviewBody(media.getTmdbId(), "MOVIE", 3, "Second")))
@@ -100,18 +100,43 @@ class ReviewIntegrationTest extends AbstractIntegrationTest {
 	}
 
 	@Test
-	void getReviewsByTmdbId_returns200_andListsReviews() throws Exception {
+	void getReviewsByTmdbId_unauthenticated_returns200() throws Exception {
 		Users user = saveUser("review-list-user", true);
 		Media media = saveMedia(7009L, "Review Listing Movie", com.project.watchmate.media.catalog.domain.MediaType.MOVIE);
 		saveReview(user, media, 5, "Excellent");
 
-		mockMvc.perform(get("/api/v1/movies/{tmdbId}/reviews", media.getTmdbId())
-			.header("Authorization", bearerToken(user)))
+		mockMvc.perform(get("/api/v1/movies/{tmdbId}/reviews", media.getTmdbId()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$[0].reviewId").isNumber())
 			.andExpect(jsonPath("$[0].tmdbId").value(media.getTmdbId().intValue()))
 			.andExpect(jsonPath("$[0].starRating").value(5))
 			.andExpect(jsonPath("$[0].comment").value("Excellent"));
+	}
+
+	@Test
+	void getShowReviewsByTmdbId_unauthenticated_returns200() throws Exception {
+		Users user = saveUser("review-show-list-user", true);
+		Media media = saveMedia(7010L, "Review Listing Show", com.project.watchmate.media.catalog.domain.MediaType.SHOW);
+		saveReview(user, media, 4, "Great show");
+
+		mockMvc.perform(get("/api/v1/shows/{tmdbId}/reviews", media.getTmdbId()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$[0].reviewId").isNumber())
+			.andExpect(jsonPath("$[0].starRating").value(4))
+			.andExpect(jsonPath("$[0].comment").value("Great show"));
+	}
+
+	@Test
+	void getReviewById_unauthenticated_returns200() throws Exception {
+		Users user = saveUser("review-get-user", true);
+		Media media = saveMedia(7011L, "Single Review Movie", com.project.watchmate.media.catalog.domain.MediaType.MOVIE);
+		Review review = saveReview(user, media, 3, "Decent");
+
+		mockMvc.perform(get("/api/v1/reviews/{reviewId}", review.getId()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.reviewId").value(review.getId().intValue()))
+			.andExpect(jsonPath("$.starRating").value(3))
+			.andExpect(jsonPath("$.comment").value("Decent"));
 	}
 
 	@Test

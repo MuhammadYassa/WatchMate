@@ -339,6 +339,19 @@ class SocialIntegrationTest extends AbstractIntegrationTest {
 	}
 
 	@Test
+	void followUnverifiedUser_byNumericId_returns404() throws Exception {
+		Users follower = saveUser("social-follower-verified", true);
+		Users unverified = saveUser("social-unverified-target", false);
+
+		mockMvc.perform(post("/api/v1/social/follow/{userId}", unverified.getId())
+			.header("Authorization", bearerToken(follower)))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
+
+		assertThat(usersRepository.isFollowing(follower.getId(), unverified.getId())).isFalse();
+	}
+
+	@Test
 	void followSelf_returns400() throws Exception {
 		Users user = saveUser("social-self-user", true);
 

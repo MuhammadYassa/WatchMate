@@ -67,6 +67,7 @@ public class WatchListService {
         return watchListDtoAssembler.mapToWatchListDTO(watchList);
     }
 
+    @Transactional
     public void deleteWatchList(Users user, Long id) {
         WatchList watchList = watchListRepository.findById(Objects.requireNonNull(id, "id")).orElseThrow(() -> new WatchListNotFoundException("WatchList not found"));
 
@@ -112,6 +113,7 @@ public class WatchListService {
         return new PageImpl<>(cachedPage.getContent(), pageable, cachedPage.getTotalElements());
     }
 
+    @Transactional
     public WatchListDTO addMediaToWatchList(Users user, Long watchListId, Long tmdbId, String type) {
         WatchList watchList = watchListRepository.findById(Objects.requireNonNull(watchListId, "watchListId")).orElseThrow(() -> new WatchListNotFoundException("WatchList does not exist."));
 
@@ -140,6 +142,7 @@ public class WatchListService {
         return watchListDtoAssembler.mapToWatchListDTO(watchList);
     }   
 
+    @Transactional
     public WatchListDTO removeMediaFromWatchList(Users user, Long watchListId, Long tmdbId, String type) {
         WatchList watchList = watchListRepository.findById(Objects.requireNonNull(watchListId, "watchListId")).orElseThrow(() -> new WatchListNotFoundException("WatchList does not exist."));
 

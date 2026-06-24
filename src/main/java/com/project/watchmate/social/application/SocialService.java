@@ -63,7 +63,7 @@ public class SocialService {
     private final ReviewService reviewService;
 
     private Users findAndValidateTargetUser(Long userId){
-        return usersRepository.findById(Objects.requireNonNull(userId, "userId"))
+        return usersRepository.findByIdAndEmailVerifiedTrue(Objects.requireNonNull(userId, "userId"))
         .orElseThrow(() -> new UserNotFoundException("User not found"));
     }
 

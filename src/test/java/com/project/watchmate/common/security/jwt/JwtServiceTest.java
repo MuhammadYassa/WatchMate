@@ -41,6 +41,7 @@ class JwtServiceTest {
     void setUp() {
         jwtService = new JwtService();
         ReflectionTestUtils.setField(jwtService, "secret", TEST_SECRET_BASE64);
+        ReflectionTestUtils.setField(jwtService, "accessTokenExpiryMinutes", 15L);
         jwtService.initializeSigningKey();
     }
 
