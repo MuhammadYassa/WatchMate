@@ -81,7 +81,7 @@ public class ReviewService {
         return;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Page<ReviewResponseDTO> getReviews(Long tmdbId, MediaType mediaType, int page, int size) {
         int cappedSize = Math.min(size, 50);
         Pageable pageable = PageRequest.of(page, cappedSize, Sort.by("datePosted").descending());
