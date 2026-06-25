@@ -63,6 +63,15 @@ public interface UserMediaStatusRepository extends JpaRepository<UserMediaStatus
         Pageable pageable
     );
 
+    @Query("select ums " +
+        "from UserMediaStatus ums " +
+        "join fetch ums.media m " +
+        "where ums.user = :user " +
+        "and ums.status = com.project.watchmate.media.catalog.domain.WatchStatus.TO_WATCH " +
+        "and m.type = com.project.watchmate.media.catalog.domain.MediaType.MOVIE " +
+        "order by ums.updatedAt desc, ums.id desc")
+    List<UserMediaStatus> findToWatchMoviesByUser(@Param("user") Users user);
+
 }
 
 

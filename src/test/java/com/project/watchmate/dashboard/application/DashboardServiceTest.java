@@ -48,7 +48,7 @@ class DashboardServiceTest {
             userShowTrackingRepository,
             dashboardMapper
         );
-        dashboardService = new DashboardService(userShowTrackingRepository, dashboardMapper, continueWatchingCacheService);
+        dashboardService = new DashboardService(userShowTrackingRepository, userMediaStatusRepository, dashboardMapper, continueWatchingCacheService);
     }
 
     @Test

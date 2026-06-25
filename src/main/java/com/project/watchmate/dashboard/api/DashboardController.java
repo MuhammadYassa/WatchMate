@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.project.watchmate.common.error.ApiError;
 import com.project.watchmate.dashboard.dto.CalendarResponseDTO;
 import com.project.watchmate.dashboard.dto.ContinueWatchingResponseDTO;
+import com.project.watchmate.dashboard.dto.ToWatchItemDTO;
 import com.project.watchmate.dashboard.dto.UpcomingEpisodesResponseDTO;
 import com.project.watchmate.common.security.auth.UserPrincipal;
 import com.project.watchmate.user.domain.Users;
@@ -29,6 +30,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import org.springframework.data.domain.Page;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -76,6 +78,30 @@ public class DashboardController {
     ) {
         Users user = userPrincipal.getUser();
         return ResponseEntity.ok(dashboardService.getUpcomingEpisodesForUser(user));
+    }
+
+    @GetMapping("/to-watch")
+    @Operation(
+        summary = "Get to-watch items",
+        description = "Returns a paginated list of all media the authenticated user has marked as TO_WATCH. " +
+            "Movies and shows are combined and sorted by most-recently updated first. " +
+            "Use the 'type' parameter to filter by MOVIE, SHOW, or ALL (default)."
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "To-watch items returned (paginated)"),
+        @ApiResponse(responseCode = "400", description = "Invalid request parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "401", description = "Authentication failed", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<Page<ToWatchItemDTO>> getToWatchItems(
+        @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size,
+        @RequestParam(defaultValue = "ALL") String type
+    ) {
+        Users user = userPrincipal.getUser();
+        return ResponseEntity.ok(dashboardService.getToWatchItems(user, page, size, type));
     }
 
     @GetMapping("/calendar")

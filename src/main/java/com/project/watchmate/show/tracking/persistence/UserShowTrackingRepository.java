@@ -95,6 +95,14 @@ public interface UserShowTrackingRepository extends JpaRepository<UserShowTracki
         @Param("from") LocalDate from,
         @Param("to") LocalDate to
     );
+
+    @Query("select ust " +
+        "from UserShowTracking ust " +
+        "join fetch ust.media m " +
+        "where ust.user = :user " +
+        "and ust.status = com.project.watchmate.media.catalog.domain.WatchStatus.TO_WATCH " +
+        "order by ust.updatedAt desc, ust.id desc")
+    List<UserShowTracking> findToWatchShowsByUser(@Param("user") Users user);
 }
 
 

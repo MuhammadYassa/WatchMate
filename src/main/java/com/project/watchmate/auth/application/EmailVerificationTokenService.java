@@ -84,7 +84,7 @@ public class EmailVerificationTokenService {
     public void sendVerificationEmail(String toEmail, String token){
         String subject = "Verify Your Email - WatchMate";
 
-        String verificationLink = appDomain + "/api/v1/auth/verify?token=" + token;
+        String verificationLink = appDomain + "/verify-email?token=" + token;
 
         String bodyText = String.format("""
             <html>

@@ -1,16 +1,26 @@
 package com.project.watchmate.dashboard.application;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.project.watchmate.dashboard.dto.CalendarResponseDTO;
 import com.project.watchmate.dashboard.dto.ContinueWatchingResponseDTO;
+import com.project.watchmate.dashboard.dto.ToWatchItemDTO;
 import com.project.watchmate.dashboard.dto.UpcomingEpisodesResponseDTO;
 import com.project.watchmate.dashboard.mapper.DashboardMapper;
+import com.project.watchmate.movie.tracking.persistence.UserMediaStatusRepository;
 import com.project.watchmate.show.tracking.domain.UserShowTracking;
 import com.project.watchmate.user.domain.Users;
 import com.project.watchmate.media.catalog.domain.WatchStatus;
@@ -32,7 +42,11 @@ public class DashboardService {
         WatchStatus.TO_WATCH
     );
 
+    private static final Set<String> VALID_TO_WATCH_TYPE_FILTERS = Set.of("ALL", "MOVIE", "SHOW");
+
     private final UserShowTrackingRepository userShowTrackingRepository;
+
+    private final UserMediaStatusRepository userMediaStatusRepository;
 
     private final DashboardMapper dashboardMapper;
 
@@ -81,6 +95,45 @@ public class DashboardService {
                 .map(dashboardMapper::mapToCalendarItem)
                 .toList())
             .build();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ToWatchItemDTO> getToWatchItems(Users user, int page, int size, String type) {
+        String normalizedType = type == null ? "ALL" : type.trim().toUpperCase(Locale.ROOT);
+        if (!VALID_TO_WATCH_TYPE_FILTERS.contains(normalizedType)) {
+            throw new IllegalArgumentException(
+                "Invalid type filter '" + type + "'. Allowed values: ALL, MOVIE, SHOW.");
+        }
+
+        boolean includeMovies = "ALL".equals(normalizedType) || "MOVIE".equals(normalizedType);
+        boolean includeShows = "ALL".equals(normalizedType) || "SHOW".equals(normalizedType);
+
+        List<ToWatchItemDTO> items = new ArrayList<>();
+
+        if (includeMovies) {
+            userMediaStatusRepository.findToWatchMoviesByUser(user).stream()
+                .map(dashboardMapper::mapToToWatchItem)
+                .forEach(items::add);
+        }
+
+        if (includeShows) {
+            userShowTrackingRepository.findToWatchShowsByUser(user).stream()
+                .map(dashboardMapper::mapToToWatchItem)
+                .forEach(items::add);
+        }
+
+        items.sort(Comparator.comparing(
+            ToWatchItemDTO::getUpdatedAt,
+            Comparator.nullsLast(Comparator.<LocalDateTime>naturalOrder().reversed())
+        ));
+
+        int total = items.size();
+        int start = page * size;
+        List<ToWatchItemDTO> pageContent = start >= total
+            ? List.of()
+            : items.subList(start, Math.min(start + size, total));
+
+        return new PageImpl<>(pageContent, PageRequest.of(page, size), total);
     }
 
     private int normalizeLimit(Integer limit) {

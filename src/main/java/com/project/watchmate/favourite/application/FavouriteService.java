@@ -71,7 +71,7 @@ public class FavouriteService {
         return FavouriteStatusDTO.builder().tmdbId(tmdbId).isFavourited(managedUser.getFavorites().contains(media)).build();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public FavouriteStatusDTO isFavourited (Long tmdbId, String type, Users user){
         Media media = mediaResolutionService.resolveMediaByTmdbId(tmdbId, type);
         boolean favourited = usersRepository.isFavouritedByUser(user.getId(), media.getId());

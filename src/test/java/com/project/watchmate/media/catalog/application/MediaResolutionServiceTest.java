@@ -6,13 +6,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 import java.util.Optional;
 import java.util.List;
 
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -42,6 +48,9 @@ class MediaResolutionServiceTest {
     @Mock
     private WatchMateCacheEvictionService cacheEvictionService;
 
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     @InjectMocks
     private MediaResolutionService mediaResolutionService;
 
@@ -55,6 +64,8 @@ class MediaResolutionServiceTest {
             .title("Resolved Show")
             .type(MediaType.SHOW)
             .build();
+        lenient().when(transactionManager.getTransaction(any(TransactionDefinition.class)))
+            .thenReturn(new SimpleTransactionStatus());
     }
 
     @Nested
@@ -76,14 +87,52 @@ class MediaResolutionServiceTest {
         void resolveMediaByTmdbId_WhenMediaMissing_ImportsAndSavesMedia() {
             when(mediaRepository.findByTmdbIdAndType(TMDB_ID, MediaType.SHOW)).thenReturn(Optional.empty());
             when(tmdbService.fetchMediaByTmdbId(TMDB_ID, MediaType.SHOW)).thenReturn(media);
-            when(mediaRepository.save(media)).thenReturn(media);
+            when(mediaRepository.saveAndFlush(media)).thenReturn(media);
 
             Media result = mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, "SHOW");
 
             assertNotNull(result);
             assertEquals(media, result);
             verify(tmdbService).fetchMediaByTmdbId(TMDB_ID, MediaType.SHOW);
-            verify(mediaRepository).save(media);
+            verify(mediaRepository).saveAndFlush(media);
+        }
+
+        @Test
+        void resolveMediaByTmdbId_WhenSaveHitsDuplicateMediaKey_RequeriesAndReturnsExistingMedia() {
+            Media imported = Media.builder()
+                .tmdbId(TMDB_ID)
+                .title("Imported Show")
+                .type(MediaType.SHOW)
+                .build();
+            DataIntegrityViolationException duplicate = new DataIntegrityViolationException(
+                "Duplicate entry '1399-SHOW' for key 'media.uq_media_tmdb_id_type'"
+            );
+            when(mediaRepository.findByTmdbIdAndType(TMDB_ID, MediaType.SHOW))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(media));
+            when(tmdbService.fetchMediaByTmdbId(TMDB_ID, MediaType.SHOW)).thenReturn(imported);
+            when(mediaRepository.saveAndFlush(imported)).thenThrow(duplicate);
+
+            Media result = mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, "SHOW");
+
+            assertEquals(media, result);
+            verify(mediaRepository).saveAndFlush(imported);
+        }
+
+        @Test
+        void resolveMediaByTmdbId_WhenSaveHitsDifferentIntegrityViolation_PropagatesFailure() {
+            DataIntegrityViolationException exception = new DataIntegrityViolationException("Foreign key failed");
+            when(mediaRepository.findByTmdbIdAndType(TMDB_ID, MediaType.SHOW)).thenReturn(Optional.empty());
+            when(tmdbService.fetchMediaByTmdbId(TMDB_ID, MediaType.SHOW)).thenReturn(media);
+            when(mediaRepository.saveAndFlush(media)).thenThrow(exception);
+
+            DataIntegrityViolationException result = assertThrows(
+                DataIntegrityViolationException.class,
+                () -> mediaResolutionService.resolveMediaByTmdbId(TMDB_ID, "SHOW")
+            );
+
+            assertEquals(exception, result);
+            verify(mediaRepository, never()).findById(anyLong());
         }
 
         @Test

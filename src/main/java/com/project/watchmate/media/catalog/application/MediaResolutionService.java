@@ -7,7 +7,9 @@ import java.util.Objects;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.project.watchmate.common.cache.WatchMateCacheEvictionService;
 import com.project.watchmate.common.error.MediaNotFoundException;
@@ -27,15 +29,25 @@ public class MediaResolutionService {
 
     private final WatchMateCacheEvictionService cacheEvictionService;
 
-    @Transactional
+    private final PlatformTransactionManager transactionManager;
+
     public Media resolveMediaByTmdbId(Long tmdbId, String typeStr) {
         return resolveMediaByTmdbId(tmdbId, parseMediaType(typeStr));
     }
 
-    @Transactional
     public Media resolveMediaByTmdbId(Long tmdbId, MediaType type) {
         Long resolvedTmdbId = Objects.requireNonNull(tmdbId, "tmdbId");
 
+        Media media;
+        try {
+            media = executeRequiresNew(() -> resolveMediaByTmdbIdInTransaction(resolvedTmdbId, type));
+        } catch (DataIntegrityViolationException ex) {
+            media = recoverDuplicateMedia(resolvedTmdbId, type, ex);
+        }
+        return attachToCurrentTransaction(media);
+    }
+
+    private Media resolveMediaByTmdbIdInTransaction(Long resolvedTmdbId, MediaType type) {
         if (type != null) {
             Media media = mediaRepository.findByTmdbIdAndType(resolvedTmdbId, type).orElse(null);
             if (media != null) {
@@ -57,14 +69,9 @@ public class MediaResolutionService {
             throw new MediaNotFoundException("TMDB media not found for ID: " + resolvedTmdbId);
         }
 
-        try {
-            Media saved = mediaRepository.save(importedMedia);
-            cacheEvictionService.evictPublicMediaDetailBase(saved.getType(), saved.getTmdbId());
-            return saved;
-        } catch (DataIntegrityViolationException ex) {
-            Media existingMedia = mediaRepository.findByTmdbIdAndType(resolvedTmdbId, type).orElseThrow(() -> ex);
-            return existingMedia;
-        }
+        Media saved = mediaRepository.saveAndFlush(importedMedia);
+        cacheEvictionService.evictPublicMediaDetailBase(saved.getType(), saved.getTmdbId());
+        return saved;
     }
 
     public MediaType parseMediaType(String typeStr) {
@@ -88,6 +95,33 @@ public class MediaResolutionService {
             throw new IllegalArgumentException("Multiple media items share this TMDB ID. Please supply the media type.");
         }
         return matchingMedia.get(0);
+    }
+
+    private Media attachToCurrentTransaction(Media media) {
+        if (media == null || media.getId() == null) {
+            return media;
+        }
+        return mediaRepository.findById(media.getId()).orElse(media);
+    }
+
+    private Media recoverDuplicateMedia(Long tmdbId, MediaType type, DataIntegrityViolationException ex) {
+        if (type == null || !isMediaTmdbTypeDuplicate(ex)) {
+            throw ex;
+        }
+
+        return executeRequiresNew(() -> mediaRepository.findByTmdbIdAndType(tmdbId, type)
+            .orElseThrow(() -> ex));
+    }
+
+    private <T> T executeRequiresNew(java.util.function.Supplier<T> action) {
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return transactionTemplate.execute(status -> action.get());
+    }
+
+    private boolean isMediaTmdbTypeDuplicate(DataIntegrityViolationException ex) {
+        String message = ex.getMostSpecificCause() == null ? ex.getMessage() : ex.getMostSpecificCause().getMessage();
+        return message != null && message.contains("uq_media_tmdb_id_type");
     }
 }
 

@@ -1,17 +1,21 @@
 package com.project.watchmate.review.integration;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
 import com.project.watchmate.common.integration.support.AbstractIntegrationTest;
 import com.project.watchmate.media.catalog.domain.Media;
+import com.project.watchmate.media.tmdb.dto.TmdbMovieDTO;
 import com.project.watchmate.review.domain.Review;
 import com.project.watchmate.user.domain.Role;
 import com.project.watchmate.user.domain.Users;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -115,6 +119,27 @@ class ReviewIntegrationTest extends AbstractIntegrationTest {
 	}
 
 	@Test
+	void getMovieReviews_whenMediaMissing_importsMediaAndReturnsEmptyPage() throws Exception {
+		when(tmdbClient.fetchMediaById(eq(7013L), eq(com.project.watchmate.media.catalog.domain.MediaType.MOVIE)))
+			.thenReturn(TmdbMovieDTO.builder()
+				.id(7013L)
+				.title("Imported Review Movie")
+				.overview("Imported for review listing")
+				.posterPath("/imported-review-movie.jpg")
+				.releaseDate("2024-02-01")
+				.voteAverage(7.1)
+				.genres(List.of())
+				.build());
+
+		mockMvc.perform(get("/api/v1/movies/{tmdbId}/reviews", 7013L))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content.length()").value(0))
+			.andExpect(jsonPath("$.totalElements").value(0));
+
+		assertThat(mediaRepository.findByTmdbIdAndType(7013L, com.project.watchmate.media.catalog.domain.MediaType.MOVIE)).isPresent();
+	}
+
+	@Test
 	void getShowReviewsByTmdbId_unauthenticated_returns200() throws Exception {
 		Users user = saveUser("review-show-list-user", true);
 		Media media = saveMedia(7010L, "Review Listing Show", com.project.watchmate.media.catalog.domain.MediaType.SHOW);
@@ -126,6 +151,27 @@ class ReviewIntegrationTest extends AbstractIntegrationTest {
 			.andExpect(jsonPath("$.content[0].starRating").value(4))
 			.andExpect(jsonPath("$.content[0].comment").value("Great show"))
 			.andExpect(jsonPath("$.totalElements").value(1));
+	}
+
+	@Test
+	void getShowReviews_whenMediaMissing_importsMediaAndReturnsEmptyPage() throws Exception {
+		when(tmdbClient.fetchMediaById(eq(7014L), eq(com.project.watchmate.media.catalog.domain.MediaType.SHOW)))
+			.thenReturn(TmdbMovieDTO.builder()
+				.id(7014L)
+				.title("Imported Review Show")
+				.overview("Imported show for review listing")
+				.posterPath("/imported-review-show.jpg")
+				.releaseDate("2024-03-01")
+				.voteAverage(7.6)
+				.genres(List.of())
+				.build());
+
+		mockMvc.perform(get("/api/v1/shows/{tmdbId}/reviews", 7014L))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content.length()").value(0))
+			.andExpect(jsonPath("$.totalElements").value(0));
+
+		assertThat(mediaRepository.findByTmdbIdAndType(7014L, com.project.watchmate.media.catalog.domain.MediaType.SHOW)).isPresent();
 	}
 
 	@Test

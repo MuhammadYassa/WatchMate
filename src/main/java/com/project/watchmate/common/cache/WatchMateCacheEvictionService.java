@@ -3,6 +3,7 @@ package com.project.watchmate.common.cache;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.data.redis.core.Cursor;
@@ -41,6 +42,7 @@ public class WatchMateCacheEvictionService {
         this(null);
     }
 
+    @Autowired
     public WatchMateCacheEvictionService(StringRedisTemplate stringRedisTemplate) {
         this.stringRedisTemplate = stringRedisTemplate;
     }

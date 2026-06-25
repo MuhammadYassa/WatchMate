@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import com.project.watchmate.dashboard.dto.CalendarItemDTO;
 import com.project.watchmate.dashboard.dto.ContinueWatchingItemDTO;
+import com.project.watchmate.dashboard.dto.ToWatchItemDTO;
 import com.project.watchmate.dashboard.dto.UpcomingEpisodeItemDTO;
 import com.project.watchmate.media.catalog.domain.Media;
 import com.project.watchmate.media.catalog.domain.MediaType;
@@ -113,6 +114,38 @@ public class DashboardMapper {
         return latest == null
             ? new LatestEpisode(null, null)
             : new LatestEpisode(latest.getSeasonNumber(), latest.getEpisodeNumber());
+    }
+
+    public ToWatchItemDTO mapToToWatchItem(UserMediaStatus status) {
+        Media media = status.getMedia();
+        return ToWatchItemDTO.builder()
+            .tmdbId(media.getTmdbId())
+            .type(media.getType())
+            .title(media.getTitle())
+            .posterPath(media.getPosterPath())
+            .backdropPath(media.getBackdropPath())
+            .rating(media.getRating())
+            .watchStatus(status.getStatus())
+            .releaseDate(media.getReleaseDate())
+            .firstAirDate(null)
+            .updatedAt(status.getUpdatedAt())
+            .build();
+    }
+
+    public ToWatchItemDTO mapToToWatchItem(UserShowTracking tracking) {
+        Media media = tracking.getMedia();
+        return ToWatchItemDTO.builder()
+            .tmdbId(media.getTmdbId())
+            .type(media.getType())
+            .title(media.getTitle())
+            .posterPath(media.getPosterPath())
+            .backdropPath(media.getBackdropPath())
+            .rating(media.getRating())
+            .watchStatus(tracking.getStatus())
+            .releaseDate(null)
+            .firstAirDate(media.getReleaseDate())
+            .updatedAt(tracking.getUpdatedAt())
+            .build();
     }
 
     private record LatestEpisode(Integer seasonNumber, Integer episodeNumber) {

@@ -5,11 +5,15 @@ import com.project.watchmate.media.catalog.dto.MediaDetailsDTO;
 import java.util.List;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Schema(name = "WatchList", description = "Watchlist summary returned by watchlist endpoints.")
 public class WatchListDTO {
 
