@@ -44,6 +44,8 @@ import com.project.watchmate.movie.application.PublicMediaDetailBaseCacheService
 import com.project.watchmate.movie.dto.MovieDetailsDTO;
 import com.project.watchmate.movie.dto.PublicMovieDetailBaseDTO;
 import com.project.watchmate.movie.tracking.persistence.UserMediaStatusRepository;
+import org.springframework.data.domain.Page;
+
 import com.project.watchmate.review.persistence.ReviewRepository;
 import com.project.watchmate.show.catalog.application.ShowCatalogService;
 import com.project.watchmate.show.metadata.application.PublicShowMetadataCacheService;
@@ -51,7 +53,7 @@ import com.project.watchmate.show.metadata.application.ShowMetadataService;
 import com.project.watchmate.show.metadata.dto.PublicShowMetadataDTO;
 import com.project.watchmate.show.metadata.dto.PublicShowSeasonMetadataDTO;
 import com.project.watchmate.show.metadata.dto.ShowDetailsDTO;
-import com.project.watchmate.show.metadata.dto.ShowSeasonsDetailsDTO;
+import com.project.watchmate.show.metadata.dto.ShowEpisodeDetailsDTO;
 import com.project.watchmate.show.metadata.mapper.ShowMetadataMapper;
 import com.project.watchmate.show.tracking.domain.UserEpisodeWatch;
 import com.project.watchmate.show.tracking.domain.UserShowTracking;
@@ -238,13 +240,13 @@ class PublicDetailOverlayCacheBehaviorTest {
         when(userShowTrackingRepository.findWithEpisodeWatchesByUserAndMedia(userTwo, show))
             .thenReturn(Optional.empty());
 
-        ShowSeasonsDetailsDTO first = showMetadataService.getShowSeasonDetails(200L, 1, MediaType.SHOW, userOne);
-        ShowSeasonsDetailsDTO second = showMetadataService.getShowSeasonDetails(200L, 1, MediaType.SHOW, userTwo);
+        Page<ShowEpisodeDetailsDTO> first = showMetadataService.getShowSeasonDetails(200L, 1, MediaType.SHOW, userOne, 0, 20);
+        Page<ShowEpisodeDetailsDTO> second = showMetadataService.getShowSeasonDetails(200L, 1, MediaType.SHOW, userTwo, 0, 20);
 
-        assertEquals(Boolean.TRUE, first.getEpisodes().get(0).getWatched());
-        assertEquals(Boolean.FALSE, second.getEpisodes().get(0).getWatched());
-        assertEquals(501L, first.getEpisodes().get(0).getTmdbEpisodeId());
-        assertEquals(501L, second.getEpisodes().get(0).getTmdbEpisodeId());
+        assertEquals(Boolean.TRUE, first.getContent().get(0).getWatched());
+        assertEquals(Boolean.FALSE, second.getContent().get(0).getWatched());
+        assertEquals(501L, first.getContent().get(0).getTmdbEpisodeId());
+        assertEquals(501L, second.getContent().get(0).getTmdbEpisodeId());
         verify(showCatalogService, times(1)).ensureSeasonCached(show, 200L, 1);
 
         Object cachedValue = cacheManager.getCache(WatchMateCacheNames.PUBLIC_SEASON_METADATA)

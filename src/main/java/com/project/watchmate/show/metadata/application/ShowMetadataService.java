@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,7 +19,6 @@ import com.project.watchmate.show.metadata.dto.PublicShowMetadataDTO;
 import com.project.watchmate.show.metadata.dto.PublicShowSeasonMetadataDTO;
 import com.project.watchmate.show.metadata.dto.ShowDetailsDTO;
 import com.project.watchmate.show.metadata.dto.ShowEpisodeDetailsDTO;
-import com.project.watchmate.show.metadata.dto.ShowSeasonsDetailsDTO;
 import com.project.watchmate.common.error.UserNotFoundException;
 import com.project.watchmate.common.mapper.WatchMateMapper;
 import com.project.watchmate.media.tmdb.dto.TmdbTvDetailsDTO;
@@ -84,11 +86,20 @@ public class ShowMetadataService {
     }
 
     @Transactional
-    public ShowSeasonsDetailsDTO getShowSeasonDetails(Long tmdbId, Integer seasonNumber, MediaType mediaType, Users user) {
+    public Page<ShowEpisodeDetailsDTO> getShowSeasonDetails(Long tmdbId, Integer seasonNumber, MediaType mediaType, Users user, int page, int size) {
         showCatalogService.validateShowType(mediaType);
         PublicShowSeasonMetadataDTO publicSeason = publicShowMetadataCacheService.getSeasonMetadata(tmdbId, seasonNumber);
         Media media = user == null ? null : showCatalogService.findImportedShow(tmdbId);
-        return toShowSeasonDetailsDTO(publicSeason, resolveWatchedEpisodeKeys(user, media));
+        Set<String> watchedKeys = resolveWatchedEpisodeKeys(user, media);
+
+        List<ShowEpisodeDetailsDTO> allEpisodes = publicSeason.getEpisodes().stream()
+            .map(ep -> toShowEpisodeDetailsDTO(ep, watchedKeys))
+            .toList();
+
+        int from = page * size;
+        int to = Math.min(from + size, allEpisodes.size());
+        List<ShowEpisodeDetailsDTO> content = from >= allEpisodes.size() ? List.of() : allEpisodes.subList(from, to);
+        return new PageImpl<>(content, PageRequest.of(page, size), allEpisodes.size());
     }
 
     private UserContext resolveUserContext(Users userParam, Media media) {
@@ -160,21 +171,6 @@ public class ShowMetadataService {
             .cast(extras.cast())
             .bestTrailer(extras.bestTrailer())
             .watchProviders(extras.watchProviders())
-            .build();
-    }
-
-    private ShowSeasonsDetailsDTO toShowSeasonDetailsDTO(PublicShowSeasonMetadataDTO publicSeason, Set<String> watchedEpisodeKeys) {
-        return ShowSeasonsDetailsDTO.builder()
-            .tmdbId(publicSeason.getTmdbId())
-            .seasonNumber(publicSeason.getSeasonNumber())
-            .name(publicSeason.getName())
-            .overview(publicSeason.getOverview())
-            .posterPath(publicSeason.getPosterPath())
-            .airDate(publicSeason.getAirDate())
-            .episodeCount(publicSeason.getEpisodeCount())
-            .episodes(publicSeason.getEpisodes().stream()
-                .map(episode -> toShowEpisodeDetailsDTO(episode, watchedEpisodeKeys))
-                .toList())
             .build();
     }
 

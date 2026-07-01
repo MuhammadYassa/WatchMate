@@ -155,18 +155,15 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/shows/{tmdbId}/seasons/{seasonNumber}/episodes", 37854L, 21))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.tmdbId").value(37854))
-            .andExpect(jsonPath("$.seasonNumber").value(21))
-            .andExpect(jsonPath("$.name").value("Season 21"))
-            .andExpect(jsonPath("$.episodeCount").value(2))
-            .andExpect(jsonPath("$.episodes", hasSize(2)))
-            .andExpect(jsonPath("$.episodes[0].tmdbEpisodeId").value(2101))
-            .andExpect(jsonPath("$.episodes[0].seasonNumber").value(21))
-            .andExpect(jsonPath("$.episodes[0].episodeNumber").value(1))
-            .andExpect(jsonPath("$.episodes[0].name").value("Departure"))
-            .andExpect(jsonPath("$.episodes[1].tmdbEpisodeId").value(2102))
-            .andExpect(jsonPath("$.episodes[1].episodeNumber").value(2))
-            .andExpect(jsonPath("$.episodes[1].name").value("Arrival"));
+            .andExpect(jsonPath("$.totalElements").value(2))
+            .andExpect(jsonPath("$.content", hasSize(2)))
+            .andExpect(jsonPath("$.content[0].tmdbEpisodeId").value(2101))
+            .andExpect(jsonPath("$.content[0].seasonNumber").value(21))
+            .andExpect(jsonPath("$.content[0].episodeNumber").value(1))
+            .andExpect(jsonPath("$.content[0].name").value("Departure"))
+            .andExpect(jsonPath("$.content[1].tmdbEpisodeId").value(2102))
+            .andExpect(jsonPath("$.content[1].episodeNumber").value(2))
+            .andExpect(jsonPath("$.content[1].name").value("Arrival"));
 
         Media imported = mediaRepository.findByTmdbIdAndType(37854L, MediaType.SHOW).orElseThrow();
         assertThat(showSeasonRepository.findByMediaIdAndSeasonNumber(imported.getId(), 21)).isPresent();
@@ -204,9 +201,9 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/shows/{tmdbId}/seasons/{seasonNumber}/episodes", 37854L, 21))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.episodes", hasSize(2)))
-            .andExpect(jsonPath("$.episodes[0].tmdbEpisodeId").value(2101))
-            .andExpect(jsonPath("$.episodes[0].name").value("Departure"));
+            .andExpect(jsonPath("$.content", hasSize(2)))
+            .andExpect(jsonPath("$.content[0].tmdbEpisodeId").value(2101))
+            .andExpect(jsonPath("$.content[0].name").value("Departure"));
 
         verify(tmdbClient, never()).fetchTvSeasonDetails(eq(37854L), eq(21));
         verify(tmdbClient, never()).fetchTvDetailsById(eq(37854L));
@@ -233,8 +230,7 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/shows/{tmdbId}/seasons/{seasonNumber}/episodes", 37854L, 21))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.name").value("Season 21"))
-            .andExpect(jsonPath("$.episodes[0].name").value("Departure"));
+            .andExpect(jsonPath("$.content[0].name").value("Departure"));
 
         Media persistedShow = mediaRepository.findByTmdbIdAndType(37854L, MediaType.SHOW).orElseThrow();
         ShowSeason refreshedSeason = showSeasonRepository.findByMediaIdAndSeasonNumber(persistedShow.getId(), 21).orElseThrow();
@@ -270,13 +266,169 @@ class ShowFeaturesIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/shows/{tmdbId}/seasons/{seasonNumber}/episodes", 37855L, 3))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.tmdbId").value(37855))
-            .andExpect(jsonPath("$.seasonNumber").value(3))
-            .andExpect(jsonPath("$.episodes", hasSize(1)))
-            .andExpect(jsonPath("$.episodes[0].tmdbEpisodeId").value(nullValue()))
-            .andExpect(jsonPath("$.episodes[0].name").value("Legacy Episode"));
+            .andExpect(jsonPath("$.totalElements").value(1))
+            .andExpect(jsonPath("$.content", hasSize(1)))
+            .andExpect(jsonPath("$.content[0].tmdbEpisodeId").value(nullValue()))
+            .andExpect(jsonPath("$.content[0].name").value("Legacy Episode"));
 
         verify(tmdbClient, never()).fetchTvSeasonDetails(eq(37855L), eq(3));
+    }
+
+    @Test
+    void publicShowSeasonEpisodes_defaultPageReturnsAtMost20Episodes() throws Exception {
+        Media importedShow = saveMedia(37856L, "Long Show", MediaType.SHOW);
+        showSeasonRepository.save(ShowSeason.builder()
+            .media(importedShow)
+            .seasonNumber(1)
+            .name("Season 1")
+            .episodeCount(25)
+            .lastTmdbSyncAt(java.time.LocalDateTime.now())
+            .build());
+        for (int ep = 1; ep <= 25; ep++) {
+            showEpisodeRepository.save(ShowEpisode.builder()
+                .media(importedShow)
+                .seasonNumber(1)
+                .episodeNumber(ep)
+                .title("Episode " + ep)
+                .airDate(java.time.LocalDate.of(2020, 1, ep > 28 ? 28 : ep))
+                .lastTmdbSyncAt(java.time.LocalDateTime.now())
+                .build());
+        }
+
+        mockMvc.perform(get("/api/v1/shows/{tmdbId}/seasons/{seasonNumber}/episodes", 37856L, 1))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content", hasSize(20)))
+            .andExpect(jsonPath("$.totalElements").value(25))
+            .andExpect(jsonPath("$.totalPages").value(2))
+            .andExpect(jsonPath("$.first").value(true))
+            .andExpect(jsonPath("$.last").value(false))
+            .andExpect(jsonPath("$.number").value(0))
+            .andExpect(jsonPath("$.size").value(20))
+            .andExpect(jsonPath("$.content[0].episodeNumber").value(1))
+            .andExpect(jsonPath("$.content[19].episodeNumber").value(20));
+    }
+
+    @Test
+    void publicShowSeasonEpisodes_secondPageReturnsRemainingEpisodes() throws Exception {
+        Media importedShow = saveMedia(37857L, "Long Show 2", MediaType.SHOW);
+        showSeasonRepository.save(ShowSeason.builder()
+            .media(importedShow)
+            .seasonNumber(1)
+            .name("Season 1")
+            .episodeCount(25)
+            .lastTmdbSyncAt(java.time.LocalDateTime.now())
+            .build());
+        for (int ep = 1; ep <= 25; ep++) {
+            showEpisodeRepository.save(ShowEpisode.builder()
+                .media(importedShow)
+                .seasonNumber(1)
+                .episodeNumber(ep)
+                .title("Episode " + ep)
+                .airDate(java.time.LocalDate.of(2020, 1, ep > 28 ? 28 : ep))
+                .lastTmdbSyncAt(java.time.LocalDateTime.now())
+                .build());
+        }
+
+        mockMvc.perform(get("/api/v1/shows/{tmdbId}/seasons/{seasonNumber}/episodes?page=1&size=20", 37857L, 1))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content", hasSize(5)))
+            .andExpect(jsonPath("$.totalElements").value(25))
+            .andExpect(jsonPath("$.number").value(1))
+            .andExpect(jsonPath("$.first").value(false))
+            .andExpect(jsonPath("$.last").value(true))
+            .andExpect(jsonPath("$.content[0].episodeNumber").value(21))
+            .andExpect(jsonPath("$.content[4].episodeNumber").value(25));
+    }
+
+    @Test
+    void publicShowSeasonEpisodes_sizeExceeding20Returns400() throws Exception {
+        mockMvc.perform(get("/api/v1/shows/{tmdbId}/seasons/{seasonNumber}/episodes?size=50", 37854L, 21))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void publicShowSeasonEpisodes_negativePageReturns400() throws Exception {
+        mockMvc.perform(get("/api/v1/shows/{tmdbId}/seasons/{seasonNumber}/episodes?page=-1", 37854L, 21))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void publicShowSeasonEpisodes_outOfRangePageReturnsEmptyPage() throws Exception {
+        Media importedShow = saveMedia(37858L, "Short Show", MediaType.SHOW);
+        showSeasonRepository.save(ShowSeason.builder()
+            .media(importedShow)
+            .seasonNumber(1)
+            .name("Season 1")
+            .episodeCount(2)
+            .lastTmdbSyncAt(java.time.LocalDateTime.now())
+            .build());
+        showEpisodeRepository.save(ShowEpisode.builder()
+            .media(importedShow).seasonNumber(1).episodeNumber(1).title("Episode 1")
+            .airDate(java.time.LocalDate.of(2020, 1, 1)).lastTmdbSyncAt(java.time.LocalDateTime.now()).build());
+        showEpisodeRepository.save(ShowEpisode.builder()
+            .media(importedShow).seasonNumber(1).episodeNumber(2).title("Episode 2")
+            .airDate(java.time.LocalDate.of(2020, 1, 8)).lastTmdbSyncAt(java.time.LocalDateTime.now()).build());
+
+        mockMvc.perform(get("/api/v1/shows/{tmdbId}/seasons/{seasonNumber}/episodes?page=5&size=20", 37858L, 1))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content", hasSize(0)))
+            .andExpect(jsonPath("$.totalElements").value(2))
+            .andExpect(jsonPath("$.empty").value(true));
+    }
+
+    @Test
+    void publicShowSeasonEpisodes_episodesOrderedByEpisodeNumber() throws Exception {
+        Media importedShow = saveMedia(37859L, "Ordered Show", MediaType.SHOW);
+        showSeasonRepository.save(ShowSeason.builder()
+            .media(importedShow).seasonNumber(1).name("Season 1").episodeCount(3)
+            .lastTmdbSyncAt(java.time.LocalDateTime.now()).build());
+        showEpisodeRepository.save(ShowEpisode.builder()
+            .media(importedShow).seasonNumber(1).episodeNumber(3).title("Episode 3")
+            .airDate(java.time.LocalDate.of(2020, 1, 15)).lastTmdbSyncAt(java.time.LocalDateTime.now()).build());
+        showEpisodeRepository.save(ShowEpisode.builder()
+            .media(importedShow).seasonNumber(1).episodeNumber(1).title("Episode 1")
+            .airDate(java.time.LocalDate.of(2020, 1, 1)).lastTmdbSyncAt(java.time.LocalDateTime.now()).build());
+        showEpisodeRepository.save(ShowEpisode.builder()
+            .media(importedShow).seasonNumber(1).episodeNumber(2).title("Episode 2")
+            .airDate(java.time.LocalDate.of(2020, 1, 8)).lastTmdbSyncAt(java.time.LocalDateTime.now()).build());
+
+        mockMvc.perform(get("/api/v1/shows/{tmdbId}/seasons/{seasonNumber}/episodes", 37859L, 1))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content[0].episodeNumber").value(1))
+            .andExpect(jsonPath("$.content[1].episodeNumber").value(2))
+            .andExpect(jsonPath("$.content[2].episodeNumber").value(3));
+    }
+
+    @Test
+    void publicShowSeasonEpisodes_watchedFlagsCorrectAfterPagination() throws Exception {
+        Users user = saveUser("season-watched-page-user", true);
+        Media show = saveMedia(37860L, "Watch Flags Show", MediaType.SHOW);
+        showSeasonRepository.save(ShowSeason.builder()
+            .media(show).seasonNumber(1).name("Season 1").episodeCount(3)
+            .lastTmdbSyncAt(java.time.LocalDateTime.now()).build());
+        showEpisodeRepository.save(ShowEpisode.builder()
+            .media(show).seasonNumber(1).episodeNumber(1).title("Episode 1")
+            .airDate(java.time.LocalDate.of(2020, 1, 1)).lastTmdbSyncAt(java.time.LocalDateTime.now()).build());
+        showEpisodeRepository.save(ShowEpisode.builder()
+            .media(show).seasonNumber(1).episodeNumber(2).title("Episode 2")
+            .airDate(java.time.LocalDate.of(2020, 1, 8)).lastTmdbSyncAt(java.time.LocalDateTime.now()).build());
+        showEpisodeRepository.save(ShowEpisode.builder()
+            .media(show).seasonNumber(1).episodeNumber(3).title("Episode 3")
+            .airDate(java.time.LocalDate.of(2020, 1, 15)).lastTmdbSyncAt(java.time.LocalDateTime.now()).build());
+
+        UserShowTracking tracking = UserShowTracking.builder()
+            .user(user).media(show).status(WatchStatus.WATCHING).episodeWatches(new java.util.ArrayList<>()).build();
+        tracking.getEpisodeWatches().add(UserEpisodeWatch.builder()
+            .userShowTracking(tracking).seasonNumber(1).episodeNumber(2)
+            .watchedAt(java.time.LocalDateTime.now()).build());
+        userShowTrackingRepository.save(tracking);
+
+        mockMvc.perform(get("/api/v1/shows/{tmdbId}/seasons/{seasonNumber}/episodes", 37860L, 1)
+            .header("Authorization", bearerToken(user)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content[0].watched").value(false))
+            .andExpect(jsonPath("$.content[1].watched").value(true))
+            .andExpect(jsonPath("$.content[2].watched").value(false));
     }
 
     @Test

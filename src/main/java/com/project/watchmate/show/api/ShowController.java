@@ -23,7 +23,7 @@ import com.project.watchmate.show.metadata.dto.ShowDetailsDTO;
 import com.project.watchmate.show.tracking.dto.ShowTrackingDTO;
 import com.project.watchmate.show.jobs.dto.ShowTrackingJobDTO;
 import com.project.watchmate.show.tracking.dto.ShowTrackingStatusDTO;
-import com.project.watchmate.show.metadata.dto.ShowSeasonsDetailsDTO;
+import com.project.watchmate.show.metadata.dto.ShowEpisodeDetailsDTO;
 import com.project.watchmate.show.tracking.dto.UpdateShowTrackingPositionRequestDTO;
 import com.project.watchmate.common.dto.UpdateWatchStatusRequestDTO;
 import com.project.watchmate.show.tracking.dto.WatchedEpisodeDTO;
@@ -181,20 +181,30 @@ public class ShowController {
     }
 
     @GetMapping("/{tmdbId}/seasons/{seasonNumber}/episodes")
-    @Operation(summary = "Get public show season episodes", description = "Returns public episode details for one requested season. Season and episode metadata is cached lazily per season, and authenticated responses include watched flags from canonical watched-episode rows.")
+    @Operation(
+        summary = "Get public show season episodes",
+        description = "Returns paginated public episode details for one requested season. " +
+            "Season and episode metadata is cached lazily per season. " +
+            "Authenticated responses include watched flags from canonical watched-episode rows. " +
+            "Maximum page size is 20; requests with size > 20 are rejected with 400."
+    )
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Public season episode details returned", content = @Content(schema = @Schema(implementation = ShowSeasonsDetailsDTO.class))),
-        @ApiResponse(responseCode = "400", description = "Invalid request parameter", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "200", description = "Paginated public season episode details returned", content = @Content(schema = @Schema(implementation = ShowEpisodeDetailsDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid request parameter (e.g. negative page, size < 1 or size > 20)", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "404", description = "Show or season not found", content = @Content(schema = @Schema(implementation = ApiError.class))),
         @ApiResponse(responseCode = "500", description = "Unexpected server error", content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<ShowSeasonsDetailsDTO> getShowSeasonDetails(
+    public ResponseEntity<Page<ShowEpisodeDetailsDTO>> getShowSeasonDetails(
         @PathVariable @Min(1) Long tmdbId,
         @PathVariable @Min(0) Integer seasonNumber,
+        @Parameter(description = "Zero-based page index (default 0)")
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @Parameter(description = "Page size, 1–20 (default 20)")
+        @RequestParam(defaultValue = "20") @Min(1) @Max(20) int size,
         @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
         Users user = userPrincipal == null ? null : userPrincipal.getUser();
-        return ResponseEntity.ok(showMetadataService.getShowSeasonDetails(tmdbId, seasonNumber, MEDIA_TYPE, user));
+        return ResponseEntity.ok(showMetadataService.getShowSeasonDetails(tmdbId, seasonNumber, MEDIA_TYPE, user, page, size));
     }
 
     @GetMapping("/{tmdbId}/reviews")
