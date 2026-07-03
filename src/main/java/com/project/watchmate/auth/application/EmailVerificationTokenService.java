@@ -86,30 +86,118 @@ public class EmailVerificationTokenService {
 
         String verificationLink = appDomain + "/verify-email?token=" + token;
 
-        String bodyText = String.format("""
-            <html>
-            <body>
-                <p>Hello,</p>
-                <p>Thank you for registering with <strong>WatchMate</strong>!</p>
-                <p>Please verify your email by clicking the button below:</p>
-                <p>
-                    <a href="%s" style="
-                        background-color:rgb(240, 84, 53);
-                        color: white;
-                        padding: 10px 20px;
-                        text-decoration: none;
-                        display: inline-block;
-                        border-radius: 5px;
-                        font-weight: bold;
-                    ">
-                        Click here to verify
-                    </a>
-                </p>
-                <p>This link will expire in 15 minutes.</p>
-                <p>– WatchMate Team</p>
+        String bodyText = """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta name="color-scheme" content="dark">
+                <meta name="supported-color-schemes" content="dark">
+                <title>Verify your email</title>
+            </head>
+            <body style="margin:0; padding:0; background-color:#0c0d0d; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;">
+                <!-- Preheader (hidden preview text) -->
+                <div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">
+                    Confirm your email to start tracking what you watch. This link expires in 15 minutes.
+                </div>
+
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#0c0d0d;">
+                    <tr>
+                        <td align="center" style="padding:48px 16px;">
+                            <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:560px; max-width:100%;">
+
+                                <!-- Brand -->
+                                <tr>
+                                    <td align="center" style="padding-bottom:28px;">
+                                        <span style="font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:22px; font-weight:800; letter-spacing:-0.5px; color:#edefee;">Watch<span style="color:#45c793;">Mate</span></span>
+                                    </td>
+                                </tr>
+
+                                <!-- Card -->
+                                <tr>
+                                    <td style="background-color:#16181a; border:1px solid #26292b; border-radius:14px; overflow:hidden;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+
+                                            <!-- Jade accent bar -->
+                                            <tr>
+                                                <td style="height:4px; background-color:#2fae7e; font-size:0; line-height:0;">&nbsp;</td>
+                                            </tr>
+
+                                            <tr>
+                                                <td style="padding:44px 44px 40px 44px;">
+
+                                                    <h1 style="margin:0 0 14px 0; font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:26px; line-height:34px; font-weight:700; letter-spacing:-0.4px; color:#edefee;">
+                                                        Verify your email address
+                                                    </h1>
+
+                                                    <p style="margin:0 0 28px 0; font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:15px; line-height:24px; color:#b4b9b7;">
+                                                        Welcome to WatchMate! You're one step away from tracking, rating, and discovering everything you watch. Confirm your email address to activate your account.
+                                                    </p>
+
+                                                    <!-- CTA button -->
+                                                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 28px auto;">
+                                                        <tr>
+                                                            <td align="center" style="background-color:#45c793; border-radius:10px;">
+                                                                <a href="{{VERIFICATION_LINK}}" target="_blank" style="display:inline-block; padding:14px 40px; font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:15px; font-weight:700; letter-spacing:0.2px; color:#06231a; text-decoration:none; border-radius:10px;">
+                                                                    Verify Email
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+
+                                                    <!-- Expiry note -->
+                                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
+                                                        <tr>
+                                                            <td align="center" style="background-color:#1d1f21; border:1px solid #26292b; border-radius:8px; padding:12px 16px; font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:13px; line-height:20px; color:#7f8583;">
+                                                                &#9202;&nbsp; This link expires in <span style="color:#6fd1a8; font-weight:600;">15 minutes</span>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+
+                                                    <!-- Divider -->
+                                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                                        <tr>
+                                                            <td style="height:1px; background-color:#26292b; font-size:0; line-height:0;">&nbsp;</td>
+                                                        </tr>
+                                                    </table>
+
+                                                    <!-- Fallback link -->
+                                                    <p style="margin:24px 0 6px 0; font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:13px; line-height:20px; color:#7f8583;">
+                                                        If the button doesn't work, copy and paste this link into your browser:
+                                                    </p>
+                                                    <p style="margin:0; word-break:break-all; font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:13px; line-height:20px;">
+                                                        <a href="{{VERIFICATION_LINK}}" target="_blank" style="color:#2fae7e; text-decoration:underline;">{{VERIFICATION_LINK}}</a>
+                                                    </p>
+
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <!-- Footer -->
+                                <tr>
+                                    <td align="center" style="padding:28px 24px 0 24px;">
+                                        <p style="margin:0 0 6px 0; font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:12px; line-height:18px; color:#7f8583;">
+                                            You're receiving this email because an account was created on WatchMate with this address.
+                                        </p>
+                                        <p style="margin:0; font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:12px; line-height:18px; color:#7f8583;">
+                                            If this wasn't you, you can safely ignore this email.
+                                        </p>
+                                        <p style="margin:16px 0 0 0; font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:12px; line-height:18px; color:#7f8583;">
+                                            &#169; 2026 <span style="color:#b4b9b7; font-weight:600;">WatchMate</span>
+                                        </p>
+                                    </td>
+                                </tr>
+
+                            </table>
+                        </td>
+                    </tr>
+                </table>
             </body>
             </html>
-            """, verificationLink);
+            """.replace("{{VERIFICATION_LINK}}", verificationLink);
 
             Destination destination = Destination.builder()
             .toAddresses(toEmail)
