@@ -6,8 +6,6 @@ services:
     container_name: watchmate-app
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
     extra_hosts: 
