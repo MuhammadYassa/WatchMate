@@ -77,7 +77,8 @@ import static org.mockito.Mockito.mock;
 	"management.health.redis.enabled=false",
 	"watchmate.discovery.sync.startup-enabled=false",
 	"watchmate.show-jobs.poll-delay-ms=3600000",
-	"watchmate.rate-limit.enabled=false"
+	"watchmate.rate-limit.enabled=false",
+	"watchmate.cors.allowed-origins=http://localhost:5173,http://127.0.0.1:5173"
 })
 public abstract class AbstractIntegrationTest {
 
